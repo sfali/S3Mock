@@ -23,7 +23,7 @@ lazy val root = (project in file("."))
       val akkaVersion = "2.5.12"
       val akkaHttpVersion = "10.1.1"
       val circeVersion = "0.9.0"
-      val amazonawsVersion = "1.11.314"
+      val amazonawsVersion = "1.11.328"
 
       val akka = "com.typesafe.akka"
       val scalaTest = "org.scalatest"
@@ -49,6 +49,8 @@ lazy val root = (project in file("."))
         heikoseeberger   %% "akka-http-circe"                   % "1.18.0",
         scalaLangModules %% "scala-xml"                         % "1.0.6",
         amazonaws        % "aws-java-sdk-s3"                    % amazonawsVersion,
+        amazonaws        % "aws-java-sdk-sqs"                   % amazonawsVersion,
+        amazonaws        % "aws-java-sdk-sns"                   % amazonawsVersion,
         akka             %% "akka-testkit"                      % akkaVersion       % "it, test",
         scalaTest        %% "scalatest"                         % "3.0.4"           % "it, test",
         scalacheck       %% "scalacheck"                        % "1.13.5"          % "it, test",
