@@ -45,37 +45,49 @@ class Settings(config: Config) {
   }
 
   object sqs {
-    private val endPoint: Option[EndpointConfiguration] = {
-      val endPoint = config.getString("app.sqs.end-point")
-      if (endPoint.isEmpty) None else Some(new EndpointConfiguration(endPoint, aws.region))
-    }
-    val queueUrl: String = config.getString("app.sqs.queue-url")
-    private val builder =
-      AmazonSQSAsyncClientBuilder
-        .standard()
-        .withCredentials(aws.credentialsProvider)
-    val sqsClient: AmazonSQSAsync =
-      endPoint
-        .map(ep => builder.withEndpointConfiguration(ep))
-        .getOrElse(builder)
-        .build()
+    val maybeQueueUrl: Option[String] = getOptionalString("app.sqs.queue-url")
+
+    private val maybeEndpointConfiguration: Option[EndpointConfiguration] =
+      getOptionalEndpointConfiguration("app.sqs.end-point")
+
+    private val maybeBuilder: Option[AmazonSQSAsyncClientBuilder] =
+      maybeQueueUrl
+        .map { _ =>
+          AmazonSQSAsyncClientBuilder
+            .standard()
+            .withCredentials(aws.credentialsProvider)
+        }
+
+    val maybeSqsClient: Option[AmazonSQSAsync] =
+      (maybeBuilder, maybeEndpointConfiguration) match {
+        case (None, _) => None
+        case (Some(builder), Some(endpointConfiguration)) =>
+          Some(builder.withEndpointConfiguration(endpointConfiguration).build())
+        case (Some(builder), None) => Some(builder.build())
+      }
   }
 
   object sns {
-    private val endPoint: Option[EndpointConfiguration] = {
-      val endPoint = config.getString("app.sns.end-point")
-      if (endPoint.isEmpty) None else Some(new EndpointConfiguration(endPoint, aws.region))
-    }
-    val topicArn: String = config.getString("app.sns.topic-arn")
-    private val builder =
-      AmazonSNSAsyncClientBuilder
-        .standard()
-        .withCredentials(aws.credentialsProvider)
-    val snsClient: AmazonSNSAsync =
-      endPoint
-        .map(ep => builder.withEndpointConfiguration(ep))
-        .getOrElse(builder)
-        .build()
+    val maybeTopicArn: Option[String] = getOptionalString("app.sns.topic-arn")
+
+    private val maybeEndpointConfiguration: Option[EndpointConfiguration] =
+      getOptionalEndpointConfiguration("app.sns.end-point")
+
+    private val maybeBuilder: Option[AmazonSNSAsyncClientBuilder] =
+      maybeTopicArn
+        .map { _ =>
+          AmazonSNSAsyncClientBuilder
+            .standard()
+            .withCredentials(aws.credentialsProvider)
+        }
+
+    val maybeSnsClient: Option[AmazonSNSAsync] =
+      (maybeBuilder, maybeEndpointConfiguration) match {
+        case (None, _) => None
+        case (Some(builder), Some(endpointConfiguration)) =>
+          Some(builder.withEndpointConfiguration(endpointConfiguration).build())
+        case (Some(builder), None) => Some(builder.build())
+      }
   }
 
   private def initializeList(path: String): List[String] = {
@@ -84,6 +96,17 @@ class Settings(config: Config) {
       Try(maybeValue.get.split(",")).toOption.map(_.toList).getOrElse(Nil)
     else Nil
   }
+
+  private def getOptionalString(keyPath: String): Option[String] = {
+    val value = config.getString(keyPath)
+    if (Option(value).isDefined && value.trim.nonEmpty) Some(value.trim) else None
+  }
+
+  private def getOptionalEndpointConfiguration(keyPath: String): Option[EndpointConfiguration] = {
+    val endPoint = config.getString(keyPath)
+    if (endPoint.isEmpty) None else Some(new EndpointConfiguration(endPoint, aws.region))
+  }
+
 
 }
 
