@@ -17,7 +17,7 @@ package object data {
   }
 
   case class BootstrapConfiguration(initialBuckets: List[InitialBucket] = Nil,
-                                    Notifications: List[Notification] = Nil)
+                                    notifications: List[Notification] = Nil)
 
   object BootstrapConfiguration {
     implicit val BootstrapDataDecoder: Decoder[BootstrapConfiguration] =

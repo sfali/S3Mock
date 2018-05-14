@@ -4,11 +4,11 @@ import akka.actor.{Actor, ActorLogging, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import com.loyalty.testing.s3.Settings
 import com.loyalty.testing.s3.notification.DestinationType.DestinationType
-import com.loyalty.testing.s3.notification.{DestinationType, NotificationData}
+import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationData}
 
 import scala.concurrent.duration._
 
-class NotificationRouter(implicit settings: Settings)
+class NotificationRouter(notifications: List[Notification])(implicit settings: Settings)
   extends Actor
     with ActorLogging {
 
@@ -49,8 +49,8 @@ class NotificationRouter(implicit settings: Settings)
 
 object NotificationRouter {
 
-  def props()(implicit settings: Settings): Props =
-    Props(new NotificationRouter())
+  def props(notifications: List[Notification] = Nil)
+           (implicit settings: Settings): Props = Props(new NotificationRouter(notifications))
 
   case class SendNotification(destinationType: DestinationType,
                               name: String,

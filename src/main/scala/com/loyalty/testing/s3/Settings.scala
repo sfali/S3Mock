@@ -22,8 +22,6 @@ class Settings(config: Config) {
   object bootstrap {
     val dataPath: Option[Path] = getOptionalString("app.bootstrap.data-path")
       .map(path => Paths.get(path).toAbsolutePath)
-    val initialBuckets: List[String] = initializeList("app.bootstrap.initial-buckets")
-    val versionedBuckets: List[String] = initializeList("app.bootstrap.versioned-buckets")
   }
 
   object aws {
