@@ -72,14 +72,14 @@ class S3MockAwsClientSpec
   }*/
 
   it should "upload multipart" in {
-    val key = "/input/upload.txt"
+    val key = "input/upload.txt"
     val path = Paths.get("src", "it", "resources", "sample.txt").toAbsolutePath
     val completeResult = s3Client.multipartUpload(defaultBucketName, key, path)
     log.info("Multipart complete {}:{}", completeResult.getETag, completeResult.getVersionId)
   }
 
   it should "get object" in {
-    val key = "/input/upload.txt"
+    val key = "input/upload.txt"
     val s3Object = s3Client.getObject(defaultBucketName, key)
     val s3ObjectInputStream = s3Object.getObjectContent
 
@@ -93,7 +93,7 @@ class S3MockAwsClientSpec
   }
 
   it should "..." in {
-    val key = "/input/upload.txt"
+    val key = "input/upload.txt"
     val metadata = s3Client.getObjectMetadata(defaultBucketName, key)
     log.info("((((( {}:{} )))))", metadata.getContentLength, metadata.getVersionId)
   }
