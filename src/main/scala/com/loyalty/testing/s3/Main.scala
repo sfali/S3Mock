@@ -7,6 +7,7 @@ import akka.actor.ActorSystem
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.server.HttpApp
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
+import com.loyalty.testing.s3.notification.actor.NotificationRouter
 import com.loyalty.testing.s3.repositories.{FileRepository, FileStore}
 import com.loyalty.testing.s3.request.{BucketVersioning, CreateBucketConfiguration}
 import com.loyalty.testing.s3.routes.S3Routes
@@ -31,6 +32,8 @@ object Main extends HttpApp with App with S3Routes {
   private val initialBuckets: List[String] = settings.bootstrap.initialBuckets
   private val versionedBuckets: List[String] = settings.bootstrap.versionedBuckets
 
+  private val notificationRouter = system.actorOf(NotificationRouter.props(), "notification-router")
+
   initialBuckets
     .foreach {
       bucketName =>
@@ -42,7 +45,6 @@ object Main extends HttpApp with App with S3Routes {
             case Failure(ex) => log.warning("Failed to create bucket: {}, message {}", ex.getMessage)
           }
     }
-
 
   override protected def routes = s3Routes
 
