@@ -7,6 +7,8 @@ import java.security.MessageDigest
 import java.util.UUID
 
 import com.amazonaws.services.s3.model.{ObjectMetadata, PutObjectResult}
+import com.amazonaws.services.sns.AmazonSNSAsync
+import com.amazonaws.services.sqs.AmazonSQSAsync
 import com.loyalty.testing.s3.request.UploadPart
 import com.loyalty.testing.s3.response.CompleteMultipartUploadResult
 import javax.xml.bind.DatatypeConverter
@@ -88,6 +90,16 @@ package object s3 {
         result.setVersionId(versionId)
         result
     }
+  }
+
+  trait SqsSettings {
+    val maybeQueueUrl: Option[String]
+    val maybeSqsClient: Option[AmazonSQSAsync]
+  }
+
+  trait SnsSettings {
+    val maybeTopicArn: Option[String]
+    val maybeSnsClient: Option[AmazonSNSAsync]
   }
 
   private def createDirectories(path: Path): Unit = {

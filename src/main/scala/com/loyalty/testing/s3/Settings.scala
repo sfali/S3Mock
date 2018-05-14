@@ -44,8 +44,8 @@ class Settings(config: Config) {
     }
   }
 
-  object sqs {
-    val maybeQueueUrl: Option[String] = getOptionalString("app.sqs.queue-url")
+  object sqs extends SqsSettings {
+    override val maybeQueueUrl: Option[String] = getOptionalString("app.sqs.queue-url")
 
     private val maybeEndpointConfiguration: Option[EndpointConfiguration] =
       getOptionalEndpointConfiguration("app.sqs.end-point")
@@ -58,7 +58,7 @@ class Settings(config: Config) {
             .withCredentials(aws.credentialsProvider)
         }
 
-    val maybeSqsClient: Option[AmazonSQSAsync] =
+    override val maybeSqsClient: Option[AmazonSQSAsync] =
       (maybeBuilder, maybeEndpointConfiguration) match {
         case (None, _) => None
         case (Some(builder), Some(endpointConfiguration)) =>
@@ -67,8 +67,8 @@ class Settings(config: Config) {
       }
   }
 
-  object sns {
-    val maybeTopicArn: Option[String] = getOptionalString("app.sns.topic-arn")
+  object sns extends SnsSettings {
+    override val maybeTopicArn: Option[String] = getOptionalString("app.sns.topic-arn")
 
     private val maybeEndpointConfiguration: Option[EndpointConfiguration] =
       getOptionalEndpointConfiguration("app.sns.end-point")
@@ -81,7 +81,7 @@ class Settings(config: Config) {
             .withCredentials(aws.credentialsProvider)
         }
 
-    val maybeSnsClient: Option[AmazonSNSAsync] =
+    override val maybeSnsClient: Option[AmazonSNSAsync] =
       (maybeBuilder, maybeEndpointConfiguration) match {
         case (None, _) => None
         case (Some(builder), Some(endpointConfiguration)) =>
