@@ -2,6 +2,7 @@ package com.loyalty.testing.s3.route
 
 import java.nio.file.{Path, Paths}
 
+import akka.actor.ActorRef
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers._
@@ -9,14 +10,13 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpHeader}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
+import akka.testkit.TestProbe
 import com.amazonaws.services.s3.Headers
+import com.loyalty.testing.s3.Settings
 import com.loyalty.testing.s3.repositories.{FileRepository, FileStore}
 import com.loyalty.testing.s3.routes.S3Routes
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, MustMatchers}
-
-import scala.util.Failure
-import scala.util.Success
 
 class RoutesSpec
   extends FlatSpecLike
@@ -34,6 +34,8 @@ class RoutesSpec
   override protected implicit val mat: ActorMaterializer = ActorMaterializer()
   override protected val log: LoggingAdapter = system.log
   override protected val repository: FileRepository = FileRepository(FileStore(dataPath), log)
+  private implicit val settings: Settings = Settings()
+  override protected val notificationRouter: ActorRef = TestProbe().ref
 
   override protected def afterAll(): Unit = {
     super.afterAll()

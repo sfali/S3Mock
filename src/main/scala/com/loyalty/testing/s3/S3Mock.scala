@@ -1,9 +1,10 @@
 package com.loyalty.testing.s3
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.Http
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
+import com.loyalty.testing.s3.notification.actor.NotificationRouter
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.routes.S3Routes
 
@@ -14,6 +15,8 @@ class S3Mock(implicit val system: ActorSystem, override val repository: Reposito
 
   override protected implicit val log: LoggingAdapter = system.log
   override protected implicit val mat: ActorMaterializer = ActorMaterializer(ActorMaterializerSettings(system))
+  private implicit val settings: Settings = Settings()
+  override protected val notificationRouter: ActorRef = system.actorOf(NotificationRouter.props())
 
   private val http = Http()
   private var bind: Http.ServerBinding = _
