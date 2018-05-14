@@ -31,10 +31,24 @@ class NotificationRouter(notifications: List[Notification])(implicit settings: S
   }
 
   override def receive: Receive = {
-    case SendNotification(destinationType, name, notificationData) if destinationType == Sqs =>
+    case SendNotification(notificationData) =>
+      if (notifications.nonEmpty) {
+        notifications
+          .foreach {
+            notification =>
+              val bucketMatch = notification.bucketName == notificationData.bucketName
+              val prefixMatch = notification.prefix.exists(notificationData.key.startsWith)
+              val suffixMatch = notification.suffix.exists(notificationData.key.endsWith)
+              if (bucketMatch && prefixMatch && suffixMatch) {
+                self ! SendNotificationToDestination(notification.destinationType, notification.name, notificationData)
+              }
+          }
+      }
+
+    case SendNotificationToDestination(destinationType, name, notificationData) if destinationType == Sqs =>
       router.route(SqsNotification(name, notificationData), sender())
 
-    case SendNotification(destinationType, name, notificationData) if destinationType == Sns =>
+    case SendNotificationToDestination(destinationType, name, notificationData) if destinationType == Sns =>
       router.route(SnsNotification(name, notificationData), sender())
 
     case Terminated(a) =>
@@ -52,8 +66,10 @@ object NotificationRouter {
   def props(notifications: List[Notification] = Nil)
            (implicit settings: Settings): Props = Props(new NotificationRouter(notifications))
 
-  case class SendNotification(destinationType: DestinationType,
-                              name: String,
-                              notificationData: NotificationData)
+  case class SendNotification(notificationData: NotificationData)
+
+  private case class SendNotificationToDestination(destinationType: DestinationType,
+                                                   name: String,
+                                                   notificationData: NotificationData)
 
 }

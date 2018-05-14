@@ -3,7 +3,7 @@ package com.loyalty.testing.s3
 import java.nio.file.{Files, Paths}
 
 import akka.Done
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.server.HttpApp
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
@@ -50,7 +50,9 @@ object Main extends HttpApp with App with S3Routes {
       case None => Nil
     }
 
-  private val notificationRouter = system.actorOf(NotificationRouter.props(notifications), "notification-router")
+  override protected val notificationRouter: ActorRef = system.actorOf(
+    NotificationRouter.props(notifications),
+    "notification-router")
 
   override protected def routes = s3Routes
 
