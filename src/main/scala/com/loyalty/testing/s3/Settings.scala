@@ -1,5 +1,7 @@
 package com.loyalty.testing.s3
 
+import java.nio.file.{Path, Paths}
+
 import akka.actor.ActorSystem
 import com.amazonaws.auth._
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
@@ -18,6 +20,8 @@ class Settings(config: Config) {
   }
 
   object bootstrap {
+    val dataPath: Option[Path] = getOptionalString("app.bootstrap.data-path")
+      .map(path => Paths.get(path).toAbsolutePath)
     val initialBuckets: List[String] = initializeList("app.bootstrap.initial-buckets")
     val versionedBuckets: List[String] = initializeList("app.bootstrap.versioned-buckets")
   }

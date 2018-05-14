@@ -4,11 +4,12 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
 
 import io.circe._
-import io.circe.syntax._
 import io.circe.generic.semiauto._
 import io.circe.java8.time.{decodeZonedDateTime, encodeZonedDateTime}
 
 package object notification {
+
+  import parser._
 
   implicit final val decodeZonedDateTimeDefault: Decoder[ZonedDateTime] =
     decodeZonedDateTime(ISO_OFFSET_DATE_TIME)
@@ -108,22 +109,6 @@ package object notification {
       deriveEncoder[UserIdentity]
   }
 
-  private val printer =
-    Printer(
-      preserveOrder = true,
-      dropNullValues = true,
-      indent = " ",
-      lbraceRight = " ",
-      rbraceLeft = " ",
-      lbracketRight = System.lineSeparator(),
-      rbracketLeft = System.lineSeparator(),
-      lrbracketsEmpty = System.lineSeparator(),
-      arrayCommaRight = System.lineSeparator(),
-      objectCommaRight = " ",
-      colonLeft = " ",
-      colonRight = " "
-    )
-
   def generateSqsMessage(name: String,
                          notificationData: NotificationData): String = {
     val s3Object = S3Object(notificationData.key,
@@ -131,8 +116,7 @@ package object notification {
       notificationData.eTag,
       notificationData.maybeVersionId)
     val bucket = Bucket(notificationData.bucketName)
-    val s3 = S3(configurationId = name, bucket = bucket, `object` = s3Object)
-    printer.pretty(SqsEvent(SqsRecord(s3 = s3) :: Nil).asJson)
+    toJsonString(S3(configurationId = name, bucket = bucket, `object` = s3Object))
   }
 
 }
