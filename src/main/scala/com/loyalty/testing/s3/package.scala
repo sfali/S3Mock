@@ -71,7 +71,7 @@ package object s3 {
     val hex = md5Hex(parts.map(_.eTag).mkString)
     val eTag = s"$hex-${parts.length}"
 
-    CompleteMultipartUploadResult(bucketName, key, eTag, maybeVersionId)
+    CompleteMultipartUploadResult(bucketName, key, eTag, 0L, maybeVersionId)
   }
 
   def createPutObjectResult(eTag: String,
