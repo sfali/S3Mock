@@ -1,3 +1,5 @@
+import sbtrelease.ReleaseStateTransformations._
+
 name := "s3mock"
 
 lazy val commonSettings =
@@ -62,6 +64,17 @@ lazy val root = (project in file("."))
     }
   )
   .enablePlugins(JavaAppPackaging)
+
+releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,
+  inquireVersions,
+  setReleaseVersion,
+  commitReleaseVersion,
+  tagRelease,
+  setNextVersion,
+  commitNextVersion,
+  pushChanges
+)
 
 dockerRepository := Some("loyaltyone")
 dockerBaseImage := "loyaltyone/docker-slim-java-node:jre-8-node-8"
