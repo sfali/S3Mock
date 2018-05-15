@@ -67,7 +67,7 @@ object NotificationRouter {
                                                    configName: String,
                                                    notificationData: NotificationData)
 
-  private class RouterState(context: ActorContext) {
+  private class RouterState(context: ActorContext)(implicit settings: Settings) {
     private var _router: Router = {
       val routees = Vector.fill(5) {
         val r = context.actorOf(NotificationActor.props())
