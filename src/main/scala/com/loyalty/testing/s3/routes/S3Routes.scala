@@ -38,7 +38,7 @@ trait S3Routes {
           CopyMultipartRoute().route(bucketName, objectName),
           UploadMultipartRoute().route(bucketName, objectName),
           InitiateMultipartUploadRoute().route(bucketName, objectName),
-          PutObjectRoute().route(bucketName, objectName),
+          PutObjectRoute(notificationRouter).route(bucketName, objectName),
           GetObjectRoute().route(bucketName, objectName),
           DeleteObjectRoute().route(bucketName, objectName)
         )
