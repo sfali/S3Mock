@@ -1,6 +1,6 @@
 package com.loyalty.testing.s3.notification.actor
 
-import akka.actor.{Actor, ActorLogging, Props, Terminated}
+import akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import com.loyalty.testing.s3.Settings
 import com.loyalty.testing.s3.notification.DestinationType.DestinationType
@@ -16,14 +16,7 @@ class NotificationRouter(notifications: List[Notification])(implicit settings: S
   import NotificationActor._
   import NotificationRouter._
 
-  private var router: Router = {
-    val routees = Vector.fill(5) {
-      val r = context.actorOf(NotificationActor.props())
-      context.watch(r)
-      ActorRefRoutee(r)
-    }
-    Router(RoundRobinRoutingLogic(), routees)
-  }
+  private val routerState = new RouterState(context)
 
   override def preStart(): Unit = {
     super.preStart()
@@ -50,17 +43,13 @@ class NotificationRouter(notifications: List[Notification])(implicit settings: S
 
     case SendNotificationToDestination(destinationType, destinationName, configName, notificationData)
       if destinationType == Sqs =>
-      router.route(SqsNotification(destinationName, configName, notificationData), sender())
+      routerState.router.route(SqsNotification(destinationName, configName, notificationData), sender())
 
     case SendNotificationToDestination(destinationType, destinationName, configName, notificationData)
       if destinationType == Sns =>
-      router.route(SnsNotification(destinationName, configName, notificationData), sender())
+      routerState.router.route(SnsNotification(destinationName, configName, notificationData), sender())
 
-    case Terminated(a) =>
-      router = router.removeRoutee(a)
-      val r = context.actorOf(NotificationActor.props())
-      context.watch(r)
-      router = router.addRoutee(r)
+    case Terminated(a) => routerState.removeRoutee(a)
 
     case msg => log.warning("Unhandled message: {}", msg)
   }
@@ -77,5 +66,25 @@ object NotificationRouter {
                                                    destinationName: String,
                                                    configName: String,
                                                    notificationData: NotificationData)
+
+  private class RouterState(context: ActorContext) {
+    private var _router: Router = {
+      val routees = Vector.fill(5) {
+        val r = context.actorOf(NotificationActor.props())
+        context.watch(r)
+        ActorRefRoutee(r)
+      }
+      Router(RoundRobinRoutingLogic(), routees)
+    }
+
+    def router: Router = _router
+
+    def removeRoutee(actorRef: ActorRef): Unit = {
+      _router = _router.removeRoutee(actorRef)
+      val r = context.actorOf(NotificationActor.props())
+      context.watch(r)
+      _router = _router.addRoutee(r)
+    }
+  }
 
 }
