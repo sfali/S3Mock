@@ -12,9 +12,9 @@ class NotificationRouter(notifications: List[Notification])(implicit settings: S
   extends Actor
     with ActorLogging {
 
+  import DestinationType._
   import NotificationActor._
   import NotificationRouter._
-  import DestinationType._
 
   private var router: Router = {
     val routees = Vector.fill(5) {
@@ -40,16 +40,21 @@ class NotificationRouter(notifications: List[Notification])(implicit settings: S
               val prefixMatch = notification.prefix.exists(notificationData.key.startsWith)
               val suffixMatch = notification.suffix.exists(notificationData.key.endsWith)
               if (bucketMatch && prefixMatch && suffixMatch) {
-                self ! SendNotificationToDestination(notification.destinationType, notification.name, notificationData)
+                self ! SendNotificationToDestination(notification.destinationType,
+                  notification.destinationName, notification.name, notificationData)
               }
           }
+      } else {
+        log.warning("No notification is setup for bucket: {}", notificationData.bucketName)
       }
 
-    case SendNotificationToDestination(destinationType, name, notificationData) if destinationType == Sqs =>
-      router.route(SqsNotification(name, notificationData), sender())
+    case SendNotificationToDestination(destinationType, destinationName, configName, notificationData)
+      if destinationType == Sqs =>
+      router.route(SqsNotification(destinationName, configName, notificationData), sender())
 
-    case SendNotificationToDestination(destinationType, name, notificationData) if destinationType == Sns =>
-      router.route(SnsNotification(name, notificationData), sender())
+    case SendNotificationToDestination(destinationType, destinationName, configName, notificationData)
+      if destinationType == Sns =>
+      router.route(SnsNotification(destinationName, configName, notificationData), sender())
 
     case Terminated(a) =>
       router = router.removeRoutee(a)
@@ -69,7 +74,8 @@ object NotificationRouter {
   case class SendNotification(notificationData: NotificationData)
 
   private case class SendNotificationToDestination(destinationType: DestinationType,
-                                                   name: String,
+                                                   destinationName: String,
+                                                   configName: String,
                                                    notificationData: NotificationData)
 
 }
