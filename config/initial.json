@@ -18,7 +18,7 @@
       "name":"53dba44f-9326-46b1-9b46-37efc5893a79",
       "notificationType":"ObjectCreateAll",
       "destinationType":"Sqs",
-      "destinationName":"l1-dev-issuance-batch",
+      "destinationName":"queue1",
       "bucketName":"l1-dev-issuance-batch",
       "prefix":"input/",
       "suffix":".T"
