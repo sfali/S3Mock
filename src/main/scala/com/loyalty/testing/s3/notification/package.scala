@@ -20,6 +20,8 @@ package object notification {
   case class SqsEvent(Records: List[SqsRecord])
 
   object SqsEvent {
+    def apply(sqsRecord: SqsRecord): SqsEvent = SqsEvent(sqsRecord :: Nil)
+
     implicit val SqsEventDecoder: Decoder[SqsEvent] = deriveDecoder[SqsEvent]
     implicit val SqsEventEncoder: Encoder[SqsEvent] = deriveEncoder[SqsEvent]
   }
@@ -116,7 +118,8 @@ package object notification {
       notificationData.eTag,
       notificationData.maybeVersionId)
     val bucket = Bucket(notificationData.bucketName)
-    toJsonString(S3(configurationId = name, bucket = bucket, `object` = s3Object))
+    val s3 = S3(configurationId = name, bucket = bucket, `object` = s3Object)
+    toJsonString(SqsEvent(SqsRecord(s3 = s3)))
   }
 
 }
