@@ -93,13 +93,11 @@ package object s3 {
   }
 
   trait SqsSettings {
-    val maybeQueueUrl: Option[String]
-    val maybeSqsClient: Option[AmazonSQSAsync]
+    val sqsClient: AmazonSQSAsync
   }
 
   trait SnsSettings {
-    val maybeTopicArn: Option[String]
-    val maybeSnsClient: Option[AmazonSNSAsync]
+    val snsClient: AmazonSNSAsync
   }
 
   private def createDirectories(path: Path): Unit = {
