@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.{Files, Path, Paths}
 import java.security.MessageDigest
 import java.util.UUID
+import java.util.concurrent.CompletableFuture
 
 import com.amazonaws.services.s3.model.{ObjectMetadata, PutObjectResult}
 import com.amazonaws.services.sns.AmazonSNSAsync
@@ -13,7 +14,13 @@ import com.loyalty.testing.s3.request.UploadPart
 import com.loyalty.testing.s3.response.CompleteMultipartUploadResult
 import javax.xml.bind.DatatypeConverter
 
+import scala.concurrent.Future
+
 package object s3 {
+
+  import scala.compat.java8.FutureConverters._
+
+  type JavaFuture[V] = java.util.concurrent.Future[V]
 
   val defaultRegion: String = "us-east-1"
 
@@ -90,6 +97,10 @@ package object s3 {
         result.setVersionId(versionId)
         result
     }
+  }
+
+  implicit class JavaFutureOps[T](future: JavaFuture[T]) {
+    def toScalaFuture: Future[T] =  CompletableFuture.supplyAsync(() => future.get()).toScala
   }
 
   trait SqsSettings {
