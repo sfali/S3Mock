@@ -217,10 +217,11 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
                     if (Files.notExists(filePath)) Future.failed(new RuntimeException("unable to save file"))
                     else {
                       val eTag = digest
+                      val contentLength = Files.size(filePath)
                       val response = ObjectMeta(filePath,
-                        createPutObjectResult(eTag, digest, Files.size(filePath), maybeVersionId))
+                        createPutObjectResult(eTag, digest, contentLength, maybeVersionId))
                       bucketMetadata.putObject(key, response)
-                      Future.successful(result)
+                      Future.successful(result.copy(contentLength = contentLength))
                     }
                 }
             }

@@ -1,13 +1,13 @@
 package com.loyalty.testing.s3
 
+import java.nio.file.{Path, Paths}
+
 import akka.actor.ActorSystem
 import com.amazonaws.auth._
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.services.sns.{AmazonSNSAsync, AmazonSNSAsyncClientBuilder}
 import com.amazonaws.services.sqs.{AmazonSQSAsync, AmazonSQSAsyncClientBuilder}
 import com.typesafe.config.Config
-
-import scala.util.Try
 
 class Settings(config: Config) {
   def this(system: ActorSystem) = this(system.settings.config)
@@ -18,8 +18,8 @@ class Settings(config: Config) {
   }
 
   object bootstrap {
-    val initialBuckets: List[String] = initializeList("app.bootstrap.initial-buckets")
-    val versionedBuckets: List[String] = initializeList("app.bootstrap.versioned-buckets")
+    val dataPath: Option[Path] = getOptionalString("app.bootstrap.data-path")
+      .map(path => Paths.get(path).toAbsolutePath)
   }
 
   object aws {
@@ -44,46 +44,42 @@ class Settings(config: Config) {
     }
   }
 
-  object sqs {
-    private val endPoint: Option[EndpointConfiguration] = {
-      val endPoint = config.getString("app.sqs.end-point")
-      if (endPoint.isEmpty) None else Some(new EndpointConfiguration(endPoint, aws.region))
-    }
-    val queueUrl: String = config.getString("app.sqs.queue-url")
+  object sqs extends SqsSettings {
     private val builder =
       AmazonSQSAsyncClientBuilder
         .standard()
         .withCredentials(aws.credentialsProvider)
+
     val sqsClient: AmazonSQSAsync =
-      endPoint
-        .map(ep => builder.withEndpointConfiguration(ep))
+      getOptionalEndpointConfiguration("app.sqs.end-point")
+        .map(builder.withEndpointConfiguration)
         .getOrElse(builder)
         .build()
   }
 
-  object sns {
-    private val endPoint: Option[EndpointConfiguration] = {
-      val endPoint = config.getString("app.sns.end-point")
-      if (endPoint.isEmpty) None else Some(new EndpointConfiguration(endPoint, aws.region))
-    }
-    val topicArn: String = config.getString("app.sns.topic-arn")
+  object sns extends SnsSettings {
     private val builder =
       AmazonSNSAsyncClientBuilder
         .standard()
         .withCredentials(aws.credentialsProvider)
-    val snsClient: AmazonSNSAsync =
-      endPoint
-        .map(ep => builder.withEndpointConfiguration(ep))
+
+    override val snsClient: AmazonSNSAsync =
+      getOptionalEndpointConfiguration("app.sns.end-point")
+        .map(builder.withEndpointConfiguration)
         .getOrElse(builder)
         .build()
   }
 
-  private def initializeList(path: String): List[String] = {
-    val maybeValue = Option(config.getString(path))
-    if (maybeValue.getOrElse("").trim.nonEmpty)
-      Try(maybeValue.get.split(",")).toOption.map(_.toList).getOrElse(Nil)
-    else Nil
+  private def getOptionalString(keyPath: String): Option[String] = {
+    val value = config.getString(keyPath)
+    if (Option(value).isDefined && value.trim.nonEmpty) Some(value.trim) else None
   }
+
+  private def getOptionalEndpointConfiguration(keyPath: String): Option[EndpointConfiguration] = {
+    val endPoint = config.getString(keyPath)
+    if (endPoint.isEmpty) None else Some(new EndpointConfiguration(endPoint, aws.region))
+  }
+
 
 }
 

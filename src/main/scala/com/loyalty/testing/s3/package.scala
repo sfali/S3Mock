@@ -7,6 +7,8 @@ import java.security.MessageDigest
 import java.util.UUID
 
 import com.amazonaws.services.s3.model.{ObjectMetadata, PutObjectResult}
+import com.amazonaws.services.sns.AmazonSNSAsync
+import com.amazonaws.services.sqs.AmazonSQSAsync
 import com.loyalty.testing.s3.request.UploadPart
 import com.loyalty.testing.s3.response.CompleteMultipartUploadResult
 import javax.xml.bind.DatatypeConverter
@@ -69,7 +71,7 @@ package object s3 {
     val hex = md5Hex(parts.map(_.eTag).mkString)
     val eTag = s"$hex-${parts.length}"
 
-    CompleteMultipartUploadResult(bucketName, key, eTag, maybeVersionId)
+    CompleteMultipartUploadResult(bucketName, key, eTag, 0L, maybeVersionId)
   }
 
   def createPutObjectResult(eTag: String,
@@ -88,6 +90,14 @@ package object s3 {
         result.setVersionId(versionId)
         result
     }
+  }
+
+  trait SqsSettings {
+    val sqsClient: AmazonSQSAsync
+  }
+
+  trait SnsSettings {
+    val snsClient: AmazonSNSAsync
   }
 
   private def createDirectories(path: Path): Unit = {

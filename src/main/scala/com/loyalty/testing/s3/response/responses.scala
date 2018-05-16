@@ -47,7 +47,7 @@ case class CopyPartResult(eTag: String, lastModifiedDate: Instant = Instant.now(
     </CopyPartResult>
 }
 
-case class CompleteMultipartUploadResult(bucketName: String, key: String, eTag: String,
+case class CompleteMultipartUploadResult(bucketName: String, key: String, eTag: String, contentLength: Long,
                                          versionId: Option[String] = None) extends XmlResponse {
   val location = s"http://s3.amazonaws.com/${Paths.get(bucketName, key.decode).toString}"
 

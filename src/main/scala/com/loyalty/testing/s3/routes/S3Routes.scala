@@ -1,5 +1,6 @@
 package com.loyalty.testing.s3.routes
 
+import akka.actor.ActorRef
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
@@ -15,6 +16,7 @@ trait S3Routes {
   protected implicit val mat: ActorMaterializer
   protected implicit val log: LoggingAdapter
   protected implicit val repository: Repository
+  protected val notificationRouter: ActorRef
 
   lazy val s3Routes: Route =
     pathPrefix(Segment) { bucketName =>
@@ -32,11 +34,11 @@ trait S3Routes {
         val objectName = key.toString().decode
         concat(
           GetObjectMetadataRoute().route(bucketName, objectName),
-          CompleteMultipartUploadRoute().route(bucketName, objectName),
+          CompleteMultipartUploadRoute(notificationRouter).route(bucketName, objectName),
           CopyMultipartRoute().route(bucketName, objectName),
           UploadMultipartRoute().route(bucketName, objectName),
           InitiateMultipartUploadRoute().route(bucketName, objectName),
-          PutObjectRoute().route(bucketName, objectName),
+          PutObjectRoute(notificationRouter).route(bucketName, objectName),
           GetObjectRoute().route(bucketName, objectName),
           DeleteObjectRoute().route(bucketName, objectName)
         )
