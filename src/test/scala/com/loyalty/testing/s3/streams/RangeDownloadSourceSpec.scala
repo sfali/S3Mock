@@ -24,6 +24,7 @@ class RangeDownloadSourceSpec
     with BeforeAndAfterEach
     with ScalaFutures {
 
+  import com.loyalty.testing.s3._
   import RangeDownloadSourceSpec._
 
   private val log: LoggingAdapter = system.log
@@ -53,56 +54,62 @@ class RangeDownloadSourceSpec
   }
 
   it should "download entire file when range is not provided with chunk size less than file size" in {
-    val source = RangeDownloadSource.fromPath(path, 43)
+    val source = RangeDownloadSource.fromPath(path, 43, getDownloadRange(path))
     val eventualResult = source.toMat(Sink.seq)(Keep.both).run()
     whenReady(eventualResult._1)(validateIOResult(1000))
     whenReady(eventualResult._2)(validateString(expectedString(20)))
   }
 
   it should "download entire file when range is not provided with chunk size greater than file size" in {
-    val source = RangeDownloadSource.fromPath(path)
+    val source = RangeDownloadSource.fromPath(path, downloadRange = getDownloadRange(path))
     val eventualResult = source.toMat(Sink.seq)(Keep.both).run()
     whenReady(eventualResult._1)(validateIOResult(1000))
     whenReady(eventualResult._2)(validateString(expectedString(20)))
   }
 
   it should "download slice of bytes of a file with chunk size greater than number of bytes" in {
-    val source = RangeDownloadSource.fromPath(path, maybeRange = Some(ByteRange(0, 48)))
+    val source = RangeDownloadSource.fromPath(path, downloadRange =
+      getDownloadRange(path, Some(ByteRange(0, 48))))
     val eventualResult = source.toMat(Sink.seq)(Keep.both).run()
     whenReady(eventualResult._1)(validateIOResult(48))
     whenReady(eventualResult._2)(validateString(line))
   }
 
   it should "download slice of bytes of a file with chunk size less than number of bytes" in {
-    val source = RangeDownloadSource.fromPath(path, chunkSize = 7, maybeRange = Some(ByteRange(0, 48)))
+    val source = RangeDownloadSource.fromPath(path, chunkSize = 7, downloadRange =
+      getDownloadRange(path, Some(ByteRange(0, 48))))
     val eventualResult = source.toMat(Sink.seq)(Keep.both).run()
     whenReady(eventualResult._1)(validateIOResult(48))
     whenReady(eventualResult._2)(validateString(line))
   }
 
   it should "download offset of bytes of a file with chunk size greater than number of bytes" in {
-    val source = RangeDownloadSource.fromPath(path, maybeRange = Some(ByteRange.fromOffset(900)))
+    val source = RangeDownloadSource.fromPath(path, downloadRange =
+      getDownloadRange(path, Some(ByteRange.fromOffset(900))))
     val eventualResult = source.toMat(Sink.seq)(Keep.both).run()
     whenReady(eventualResult._1)(validateIOResult(100))
     whenReady(eventualResult._2)(validateString(expectedString(2)))
   }
 
   it should "download offset of bytes of a file with chunk size less than number of bytes" in {
-    val source = RangeDownloadSource.fromPath(path, chunkSize = 14, maybeRange = Some(ByteRange.fromOffset(900)))
+    val source = RangeDownloadSource.fromPath(path, chunkSize = 14, downloadRange =
+      getDownloadRange(path, Some(ByteRange.fromOffset(900))))
     val eventualResult = source.toMat(Sink.seq)(Keep.both).run()
     whenReady(eventualResult._1)(validateIOResult(100))
     whenReady(eventualResult._2)(validateString(expectedString(2)))
   }
 
   it should "download suffix of bytes of a file with chunk size greater than number of bytes" in {
-    val source = RangeDownloadSource.fromPath(path, maybeRange = Some(ByteRange.Suffix(50)))
+    val source = RangeDownloadSource.fromPath(path, downloadRange =
+      getDownloadRange(path, Some(ByteRange.Suffix(50))))
     val eventualResult = source.toMat(Sink.seq)(Keep.both).run()
     whenReady(eventualResult._1)(validateIOResult(50))
     whenReady(eventualResult._2)(validateString(expectedString(1)))
   }
 
   it should "download suffix of bytes of a file with chunk size less than number of bytes" in {
-    val source = RangeDownloadSource.fromPath(path, chunkSize = 14, maybeRange = Some(ByteRange.Suffix(50)))
+    val source = RangeDownloadSource.fromPath(path, chunkSize = 14, downloadRange =
+      getDownloadRange(path, Some(ByteRange.Suffix(50))))
     val eventualResult = source.toMat(Sink.seq)(Keep.both).run()
     whenReady(eventualResult._1)(validateIOResult(50))
     whenReady(eventualResult._2)(validateString(expectedString(1)))

@@ -12,13 +12,14 @@ import akka.stream.scaladsl.Source
 import akka.stream.stage.{GraphStageLogic, GraphStageWithMaterializedValue, OutHandler}
 import akka.stream.{Attributes, IOResult, Outlet, SourceShape}
 import akka.util.ByteString
+import com.loyalty.testing.s3.DownloadRange
 
 import scala.annotation.tailrec
 import scala.concurrent.{Future, Promise}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
-class RangeDownloadSource(path: Path, chunkSize: Int = 8192, maybeRange: Option[ByteRange] = None)
+class RangeDownloadSource(path: Path, chunkSize: Int = 8192, downloadRange: DownloadRange)
   extends GraphStageWithMaterializedValue[SourceShape[ByteString], Future[IOResult]] {
 
   require(chunkSize > 0, s"chunkSize '$chunkSize' must be greater than 0")
@@ -28,8 +29,9 @@ class RangeDownloadSource(path: Path, chunkSize: Int = 8192, maybeRange: Option[
 
   private val out = Outlet[ByteString]("RangeDownloadSource.out")
 
-  private val contentLength = Files.size(path)
-  private val (startPosition, endPosition, rangeCapacity) = getRangeToDownload(contentLength, maybeRange)
+  private val startPosition = downloadRange.startPosition
+  private val endPosition = downloadRange.endPosition
+  private val rangeCapacity = downloadRange.capacity
 
   override def shape: SourceShape[ByteString] = SourceShape(out)
 
@@ -121,26 +123,13 @@ class RangeDownloadSource(path: Path, chunkSize: Int = 8192, maybeRange: Option[
 
     (logic, ioResultPromise.future)
   }
-
-  private def getRangeToDownload(contentLength: Long, maybeRange: Option[ByteRange]): (Long, Long, Long) =
-    maybeRange.map {
-      case Slice(first, last) => (first, last, last - first)
-      case FromOffset(offset) =>
-        val first = offset
-        val last = contentLength
-        (first, last, last - first)
-      case Suffix(length) =>
-        val first = contentLength - length
-        val last = contentLength
-        (first, last, last - first)
-    }.getOrElse(0, contentLength, contentLength)
 }
 
 object RangeDownloadSource {
-  def apply(path: Path, chunkSize: Int = 8192, maybeRange: Option[ByteRange] = None): RangeDownloadSource =
-    new RangeDownloadSource(path, chunkSize, maybeRange)
+  def apply(path: Path, chunkSize: Int = 8192, downloadRange: DownloadRange): RangeDownloadSource =
+    new RangeDownloadSource(path, chunkSize, downloadRange)
 
-  def fromPath(path: Path, chunkSize: Int = 8192, maybeRange: Option[ByteRange] = None): Source[ByteString, Future[IOResult]] =
-    Source.fromGraph(RangeDownloadSource(path, chunkSize, maybeRange))
+  def fromPath(path: Path, chunkSize: Int = 8192, downloadRange: DownloadRange): Source[ByteString, Future[IOResult]] =
+    Source.fromGraph(RangeDownloadSource(path, chunkSize, downloadRange))
 
 }
