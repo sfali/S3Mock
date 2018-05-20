@@ -111,9 +111,10 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
         if (maybeObj.isEmpty || Files.notExists(objectPath)) Future.failed(NoSuchKeyException(bucketName, key))
         else {
           val meta = maybeObj.get
-          val contentSource = RangeDownloadSource.fromPath(meta.path, maybeRange = maybeRange)
+          val downloadRange: DownloadRange = getDownloadRange(meta.path, maybeRange)
+          val contentSource = RangeDownloadSource.fromPath(meta.path, downloadRange = downloadRange)
           Future.successful(GetObjectResponse(bucketName, key, meta.result.getETag, meta.result.getContentMd5,
-            contentSource, Option(meta.result.getVersionId)))
+            downloadRange.capacity, contentSource, Option(meta.result.getVersionId)))
         }
     }
 
