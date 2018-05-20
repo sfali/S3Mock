@@ -22,6 +22,7 @@ case class GetObjectResponse(bucketName: String,
                              key: String,
                              eTag: String,
                              contentMd5: String,
+                             contentLength: Long,
                              content: Source[ByteString, Future[IOResult]],
                              maybeVersionId: Option[String] = None)
 

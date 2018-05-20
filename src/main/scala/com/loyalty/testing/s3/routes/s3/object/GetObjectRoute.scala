@@ -30,6 +30,7 @@ class GetObjectRoute private(log: LoggingAdapter, repository: Repository) {
           complete(HttpResponse(OK,
             entity = HttpEntity(
               ContentTypes.`application/octet-stream`,
+              getObjectResponse.contentLength,
               getObjectResponse.content
             )
           ).withHeaders(headers))
