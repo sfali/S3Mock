@@ -88,7 +88,9 @@ class S3MockAwsClientSpec
     val s3ObjectInputStream = s3Object.getObjectContent
 
     Try(IOUtils.toString(s3ObjectInputStream, StandardCharsets.UTF_8)) match {
-      case Success(s) => println(s.length)
+      case Success(s) =>
+        s.length mustEqual 5365959
+        s3Object.getObjectMetadata.getContentLength mustEqual 5365959
         s3ObjectInputStream.close()
       case Failure(ex) =>
         s3ObjectInputStream.close()
