@@ -5,9 +5,9 @@ import java.nio.file.{Files, Path, Paths}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.FileIO
+import akka.stream.scaladsl.{FileIO, Keep, Sink}
 import akka.testkit.TestKit
-import akka.util.Timeout
+import akka.util.{ByteString, Timeout}
 import com.loyalty.testing.s3.repositories.{FileRepository, FileStore}
 import com.loyalty.testing.s3.request.{BucketVersioning, CreateBucketConfiguration, VersioningConfiguration}
 import com.loyalty.testing.s3.response.{BucketAlreadyExistsException, NoSuchKeyException}
@@ -162,10 +162,14 @@ class FileRepositorySpec
 
   it should "get object with range between two positions" in {
     val key = "sample.txt"
-    whenReady(repository.getObject(defaultBucketName, key, None, Some(ByteRange(0, 47)))) {
+    whenReady(repository.getObject(defaultBucketName, key, None, Some(ByteRange(0, 48)))) {
       response =>
-        response.content.utf8String must equal("A quick brown fox jumps over the silly lazy dog.")
-        response.maybeVersionId mustBe empty
+        whenReady(response.content.toMat(Sink.seq)(Keep.right).run()) {
+          result =>
+            val content = result.fold(ByteString(""))(_ ++ _).utf8String
+            content must equal("A quick brown fox jumps over the silly lazy dog.")
+            response.maybeVersionId mustBe empty
+        }
     }
   }
 
@@ -173,8 +177,12 @@ class FileRepositorySpec
     val key = "sample.txt"
     whenReady(repository.getObject(defaultBucketName, key, None, Some(ByteRange.suffix(50)))) {
       response =>
-        response.content.utf8String must equal("A quick brown fox jumps over the silly lazy dog.\r\n")
-        response.maybeVersionId mustBe empty
+        whenReady(response.content.toMat(Sink.seq)(Keep.right).run()) {
+          result =>
+            val content = result.fold(ByteString(""))(_ ++ _).utf8String
+            content must equal("A quick brown fox jumps over the silly lazy dog.\r\n")
+            response.maybeVersionId mustBe empty
+        }
     }
   }
 
@@ -182,8 +190,12 @@ class FileRepositorySpec
     val key = "sample.txt"
     whenReady(repository.getObject(defaultBucketName, key, None, Some(ByteRange.fromOffset(300)))) {
       response =>
-        response.content.utf8String must equal("A quick brown fox jumps over the silly lazy dog.\r\n")
-        response.maybeVersionId mustBe empty
+        whenReady(response.content.toMat(Sink.seq)(Keep.right).run()) {
+          result =>
+            val content = result.fold(ByteString(""))(_ ++ _).utf8String
+            content must equal("A quick brown fox jumps over the silly lazy dog.\r\n")
+            response.maybeVersionId mustBe empty
+        }
     }
   }
 

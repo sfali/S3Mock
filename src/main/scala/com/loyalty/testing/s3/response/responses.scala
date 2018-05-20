@@ -3,11 +3,14 @@ package com.loyalty.testing.s3.response
 import java.nio.file.{Path, Paths}
 import java.time.Instant
 
+import akka.stream.IOResult
+import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.amazonaws.services.s3.model.PutObjectResult
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.request.BucketVersioning.BucketVersioning
 
+import scala.concurrent.Future
 import scala.xml.Elem
 
 case class BucketResponse(bucketName: String, locationConstraint: String = defaultRegion,
@@ -20,7 +23,7 @@ case class GetObjectResponse(bucketName: String,
                              eTag: String,
                              contentMd5: String,
                              contentLength: Long,
-                             content: ByteString,
+                             content: Source[ByteString, Future[IOResult]],
                              maybeVersionId: Option[String] = None)
 
 case object DeleteObjectResponse

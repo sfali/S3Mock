@@ -6,13 +6,13 @@ import com.amazonaws.services.sqs.AmazonSQSAsync
 import com.loyalty.testing.s3.Settings
 import com.loyalty.testing.s3.notification.NotificationData
 
-import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class NotificationActor(sqsClient: AmazonSQSAsync, snsClient: AmazonSNSAsync) extends Actor with ActorLogging {
 
   import context.dispatcher
   import NotificationActor._
+  import com.loyalty.testing.s3._
   import com.loyalty.testing.s3.notification._
 
   override def preStart(): Unit = {
@@ -25,11 +25,7 @@ class NotificationActor(sqsClient: AmazonSQSAsync, snsClient: AmazonSNSAsync) ex
       val message = generateSqsMessage(configName, notificationData)
       log.info("Sending notification: {}", message)
 
-      Future
-        .successful(
-          sqsClient
-            .sendMessageAsync(queueUrl, message)
-            .get())
+      sqsClient.sendMessageAsync(queueUrl, message).toScalaFuture
         .recover {
           case ex => log.warning(
             """

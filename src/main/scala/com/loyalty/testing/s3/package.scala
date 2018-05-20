@@ -5,7 +5,10 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.{Files, Path, Paths}
 import java.security.MessageDigest
 import java.util.UUID
+import java.util.concurrent.CompletableFuture
 
+import akka.http.scaladsl.model.headers.ByteRange
+import akka.http.scaladsl.model.headers.ByteRange.{FromOffset, Slice, Suffix}
 import com.amazonaws.services.s3.model.{ObjectMetadata, PutObjectResult}
 import com.amazonaws.services.sns.AmazonSNSAsync
 import com.amazonaws.services.sqs.AmazonSQSAsync
@@ -13,7 +16,13 @@ import com.loyalty.testing.s3.request.UploadPart
 import com.loyalty.testing.s3.response.CompleteMultipartUploadResult
 import javax.xml.bind.DatatypeConverter
 
+import scala.concurrent.Future
+
 package object s3 {
+
+  import scala.compat.java8.FutureConverters._
+
+  type JavaFuture[V] = java.util.concurrent.Future[V]
 
   val defaultRegion: String = "us-east-1"
 
@@ -92,6 +101,10 @@ package object s3 {
     }
   }
 
+  implicit class JavaFutureOps[T](future: JavaFuture[T]) {
+    def toScalaFuture: Future[T] = CompletableFuture.supplyAsync(() => future.get()).toScala
+  }
+
   trait SqsSettings {
     val sqsClient: AmazonSQSAsync
   }
@@ -99,6 +112,24 @@ package object s3 {
   trait SnsSettings {
     val snsClient: AmazonSNSAsync
   }
+
+  case class DownloadRange(startPosition: Long, endPosition: Long, capacity: Long)
+
+  def getDownloadRange(path: Path, maybeRange: Option[ByteRange] = None): DownloadRange = {
+    val contentLength: Long = Files.size(path)
+    maybeRange.map {
+      case Slice(first, last) => DownloadRange(first, last, last - first)
+      case FromOffset(offset) =>
+        val first = offset
+        val last = contentLength
+        DownloadRange(first, last, last - first)
+      case Suffix(length) =>
+        val first = contentLength - length
+        val last = contentLength
+        DownloadRange(first, last, last - first)
+    }.getOrElse(DownloadRange(0, contentLength, contentLength))
+  }
+
 
   private def createDirectories(path: Path): Unit = {
     if (Files.notExists(path)) Files.createDirectories(path)

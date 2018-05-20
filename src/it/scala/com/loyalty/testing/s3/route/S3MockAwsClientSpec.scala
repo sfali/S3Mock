@@ -12,6 +12,7 @@ import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.loyalty.testing.s3.it.client.AwsClient
 import com.loyalty.testing.s3.it.{AwsSettings, S3Settings}
+import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.{FileRepository, FileStore}
 import com.loyalty.testing.s3.response.ErrorCodes
 import com.typesafe.config.ConfigFactory
@@ -36,7 +37,11 @@ class S3MockAwsClientSpec
   private val root: Path = Paths.get(System.getProperty("user.dir"), "tmp", "s3mock")
   private implicit val repository: FileRepository = FileRepository(FileStore(root), log)
   private val s3Client = AwsClient(S3MockAwsClientSpec.AwsSettingsImpl)
-  private val s3Mock = S3Mock()
+
+  private val defaultBucketName = "data-transfer"
+  private val notification = Notification(destinationName = "queue1", bucketName = defaultBucketName,
+    prefix = Some("input/"), suffix = Some(".txt"))
+  private val s3Mock = S3Mock(notification :: Nil)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -49,7 +54,6 @@ class S3MockAwsClientSpec
     TestKit.shutdownActorSystem(system)
   }
 
-  private val defaultBucketName = "data-transfer"
   it should "create bucket" in {
     val result = s3Client.createBucket(defaultBucketName)
     Option(result) must not be empty
@@ -84,7 +88,9 @@ class S3MockAwsClientSpec
     val s3ObjectInputStream = s3Object.getObjectContent
 
     Try(IOUtils.toString(s3ObjectInputStream, StandardCharsets.UTF_8)) match {
-      case Success(s) => println(s.length)
+      case Success(s) =>
+        s.length mustEqual 5365959
+        s3Object.getObjectMetadata.getContentLength mustEqual 5365959
         s3ObjectInputStream.close()
       case Failure(ex) =>
         s3ObjectInputStream.close()
