@@ -5,8 +5,6 @@ import java.nio.channels.FileChannel
 import java.nio.file.{Files, Path, StandardOpenOption}
 
 import akka.Done
-import akka.http.scaladsl.model.headers.ByteRange
-import akka.http.scaladsl.model.headers.ByteRange.{FromOffset, Slice, Suffix}
 import akka.stream.Attributes.InputBuffer
 import akka.stream.scaladsl.Source
 import akka.stream.stage.{GraphStageLogic, GraphStageWithMaterializedValue, OutHandler}
