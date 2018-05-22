@@ -1,8 +1,6 @@
 package com.loyalty.testing.s3.streams
 
-import java.nio.ByteBuffer
-import java.nio.channels.AsynchronousFileChannel
-import java.nio.file.{Files, Path, StandardOpenOption}
+import java.nio.file.Path
 
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.{Broadcast, FileIO, Flow, GraphDSL, Keep, Merge, Sink, Source}
@@ -10,7 +8,6 @@ import akka.stream.{ActorMaterializer, FlowShape, IOResult}
 import akka.util.ByteString
 
 import scala.concurrent.Future
-import scala.util.Try
 
 class FileStream private(implicit mat: ActorMaterializer) {
 
@@ -46,69 +43,16 @@ class FileStream private(implicit mat: ActorMaterializer) {
       .toMat(Sink.head)(Keep.right)
       .run()
 
-  def downloadFile(path: Path, maybeRange: Option[ByteRange.Slice] = None): Future[ByteString] = {
-    import mat.executionContext
-
-    val (chunkSize, startPosition) =
-      maybeRange.map {
-        range => ((range.last - range.first + 1).toInt, range.first)
-      }.getOrElse((Files.size(path).toInt, 0L))
-
-    val fileChannel = AsynchronousFileChannel.open(path, StandardOpenOption.READ)
-    val byteBuffer = ByteBuffer.allocate(chunkSize)
-    Future.successful(fileChannel.read(byteBuffer, startPosition).get())
-      .map {
-        _ =>
-          val bs = ByteString.fromArray(byteBuffer.array())
-          byteBuffer.clear()
-          fileChannel.close()
-          bs
-      }
-      .recover {
-        case ex =>
-          byteBuffer.clear()
-          Try(fileChannel.close())
-          throw ex
-      }
+  def downloadFile(path: Path, chunkSize: Int = 8192, maybeRange: Option[ByteRange] = None):
+                  (DownloadRange, Source[ByteString, Future[IOResult]]) = {
+    val downloadRange = DownloadRange(path, maybeRange)
+    val source = Source.fromGraph(RangeDownloadSource(path, chunkSize, downloadRange))
+    (downloadRange, source)
   }
 
-  def copyPart(sourcePath: Path, destinationPath: Path,
-               maybeSourceRange: Option[ByteRange.Slice] = None): Future[String] = {
-    import mat.executionContext
-
-    val (chunkSize, startPosition) =
-      maybeSourceRange.map {
-        range => ((range.last - range.first + 1).toInt, range.first)
-      }.getOrElse((Files.size(sourcePath).toInt, 0L))
-
-    val readChannel = AsynchronousFileChannel.open(sourcePath, StandardOpenOption.READ)
-    val readBuffer = ByteBuffer.allocate(chunkSize)
-
-    val writeChannel = AsynchronousFileChannel.open(destinationPath, StandardOpenOption.WRITE, StandardOpenOption.CREATE)
-
-    Future.successful(readChannel.read(readBuffer, startPosition).get())
-      .flatMap {
-        _ =>
-          val bs = ByteString.fromArray(readBuffer.array())
-          val eTag = md5Hex(bs.toArray)
-          val writeBuffer = ByteBuffer.wrap(bs.toArray)
-          Future.successful(writeChannel.write(writeBuffer, 0).get())
-            .map {
-              _ =>
-                readBuffer.clear()
-                writeBuffer.clear()
-                Try(readChannel.close())
-                Try(writeChannel.close())
-                eTag
-            }
-      }
-      .recover {
-        case ex =>
-          readBuffer.clear()
-          Try(readChannel.close())
-          Try(writeChannel.close())
-          throw ex
-      }
+  def copyPart(sourcePath: Path, destinationPath: Path, maybeSourceRange: Option[ByteRange] = None): Future[String] = {
+    val downloadSource = downloadFile(sourcePath, maybeRange = maybeSourceRange)
+    saveContent(downloadSource._2, destinationPath)
   }
 
 }

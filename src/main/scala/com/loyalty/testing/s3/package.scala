@@ -115,21 +115,22 @@ package object s3 {
 
   case class DownloadRange(startPosition: Long, endPosition: Long, capacity: Long)
 
-  def getDownloadRange(path: Path, maybeRange: Option[ByteRange] = None): DownloadRange = {
-    val contentLength: Long = Files.size(path)
-    maybeRange.map {
-      case Slice(first, last) => DownloadRange(first, last, last - first)
-      case FromOffset(offset) =>
-        val first = offset
-        val last = contentLength
-        DownloadRange(first, last, last - first)
-      case Suffix(length) =>
-        val first = contentLength - length
-        val last = contentLength
-        DownloadRange(first, last, last - first)
-    }.getOrElse(DownloadRange(0, contentLength, contentLength))
+  object DownloadRange {
+    def apply(path: Path, maybeRange: Option[ByteRange] = None): DownloadRange = {
+      val contentLength: Long = Files.size(path)
+      maybeRange.map {
+        case Slice(first, last) => DownloadRange(first, last, last - first)
+        case FromOffset(offset) =>
+          val first = offset
+          val last = contentLength
+          DownloadRange(first, last, last - first)
+        case Suffix(length) =>
+          val first = contentLength - length
+          val last = contentLength
+          DownloadRange(first, last, last - first)
+      }.getOrElse(DownloadRange(0, contentLength, contentLength))
+    }
   }
-
 
   private def createDirectories(path: Path): Unit = {
     if (Files.notExists(path)) Files.createDirectories(path)
