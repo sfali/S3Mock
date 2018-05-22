@@ -123,7 +123,7 @@ class StreamsSpec
     val sourcePath = Paths.get("src", "test", "resources", "sample.txt")
     val destinationPath = Files.createTempFile("test", ".txt")
 
-    whenReady(fileStream.copyPart(sourcePath, destinationPath, Some(ByteRange(300, 349)))){
+    whenReady(fileStream.copyPart(sourcePath, destinationPath, Some(ByteRange(300, 350)))){
       eTag =>
         eTag must equal(md5Hex("A quick brown fox jumps over the silly lazy dog.\r\n"))
         Files.deleteIfExists(destinationPath)

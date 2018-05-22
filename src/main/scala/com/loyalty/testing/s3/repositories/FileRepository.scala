@@ -243,11 +243,9 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
         else if (Files.notExists(uploadPath)) Future.failed(NoSuchUploadException(bucketName, key))
         else {
           val meta = maybeObj.get
-          val contentLength = Files.size(meta.path)
-          val slice = getRange(contentLength, maybeSourceRange)
           val destinationPath = uploadPath -> partNumber.toString
           Files.createDirectories(destinationPath.getParent)
-          fileStream.copyPart(meta.path, destinationPath, slice)
+          fileStream.copyPart(meta.path, destinationPath, maybeSourceRange)
             .map {
               eTag => CopyPartResult(eTag)
             }
