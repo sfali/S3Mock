@@ -11,7 +11,7 @@ import akka.util.ByteString
 import com.loyalty.testing.s3.request.BucketVersioning.BucketVersioning
 import com.loyalty.testing.s3.request._
 import com.loyalty.testing.s3.response._
-import com.loyalty.testing.s3.streams.{FileStream, RangeDownloadSource}
+import com.loyalty.testing.s3.streams.FileStream
 
 import scala.concurrent.Future
 
@@ -111,10 +111,9 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
         if (maybeObj.isEmpty || Files.notExists(objectPath)) Future.failed(NoSuchKeyException(bucketName, key))
         else {
           val meta = maybeObj.get
-          val downloadRange: DownloadRange = DownloadRange(meta.path, maybeRange)
-          val contentSource = RangeDownloadSource.fromPath(meta.path, downloadRange = downloadRange)
+          val sourceTuple = fileStream.downloadFile(meta.path, maybeRange = maybeRange)
           Future.successful(GetObjectResponse(bucketName, key, meta.result.getETag, meta.result.getContentMd5,
-            downloadRange.capacity, contentSource, Option(meta.result.getVersionId)))
+            sourceTuple._1.capacity, sourceTuple._2, Option(meta.result.getVersionId)))
         }
     }
 

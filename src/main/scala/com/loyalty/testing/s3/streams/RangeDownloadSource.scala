@@ -6,7 +6,6 @@ import java.nio.file.{Files, Path, StandardOpenOption}
 
 import akka.Done
 import akka.stream.Attributes.InputBuffer
-import akka.stream.scaladsl.Source
 import akka.stream.stage.{GraphStageLogic, GraphStageWithMaterializedValue, OutHandler}
 import akka.stream.{Attributes, IOResult, Outlet, SourceShape}
 import akka.util.ByteString
@@ -126,8 +125,4 @@ class RangeDownloadSource(path: Path, chunkSize: Int = 8192, downloadRange: Down
 object RangeDownloadSource {
   def apply(path: Path, chunkSize: Int = 8192, downloadRange: DownloadRange): RangeDownloadSource =
     new RangeDownloadSource(path, chunkSize, downloadRange)
-
-  def fromPath(path: Path, chunkSize: Int = 8192, downloadRange: DownloadRange): Source[ByteString, Future[IOResult]] =
-    Source.fromGraph(RangeDownloadSource(path, chunkSize, downloadRange))
-
 }

@@ -46,30 +46,11 @@ class FileStream private(implicit mat: ActorMaterializer) {
       .toMat(Sink.head)(Keep.right)
       .run()
 
-  def downloadFile(path: Path, maybeRange: Option[ByteRange.Slice] = None): Future[ByteString] = {
-    import mat.executionContext
-
-    val (chunkSize, startPosition) =
-      maybeRange.map {
-        range => ((range.last - range.first + 1).toInt, range.first)
-      }.getOrElse((Files.size(path).toInt, 0L))
-
-    val fileChannel = AsynchronousFileChannel.open(path, StandardOpenOption.READ)
-    val byteBuffer = ByteBuffer.allocate(chunkSize)
-    Future.successful(fileChannel.read(byteBuffer, startPosition).get())
-      .map {
-        _ =>
-          val bs = ByteString.fromArray(byteBuffer.array())
-          byteBuffer.clear()
-          fileChannel.close()
-          bs
-      }
-      .recover {
-        case ex =>
-          byteBuffer.clear()
-          Try(fileChannel.close())
-          throw ex
-      }
+  def downloadFile(path: Path, chunkSize: Int = 8192, maybeRange: Option[ByteRange] = None):
+                  (DownloadRange, Source[ByteString, Future[IOResult]]) = {
+    val downloadRange = DownloadRange(path, maybeRange)
+    val source = Source.fromGraph(RangeDownloadSource(path, chunkSize, downloadRange))
+    (downloadRange, source)
   }
 
   def copyPart(sourcePath: Path, destinationPath: Path,

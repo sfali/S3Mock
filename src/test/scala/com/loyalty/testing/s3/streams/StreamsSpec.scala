@@ -106,21 +106,6 @@ class StreamsSpec
     }
   }
 
-  it should "download all bytes" in {
-    val path = Paths.get("src", "test", "resources", "sample.txt")
-    whenReady(fileStream.downloadFile(path)) {
-      bs => expectedDigest must equal(md5Hex(bs.toArray))
-    }
-  }
-
-  it should "download range of bytes" in {
-    val path = Paths.get("src", "test", "resources", "sample.txt")
-    whenReady(fileStream.downloadFile(path, Some(ByteRange(300, 349)))) {
-      bs =>
-        bs.utf8String must equal("A quick brown fox jumps over the silly lazy dog.\r\n")
-    }
-  }
-
   it should "copy entire file to destination path when no range is provided" in {
     val sourcePath = Paths.get("src", "test", "resources", "sample.txt")
     val destinationPath = Files.createTempFile("test", ".txt")
