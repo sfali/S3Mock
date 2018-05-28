@@ -206,8 +206,20 @@ class FileRepositorySpec
     whenReady(repository.getObject(versionedBucketName, key, Some(versionId))) {
       response =>
         response.contentMd5 must equal(expectedDigest)
-        response.maybeVersionId.fold(fail("unable to get versin id")) {
-          vId => vId must equal(versionId)
+        response.maybeVersionId.fold(fail("unable to get version id")) {
+          vId => vId mustEqual versionId
+        }
+    }
+  }
+
+  it should "get object from versioned bucket without providing version" in {
+    val key = "sample1.txt"
+    val versionId = fileStore.get(versionedBucketName).get.getObject(key).get.result.getVersionId
+    whenReady(repository.getObject(versionedBucketName, key)) {
+      response =>
+        response.contentMd5 must equal(expectedDigest)
+        response.maybeVersionId.fold(fail("unable to get version id")) {
+          vId => vId mustEqual versionId
         }
     }
   }
