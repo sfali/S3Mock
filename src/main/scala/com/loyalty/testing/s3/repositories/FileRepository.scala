@@ -4,7 +4,6 @@ import java.nio.file._
 
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.headers.ByteRange
-import akka.http.scaladsl.model.headers.ByteRange.{FromOffset, Slice, Suffix}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
@@ -83,9 +82,7 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
     }
 
   private def getDestinationPathWithVersionId(key: String, bucketMetadata: BucketMetadata): (Option[String], Path) = {
-    val keyPath = bucketMetadata.path -> key
-    val fileName = keyPath.getFileName.toString
-    val parentPath = keyPath.getParent
+    val parentPath = bucketMetadata.path -> key
 
     val maybeVersioningConfiguration = bucketMetadata.maybeBucketVersioning
       .filter(_.bucketVersioning == BucketVersioning.Enabled)
@@ -93,9 +90,9 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
       maybeVersioningConfiguration match {
         case Some(_) =>
           val versionId = md5HexFromRandomUUID
-          (Some(versionId), parentPath -> (versionId, fileName))
+          (Some(versionId), parentPath -> (versionId, ContentFileName))
         case None =>
-          (None, parentPath -> (NonVersionId, fileName))
+          (None, parentPath -> (NonVersionId, ContentFileName))
       }
     Files.createDirectories(filePath.getParent)
     (maybeVersionId, filePath)
@@ -117,20 +114,11 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
         }
     }
 
-  private def getRange(contentLength: Long, maybeRange: Option[ByteRange]): Option[Slice] =
-    maybeRange.flatMap {
-      case Slice(first, last) => Some(Slice(first, last))
-      case FromOffset(offset) => Some(Slice(offset, contentLength - 1))
-      case Suffix(length) => Some(Slice(contentLength - length, contentLength - 1))
-    }
-
   private def getObjectPath(bucketMetadata: BucketMetadata, key: String,
                             maybeVersionId: Option[String] = None): Path = {
-    val keyPath = bucketMetadata.path -> key
-    val fileName = keyPath.getFileName.toString
-    val parentPath = keyPath.getParent
+    val parentPath = bucketMetadata.path -> key
 
-    maybeVersionId.map(versionId => parentPath -> (versionId, fileName))
+    maybeVersionId.map(versionId => parentPath -> (versionId, ContentFileName))
       .getOrElse(bucketMetadata.getObject(key).get.path)
   }
 
@@ -270,7 +258,8 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
 
 object FileRepository {
 
-  private val NonVersionId = "null"
+  val NonVersionId: String = "null"
+  val ContentFileName: String = "content"
 
   def apply(fileStore: FileStore, log: LoggingAdapter)(implicit mat: ActorMaterializer): FileRepository =
     new FileRepository(fileStore, FileStream(), log)

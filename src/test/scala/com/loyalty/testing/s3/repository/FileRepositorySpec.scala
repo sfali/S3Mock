@@ -24,6 +24,7 @@ class FileRepositorySpec
     with ScalaFutures {
 
   import com.loyalty.testing.s3._
+  import FileRepository._
 
   private val dataPath: Path = Paths.get(System.getProperty("user.dir"), ".s3mock")
   private val defaultBucketName = "actor-non-version"
@@ -85,7 +86,7 @@ class FileRepositorySpec
     val contentSource = FileIO.fromPath(Paths.get("src", "test", "resources", key))
     whenReady(repository.putObject(defaultBucketName, key, contentSource)) {
       objectMeta =>
-        val expectedPath = dataPath -> ("data", defaultBucketName, "null", key)
+        val expectedPath = dataPath -> ("data", defaultBucketName, key, NonVersionId, ContentFileName)
         objectMeta.path must equal(expectedPath)
         Files.exists(expectedPath.toAbsolutePath) mustBe true
         val putObjectResult = objectMeta.result
@@ -101,7 +102,7 @@ class FileRepositorySpec
     val contentSource = FileIO.fromPath(Paths.get("src", "test", "resources", fileName))
     whenReady(repository.putObject(defaultBucketName, key, contentSource)) {
       objectMeta =>
-        val expectedPath = dataPath -> ("data", defaultBucketName, "input", "null", fileName)
+        val expectedPath = dataPath -> ("data", defaultBucketName, "input", fileName, NonVersionId, ContentFileName)
         objectMeta.path must equal(expectedPath)
         Files.exists(expectedPath.toAbsolutePath) mustBe true
         val putObjectResult = objectMeta.result
@@ -118,7 +119,7 @@ class FileRepositorySpec
       objectMeta =>
         val putObjectResult = objectMeta.result
         Option(putObjectResult.getVersionId) mustBe defined
-        val expectedPath = dataPath -> ("data", versionedBucketName, putObjectResult.getVersionId, key)
+        val expectedPath = dataPath -> ("data", versionedBucketName, key, putObjectResult.getVersionId, ContentFileName)
         objectMeta.path must equal(expectedPath)
         Files.exists(expectedPath.toAbsolutePath) mustBe true
         putObjectResult.getETag must equal(expectedDigest)
@@ -134,7 +135,7 @@ class FileRepositorySpec
       objectMeta =>
         val putObjectResult = objectMeta.result
         Option(putObjectResult.getVersionId) mustBe defined
-        val expectedPath = dataPath -> ("data", versionedBucketName, "input", putObjectResult.getVersionId, fileName)
+        val expectedPath = dataPath -> ("data", versionedBucketName, "input", fileName, putObjectResult.getVersionId, ContentFileName)
         objectMeta.path must equal(expectedPath)
         Files.exists(expectedPath.toAbsolutePath) mustBe true
         putObjectResult.getETag must equal(expectedDigest)
@@ -205,8 +206,20 @@ class FileRepositorySpec
     whenReady(repository.getObject(versionedBucketName, key, Some(versionId))) {
       response =>
         response.contentMd5 must equal(expectedDigest)
-        response.maybeVersionId.fold(fail("unable to get versin id")) {
-          vId => vId must equal(versionId)
+        response.maybeVersionId.fold(fail("unable to get version id")) {
+          vId => vId mustEqual versionId
+        }
+    }
+  }
+
+  it should "get object from versioned bucket without providing version" in {
+    val key = "sample1.txt"
+    val versionId = fileStore.get(versionedBucketName).get.getObject(key).get.result.getVersionId
+    whenReady(repository.getObject(versionedBucketName, key)) {
+      response =>
+        response.contentMd5 must equal(expectedDigest)
+        response.maybeVersionId.fold(fail("unable to get version id")) {
+          vId => vId mustEqual versionId
         }
     }
   }
