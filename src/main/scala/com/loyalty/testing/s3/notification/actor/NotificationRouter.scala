@@ -35,6 +35,8 @@ class NotificationRouter(notifications: List[Notification])(implicit settings: S
               if (bucketMatch && prefixMatch && suffixMatch) {
                 self ! SendNotificationToDestination(notification.destinationType,
                   notification.destinationName, notification.name, notificationData)
+              } else {
+                log.warning("No match for notification: {} : {}", notification, notificationData)
               }
           }
       } else {
