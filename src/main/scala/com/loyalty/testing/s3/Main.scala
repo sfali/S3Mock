@@ -33,22 +33,7 @@ object Main extends HttpApp with App with S3Routes {
   log.info("Root path of S3: {}", root.toAbsolutePath)
   override implicit protected val repository: FileRepository = FileRepository(FileStore(root), log)
 
-  private val notifications: List[Notification] =
-    settings.bootstrap.dataPath match {
-      case Some(path) =>
-        val json = Files.readAllLines(path).asScala.mkString(System.lineSeparator())
-        val result = decode[BootstrapConfiguration](json)
-        result match {
-          case Left(error) =>
-            log.warning("Unable to parse Json: {}, errorr message: {}:{}", json,
-              error.getClass.getName, error.getMessage)
-            Nil
-          case Right(bootstrapConfiguration) =>
-            initializeBuckets(bootstrapConfiguration)
-            bootstrapConfiguration.notifications
-        }
-      case None => Nil
-    }
+  private val notifications: List[Notification] = initializeNotifications
 
   override protected val notificationRouter: ActorRef = system.actorOf(
     NotificationRouter.props(notifications),
@@ -60,6 +45,29 @@ object Main extends HttpApp with App with S3Routes {
     super.postServerShutdown(attempt, system)
     repository.clean()
     system.terminate()
+  }
+
+  private def initializeNotifications = {
+    val dataPath = Paths.get(System.getProperty("user.dir"), "s3", "initial.json")
+    log.info("DataPath: {}", dataPath)
+    if (Files.exists(dataPath)) {
+      log.info("Data found @: {}", dataPath)
+
+      val json = Files.readAllLines(dataPath).asScala.mkString(System.lineSeparator())
+      val result = decode[BootstrapConfiguration](json)
+      result match {
+        case Left(error) =>
+          log.warning("Unable to parse Json: {}, errorr message: {}:{}", json,
+            error.getClass.getName, error.getMessage)
+          Nil
+        case Right(bootstrapConfiguration) =>
+          initializeBuckets(bootstrapConfiguration)
+          bootstrapConfiguration.notifications
+      }
+    } else {
+      log.info("No initial data found at: {}", dataPath)
+      Nil
+    }
   }
 
   private def initializeBuckets(bootstrapConfiguration: BootstrapConfiguration): Unit =
