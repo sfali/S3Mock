@@ -1,7 +1,5 @@
 package com.loyalty.testing.s3
 
-import java.nio.file.{Path, Paths}
-
 import akka.actor.ActorSystem
 import com.amazonaws.auth._
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
@@ -15,11 +13,6 @@ class Settings(config: Config) {
   object http {
     val host: String = config.getString("app.http.host")
     val port: Int = config.getInt("app.http.port")
-  }
-
-  object bootstrap {
-    val dataPath: Option[Path] = getOptionalString("app.bootstrap.data-path")
-      .map(path => Paths.get(path).toAbsolutePath)
   }
 
   object aws {
