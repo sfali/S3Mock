@@ -133,7 +133,7 @@ class StreamsSpec
 
     whenReady(fileStream.copyPart(sourcePath, destinationPath, Some(ByteRange(300, 350)))){
       case (etag, md5) =>
-        etag must equal(md5Hex("A quick brown fox jumps over the silly lazy dog.\r\n"))
+        etag must equal(toBase16("A quick brown fox jumps over the silly lazy dog.\r\n"))
         md5 must equal(toBase64("A quick brown fox jumps over the silly lazy dog.\r\n"))
         Files.deleteIfExists(destinationPath)
     }
