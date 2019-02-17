@@ -70,11 +70,11 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
         val (maybeVersionId, filePath) = getDestinationPathWithVersionId(key, bucketMetadata)
         fileStream.saveContent(contentSource, filePath)
           .flatMap {
-            digest =>
+            case (etag, contentMD5) =>
               if (Files.notExists(filePath)) Future.failed(new RuntimeException("unable to save file"))
               else {
                 val response = ObjectMeta(filePath,
-                  createPutObjectResult(digest, digest, Files.size(filePath), maybeVersionId))
+                  createPutObjectResult(etag, contentMD5, Files.size(filePath), maybeVersionId))
                 bucketMetadata.putObject(key, response)
                 Future.successful(response)
               }
@@ -162,12 +162,11 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
           Files.createDirectories(filePath.getParent)
           fileStream.saveContent(contentSource, filePath)
             .flatMap {
-              digest =>
+              case (etag, contentMD5) =>
                 if (Files.notExists(filePath)) Future.failed(new RuntimeException("unable to save file"))
                 else {
-                  val eTag = digest
-                  bucketMetadata.addPart(uploadId, UploadPart(partNumber, eTag))
-                  val response = ObjectMeta(filePath, createPutObjectResult(eTag, digest, Files.size(filePath)))
+                  bucketMetadata.addPart(uploadId, UploadPart(partNumber, etag))
+                  val response = ObjectMeta(filePath, createPutObjectResult(etag, contentMD5, Files.size(filePath)))
                   bucketMetadata.putObject(key, response)
                   Future.successful(response)
                 }
@@ -196,13 +195,12 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
               val result = createCompleteMultipartUploadResult(bucketName, key, parts, maybeVersionId)
               fileStream.mergeFiles(filePath, tuples.map(_._2))
                 .flatMap {
-                  digest =>
+                  case (etag, contentMD5) =>
                     if (Files.notExists(filePath)) Future.failed(new RuntimeException("unable to save file"))
                     else {
-                      val eTag = digest
                       val contentLength = Files.size(filePath)
                       val response = ObjectMeta(filePath,
-                        createPutObjectResult(eTag, digest, contentLength, maybeVersionId))
+                        createPutObjectResult(etag, contentMD5, contentLength, maybeVersionId))
                       bucketMetadata.putObject(key, response)
                       Future.successful(result.copy(contentLength = contentLength))
                     }
@@ -235,7 +233,7 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
           Files.createDirectories(destinationPath.getParent)
           fileStream.copyPart(meta.path, destinationPath, maybeSourceRange)
             .map {
-              eTag => CopyPartResult(eTag)
+              case (etag, _) => CopyPartResult(etag)
             }
         }
     }

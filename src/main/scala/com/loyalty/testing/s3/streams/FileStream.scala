@@ -13,7 +13,7 @@ class FileStream private(implicit mat: ActorMaterializer) {
 
   import com.loyalty.testing.s3._
 
-  def saveContent(contentSource: Source[ByteString, _], destinationPath: Path): Future[String] =
+  def saveContent(contentSource: Source[ByteString, _], destinationPath: Path): Future[(String, String)] =
     contentSource
       .via(saveAndCalculateDigest(destinationPath))
       .toMat(Sink.head)(Keep.right)
@@ -21,14 +21,14 @@ class FileStream private(implicit mat: ActorMaterializer) {
 
   def saveAndCalculateDigest(destinationPath: Path,
                              digestCalculator: DigestCalculator = DigestCalculator())
-  : Flow[ByteString, String, Future[IOResult]] =
+  : Flow[ByteString, (String, String), Future[IOResult]] =
     Flow.fromGraph(GraphDSL.create(FileIO.toPath(destinationPath)) {
       implicit builder =>
         sink =>
           import GraphDSL.Implicits._
 
           val broadcast = builder.add(Broadcast[ByteString](2))
-          val merge = builder.add(Merge[String](1))
+          val merge = builder.add(Merge[(String, String)](1))
 
           broadcast ~> digestCalculator ~> merge
           broadcast ~> sink
@@ -36,7 +36,7 @@ class FileStream private(implicit mat: ActorMaterializer) {
           FlowShape(broadcast.in, merge.out)
     })
 
-  def mergeFiles(destinationPath: Path, paths: List[Path]): Future[String] =
+  def mergeFiles(destinationPath: Path, paths: List[Path]): Future[(String, String)] =
     Source.fromIterator(() => paths.toIterator)
       .flatMapConcat(path => FileIO.fromPath(path))
       .via(saveAndCalculateDigest(destinationPath))
@@ -50,7 +50,7 @@ class FileStream private(implicit mat: ActorMaterializer) {
     (downloadRange, source)
   }
 
-  def copyPart(sourcePath: Path, destinationPath: Path, maybeSourceRange: Option[ByteRange] = None): Future[String] = {
+  def copyPart(sourcePath: Path, destinationPath: Path, maybeSourceRange: Option[ByteRange] = None): Future[(String, String)] = {
     val downloadSource = downloadFile(sourcePath, maybeRange = maybeSourceRange)
     saveContent(downloadSource._2, destinationPath)
   }
