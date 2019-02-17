@@ -35,7 +35,8 @@ class FileRepositorySpec
   private val fileStore = FileStore(dataPath)
   private val repository = FileRepository(fileStore, system.log)
 
-  private val expectedDigest = "37099E6F8B99C52CD81DF0041543E5B0"
+  private val etagDigest = "37099e6f8b99c52cd81df0041543e5b0"
+  private val md5Digest = "Nwmeb4uZxSzYHfAEFUPlsA=="
 
   override protected def afterAll(): Unit = {
     super.afterAll()
@@ -90,8 +91,8 @@ class FileRepositorySpec
         objectMeta.path must equal(expectedPath)
         Files.exists(expectedPath.toAbsolutePath) mustBe true
         val putObjectResult = objectMeta.result
-        putObjectResult.getETag must equal(expectedDigest)
-        putObjectResult.getContentMd5 must equal(expectedDigest)
+        putObjectResult.getETag must equal(etagDigest)
+        putObjectResult.getContentMd5 must equal(md5Digest)
         Option(putObjectResult.getVersionId) mustBe empty
     }
   }
@@ -106,8 +107,8 @@ class FileRepositorySpec
         objectMeta.path must equal(expectedPath)
         Files.exists(expectedPath.toAbsolutePath) mustBe true
         val putObjectResult = objectMeta.result
-        putObjectResult.getETag must equal(expectedDigest)
-        putObjectResult.getContentMd5 must equal(expectedDigest)
+        putObjectResult.getETag must equal(etagDigest)
+        putObjectResult.getContentMd5 must equal(md5Digest)
         Option(putObjectResult.getVersionId) mustBe empty
     }
   }
@@ -122,8 +123,8 @@ class FileRepositorySpec
         val expectedPath = dataPath -> ("data", versionedBucketName, key, putObjectResult.getVersionId, ContentFileName)
         objectMeta.path must equal(expectedPath)
         Files.exists(expectedPath.toAbsolutePath) mustBe true
-        putObjectResult.getETag must equal(expectedDigest)
-        putObjectResult.getContentMd5 must equal(expectedDigest)
+        putObjectResult.getETag must equal(etagDigest)
+        putObjectResult.getContentMd5 must equal(md5Digest)
     }
   }
 
@@ -138,8 +139,8 @@ class FileRepositorySpec
         val expectedPath = dataPath -> ("data", versionedBucketName, "input", fileName, putObjectResult.getVersionId, ContentFileName)
         objectMeta.path must equal(expectedPath)
         Files.exists(expectedPath.toAbsolutePath) mustBe true
-        putObjectResult.getETag must equal(expectedDigest)
-        putObjectResult.getContentMd5 must equal(expectedDigest)
+        putObjectResult.getETag must equal(etagDigest)
+        putObjectResult.getContentMd5 must equal(md5Digest)
     }
   }
 
@@ -156,7 +157,7 @@ class FileRepositorySpec
     val key = "sample.txt"
     whenReady(repository.getObject(defaultBucketName, key)) {
       response =>
-        response.contentMd5 must equal(expectedDigest)
+        response.contentMd5 must equal(md5Digest)
         response.maybeVersionId mustBe empty
     }
   }
@@ -205,7 +206,7 @@ class FileRepositorySpec
     val versionId = fileStore.get(versionedBucketName).get.getObject(key).get.result.getVersionId
     whenReady(repository.getObject(versionedBucketName, key, Some(versionId))) {
       response =>
-        response.contentMd5 must equal(expectedDigest)
+        response.contentMd5 must equal(md5Digest)
         response.maybeVersionId.fold(fail("unable to get version id")) {
           vId => vId mustEqual versionId
         }
@@ -217,7 +218,7 @@ class FileRepositorySpec
     val versionId = fileStore.get(versionedBucketName).get.getObject(key).get.result.getVersionId
     whenReady(repository.getObject(versionedBucketName, key)) {
       response =>
-        response.contentMd5 must equal(expectedDigest)
+        response.contentMd5 must equal(md5Digest)
         response.maybeVersionId.fold(fail("unable to get version id")) {
           vId => vId mustEqual versionId
         }

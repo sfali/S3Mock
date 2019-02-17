@@ -27,14 +27,15 @@ class StreamsSpec
   private val fileStream = FileStream()
   private val basePath = "src/test/resources/"
   private val srcPath = Paths.get(basePath, "sample.txt").toAbsolutePath
-  private val expectedDigest = "37099E6F8B99C52CD81DF0041543E5B0"
+  private val etagDigest = "37099e6f8b99c52cd81df0041543e5b0"
+  private val md5Digest = "Nwmeb4uZxSzYHfAEFUPlsA=="
 
   override protected def afterAll(): Unit = {
     super.afterAll()
     TestKit.shutdownActorSystem(system)
   }
 
-  it should "calculate the correct diget" in {
+  it should "calculate the correct digest" in {
     val eventualDigest =
       FileIO
         .fromPath(srcPath)
@@ -42,7 +43,9 @@ class StreamsSpec
         .runWith(Sink.head)
 
     whenReady(eventualDigest) {
-      digest => expectedDigest must equal(digest)
+      case (etag, md5) =>
+        etagDigest must equal(etag)
+        md5Digest must equal(md5)
     }
   }
 
@@ -58,7 +61,9 @@ class StreamsSpec
         .run()
 
     whenReady(eventualDigest) {
-      digest => expectedDigest must equal(digest)
+      case (etag, md5) =>
+        etagDigest must equal(etag)
+        md5Digest must equal(md5)
     }
 
     whenReady(eventualIoResult) {
@@ -85,10 +90,11 @@ class StreamsSpec
     val eventualDigest = fileStream.saveContent(request.entity.dataBytes, destinationPath)
 
     whenReady(eventualDigest) {
-      digest =>
+      case (etag, md5) =>
         Files.exists(destinationPath) mustBe true
         Files.deleteIfExists(destinationPath)
-        expectedDigest must equal(digest)
+        etagDigest must equal(etag)
+        md5Digest must equal(md5)
     }
   }
 
@@ -99,10 +105,11 @@ class StreamsSpec
     val eventualDigest = fileStream.mergeFiles(destinationPath, files)
 
     whenReady(eventualDigest) {
-      digest =>
+      case (etag, md5) =>
         Files.exists(destinationPath) mustBe true
         Files.deleteIfExists(destinationPath)
-        expectedDigest must equal(digest)
+        etagDigest must equal(etag)
+        md5Digest must equal(md5)
     }
   }
 
@@ -111,9 +118,10 @@ class StreamsSpec
     val destinationPath = Files.createTempFile("test", ".txt")
 
     whenReady(fileStream.copyPart(sourcePath, destinationPath)) {
-      eTag =>
+      case (etag, md5) =>
         Files.size(sourcePath) must equal(Files.size(destinationPath))
-        eTag must equal(expectedDigest)
+        etagDigest must equal(etag)
+        md5Digest must equal(md5)
         Files.deleteIfExists(destinationPath)
 
     }
@@ -124,8 +132,9 @@ class StreamsSpec
     val destinationPath = Files.createTempFile("test", ".txt")
 
     whenReady(fileStream.copyPart(sourcePath, destinationPath, Some(ByteRange(300, 350)))){
-      eTag =>
-        eTag must equal(md5Hex("A quick brown fox jumps over the silly lazy dog.\r\n"))
+      case (etag, md5) =>
+        etag must equal(md5Hex("A quick brown fox jumps over the silly lazy dog.\r\n"))
+        md5 must equal(toBase64("A quick brown fox jumps over the silly lazy dog.\r\n"))
         Files.deleteIfExists(destinationPath)
     }
   }

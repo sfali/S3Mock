@@ -28,16 +28,20 @@ package object s3 {
 
   private val md = MessageDigest.getInstance("MD5")
 
-  def md5Hex(s: String): String = {
-    md.reset()
-    md.update(s.getBytes)
-    DatatypeConverter.printHexBinary(md.digest())
-  }
+  def md5Hex(s: String): String = md5Hex(s.getBytes)
 
   def md5Hex(bytes: Array[Byte]): String = {
     md.reset()
     md.update(bytes)
-    DatatypeConverter.printHexBinary(md.digest())
+    DatatypeConverter.printHexBinary(md.digest()).toLowerCase
+  }
+
+  def toBase64(s: String): String = toBase64(s.getBytes)
+
+  def toBase64(bytes: Array[Byte]): String = {
+    md.reset()
+    md.update(bytes)
+    DatatypeConverter.printBase64Binary(md.digest())
   }
 
   def md5Hex(path: Path): String = md5Hex(Files.readAllBytes(path))
