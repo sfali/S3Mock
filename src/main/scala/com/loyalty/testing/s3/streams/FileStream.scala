@@ -50,7 +50,9 @@ class FileStream private(implicit mat: ActorMaterializer) {
     (downloadRange, source)
   }
 
-  def copyPart(sourcePath: Path, destinationPath: Path, maybeSourceRange: Option[ByteRange] = None): Future[(String, String)] = {
+  def copyPart(sourcePath: Path,
+               destinationPath: Path,
+               maybeSourceRange: Option[ByteRange] = None): Future[(String, String)] = {
     val downloadSource = downloadFile(sourcePath, maybeRange = maybeSourceRange)
     saveContent(downloadSource._2, destinationPath)
   }

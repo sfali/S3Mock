@@ -35,6 +35,7 @@ trait S3Routes {
         concat(
           GetObjectMetadataRoute().route(bucketName, objectName),
           CompleteMultipartUploadRoute(notificationRouter).route(bucketName, objectName),
+          CopyObjectRoute(notificationRouter, log, repository).route(bucketName, objectName),
           CopyMultipartRoute().route(bucketName, objectName),
           UploadMultipartRoute().route(bucketName, objectName),
           InitiateMultipartUploadRoute().route(bucketName, objectName),
