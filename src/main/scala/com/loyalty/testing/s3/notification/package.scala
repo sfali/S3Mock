@@ -5,17 +5,17 @@ import java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
 
 import io.circe._
 import io.circe.generic.semiauto._
-import io.circe.java8.time.{decodeZonedDateTime, encodeZonedDateTime}
+import io.circe.java8.time.{decodeZonedDateTimeWithFormatter, encodeZonedDateTimeWithFormatter}
 
 package object notification {
 
   import parser._
 
   implicit final val decodeZonedDateTimeDefault: Decoder[ZonedDateTime] =
-    decodeZonedDateTime(ISO_OFFSET_DATE_TIME)
+    decodeZonedDateTimeWithFormatter(ISO_OFFSET_DATE_TIME)
 
   implicit final val encodeZonedDateTimeDefault: Encoder[ZonedDateTime] =
-    encodeZonedDateTime(ISO_OFFSET_DATE_TIME)
+    encodeZonedDateTimeWithFormatter(ISO_OFFSET_DATE_TIME)
 
   case class SqsEvent(Records: List[SqsRecord])
 

@@ -22,10 +22,12 @@ lazy val root = (project in file("."))
     parallelExecution in IntegrationTest := false,
     libraryDependencies ++= {
 
-      val akkaVersion = "2.5.14"
-      val akkaHttpVersion = "10.1.3"
-      val circeVersion = "0.9.3"
-      val amazonawsVersion = "1.11.388"
+      val akkaVersion = "2.5.21"
+      val akkaHttpVersion = "10.1.7"
+      val circeVersion = "0.11.1"
+      val amazonawsVersion = "1.11.502"
+      val akkaHttpCirceVersion = "1.25.2"
+      val scalaXmlVersion = "1.1.1"
 
       val akka = "com.typesafe.akka"
       val scalaTest = "org.scalatest"
@@ -48,8 +50,8 @@ lazy val root = (project in file("."))
         circe            %% "circe-generic"                     % circeVersion,
         circe            %% "circe-parser"                      % circeVersion,
         circe            %% "circe-java8"                       % circeVersion,
-        heikoseeberger   %% "akka-http-circe"                   % "1.21.0",
-        scalaLangModules %% "scala-xml"                         % "1.0.6",
+        heikoseeberger   %% "akka-http-circe"                   % akkaHttpCirceVersion,
+        scalaLangModules %% "scala-xml"                         % scalaXmlVersion,
         amazonaws        % "aws-java-sdk-s3"                    % amazonawsVersion,
         amazonaws        % "aws-java-sdk-sqs"                   % amazonawsVersion,
         amazonaws        % "aws-java-sdk-sns"                   % amazonawsVersion,
