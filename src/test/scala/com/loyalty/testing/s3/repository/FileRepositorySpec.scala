@@ -231,9 +231,33 @@ class FileRepositorySpec
       | versioning on but version id provided
     """.stripMargin.replaceAll(System.lineSeparator(), "") in {
     val key = "sample.txt"
-    val eventualResponse = repository.getObject(defaultBucketName, key, Some(md5HexFromRandomUUID))
+    val eventualResponse = repository.getObject(defaultBucketName, key, Some(toBase16FromRandomUUID))
     whenReady(eventualResponse.failed) {
       ex => ex mustBe a[NoSuchKeyException]
+    }
+  }
+  
+  it should "copy object from one path to another path within same bucket" in {
+    val fileName = "sample1.txt"
+    val sourceKey = s"$fileName"
+    val destKey = s"/output/$fileName"
+    val eventualResponse = repository.copyObject(versionedBucketName, destKey, versionedBucketName, sourceKey)
+    whenReady(eventualResponse) {
+      case (objectMetadata, copyResult) =>
+        Files.exists(objectMetadata.path) mustEqual true
+        copyResult.eTag mustEqual objectMetadata.result.getETag
+    }
+  }
+
+  it should "copy object from one path to another path between two buckets bucket" in {
+    val fileName = "sample1.txt"
+    val sourceKey = s"$fileName"
+    val destKey = s"/output/$fileName"
+    val eventualResponse = repository.copyObject(defaultBucketName, destKey, versionedBucketName, sourceKey)
+    whenReady(eventualResponse) {
+      case (objectMetadata, copyResult) =>
+        Files.exists(objectMetadata.path) mustEqual true
+        copyResult.eTag mustEqual objectMetadata.result.getETag
     }
   }
 
