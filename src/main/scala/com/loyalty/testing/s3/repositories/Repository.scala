@@ -30,6 +30,12 @@ trait Repository {
   def uploadMultipart(bucketName: String, key: String, partNumber: Int, uploadId: String,
                       contentSource: Source[ByteString, _]): Future[ObjectMeta]
 
+  def copyObject(bucketName: String,
+                 key: String,
+                 sourceBucketName: String,
+                 sourceKey: String,
+                 maybeSourceVersionId: Option[String] = None) : Future[(ObjectMeta, CopyObjectResult)]
+
   def copyMultipart(bucketName: String,
                     key: String,
                     partNumber: Int,

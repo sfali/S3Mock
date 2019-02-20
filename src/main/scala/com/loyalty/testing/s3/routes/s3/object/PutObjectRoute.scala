@@ -26,15 +26,15 @@ class PutObjectRoute private(notificationRouterRef: ActorRef, log: LoggingAdapte
         onComplete(eventualResult) {
           case Success(objectMeta) =>
             val putObjectResult = objectMeta.result
+            val maybeVersionId = Option(putObjectResult.getVersionId)
             val notificationData = NotificationData(bucketName, key,
-              putObjectResult.getMetadata.getContentLength, putObjectResult.getETag, Option(putObjectResult.getVersionId))
+              putObjectResult.getMetadata.getContentLength, putObjectResult.getETag, maybeVersionId)
             notificationRouterRef ! NotificationRouter.SendNotification(notificationData)
 
-            val result = objectMeta.result
             var response = HttpResponse(OK)
-              .withHeaders(RawHeader(CONTENT_MD5, result.getContentMd5),
-                RawHeader(ETAG, s""""${result.getETag}""""))
-            response = Option(result.getVersionId)
+              .withHeaders(RawHeader(CONTENT_MD5, putObjectResult.getContentMd5),
+                RawHeader(ETAG, s""""${putObjectResult.getETag}""""))
+            response = maybeVersionId
               .map(versionId => response.addHeader(RawHeader("x-amz-version-id", versionId)))
               .getOrElse(response)
             complete(response)

@@ -5,6 +5,7 @@
 .toDelete
 # IDEA
 .idea/**
+s3/initial.json
 
 # sbt specific
 project/.sbtserver

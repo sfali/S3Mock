@@ -7,7 +7,7 @@ import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 
-import akka.http.scaladsl.model.headers.ByteRange
+import akka.http.scaladsl.model.headers.{ByteRange, RawHeader}
 import akka.http.scaladsl.model.headers.ByteRange.{FromOffset, Slice, Suffix}
 import com.amazonaws.services.s3.model.{ObjectMetadata, PutObjectResult}
 import com.amazonaws.services.sns.AmazonSNSAsync
@@ -28,21 +28,25 @@ package object s3 {
 
   private val md = MessageDigest.getInstance("MD5")
 
-  def md5Hex(s: String): String = {
-    md.reset()
-    md.update(s.getBytes)
-    DatatypeConverter.printHexBinary(md.digest())
-  }
+  def toBase16(s: String): String = toBase16(s.getBytes)
 
-  def md5Hex(bytes: Array[Byte]): String = {
+  def toBase16(bytes: Array[Byte]): String = {
     md.reset()
     md.update(bytes)
-    DatatypeConverter.printHexBinary(md.digest())
+    DatatypeConverter.printHexBinary(md.digest()).toLowerCase
   }
 
-  def md5Hex(path: Path): String = md5Hex(Files.readAllBytes(path))
+  def toBase64(s: String): String = toBase64(s.getBytes)
 
-  def md5HexFromRandomUUID: String = md5Hex(UUID.randomUUID().toString)
+  def toBase64(bytes: Array[Byte]): String = {
+    md.reset()
+    md.update(bytes)
+    DatatypeConverter.printBase64Binary(md.digest())
+  }
+
+  def md5Hex(path: Path): String = toBase16(Files.readAllBytes(path))
+
+  def toBase16FromRandomUUID: String = toBase16(UUID.randomUUID().toString)
 
   implicit class StringOps(s: String) {
     def decode: String = URLDecoder.decode(s, UTF_8.toString)
@@ -77,7 +81,7 @@ package object s3 {
                                           key: String,
                                           parts: List[UploadPart],
                                           maybeVersionId: Option[String] = None): CompleteMultipartUploadResult = {
-    val hex = md5Hex(parts.map(_.eTag).mkString)
+    val hex = toBase16(parts.map(_.eTag).mkString)
     val eTag = s"$hex-${parts.length}"
 
     CompleteMultipartUploadResult(bucketName, key, eTag, 0L, maybeVersionId)
@@ -134,6 +138,13 @@ package object s3 {
 
   private def createDirectories(path: Path): Unit = {
     if (Files.notExists(path)) Files.createDirectories(path)
+  }
+
+  implicit class HeaderOps(headers: List[RawHeader]) {
+    def +(key: String, value: String): List[RawHeader] = headers :+ RawHeader(key, value)
+
+    def +(key: String, maybeValue: Option[String]): List[RawHeader] =
+      maybeValue.map(value => headers :+ RawHeader(key, value)).getOrElse(headers)
   }
 
 }

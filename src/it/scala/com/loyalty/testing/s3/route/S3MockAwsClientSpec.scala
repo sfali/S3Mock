@@ -16,6 +16,7 @@ import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.{FileRepository, FileStore}
 import com.loyalty.testing.s3.response.ErrorCodes
 import com.typesafe.config.ConfigFactory
+import javax.xml.bind.DatatypeConverter
 import org.apache.commons.io.IOUtils
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, MustMatchers}
@@ -80,6 +81,21 @@ class S3MockAwsClientSpec
     val path = Paths.get("src", "it", "resources", "sample.txt").toAbsolutePath
     val completeResult = s3Client.multipartUpload(defaultBucketName, key, path)
     log.info("Multipart complete {}:{}", completeResult.getETag, completeResult.getVersionId)
+  }
+
+  it should "put object" in {
+    val key = "input/upload1.txt"
+    val path = Paths.get("src", "it", "resources", "sample.txt").toAbsolutePath
+    val result = s3Client.putObject(defaultBucketName, key, path)
+    val v = DatatypeConverter.printHexBinary(result.getETag.getBytes)
+    log.info("{} : {} : {}", result.getETag, result.getContentMd5, v)
+  }
+
+  it should "copy object" in{
+    val key = "output/upload1.txt"
+    val sourceKey = "input/upload1.txt"
+    val result = s3Client.copyObject(defaultBucketName, key, defaultBucketName, sourceKey)
+    log.info("Copy = {}: {}", result.getETag, result.getVersionId)
   }
 
   it should "get object" in {

@@ -6,14 +6,15 @@ import java.security.MessageDigest
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.util.ByteString
+import com.amazonaws.util.BinaryUtils
 import javax.xml.bind.DatatypeConverter
 
-class DigestCalculator(algorithm: String) extends GraphStage[FlowShape[ByteString, String]] {
+class DigestCalculator(algorithm: String) extends GraphStage[FlowShape[ByteString, (String, String)]] {
 
   private val in = Inlet[ByteString]("DigestCalculator.in")
-  private val out = Outlet[String]("DigestCalculator.out")
+  private val out = Outlet[(String, String)]("DigestCalculator.out")
 
-  override def shape: FlowShape[ByteString, String] = FlowShape(in, out)
+  override def shape: FlowShape[ByteString, (String, String)] = FlowShape(in, out)
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new GraphStageLogic(shape) {
@@ -31,7 +32,10 @@ class DigestCalculator(algorithm: String) extends GraphStage[FlowShape[ByteStrin
         }
 
         override def onUpstreamFinish(): Unit = {
-          emit(out, DatatypeConverter.printHexBinary(digest.digest()))
+          val bytes = digest.digest()
+          val etag = DatatypeConverter.printHexBinary(bytes).toLowerCase
+          val contentMd5 = DatatypeConverter.printBase64Binary(bytes)
+          emit(out, (etag, contentMd5))
           completeStage()
         }
       })

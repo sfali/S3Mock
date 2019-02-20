@@ -41,6 +41,15 @@ case class InitiateMultipartUploadResult(bucketName: String, key: String, upload
     </InitiateMultipartUploadResult>
 }
 
+case class CopyObjectResult(eTag: String,
+                            lastModifiedDate: Instant = Instant.now()) extends XmlResponse {
+  override def toXml: Elem =
+    <CopyObjectResult>
+      <LastModified>{lastModifiedDate.toString}</LastModified>
+      <ETag>"{eTag}"</ETag>
+    </CopyObjectResult>
+}
+
 case class CopyPartResult(eTag: String, lastModifiedDate: Instant = Instant.now(),
                           maybeVersionId: Option[String] = None) extends XmlResponse {
   override def toXml: Elem =

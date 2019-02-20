@@ -3,7 +3,7 @@ package com.loyalty.testing.s3.it.client
 import java.nio.file.{Files, Path}
 
 import akka.http.scaladsl.model.headers.ByteRange
-import com.amazonaws.services.s3.AmazonS3ClientBuilder
+import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
 import com.amazonaws.services.s3.model._
 import com.loyalty.testing.s3.it.{AwsSettings, Settings}
 
@@ -15,7 +15,7 @@ class AwsClient(awsSettings: AwsSettings) {
 
   private val ChunkSize = 5 * 1024 * 1024
 
-  private val s3Client = {
+  private val s3Client: AmazonS3 = {
     val builder = AmazonS3ClientBuilder
       .standard()
       .withCredentials(awsSettings.credentialsProvider)
@@ -52,6 +52,16 @@ class AwsClient(awsSettings: AwsSettings) {
 
   def putObject(bucketName: String, key: String, path: Path): PutObjectResult =
     s3Client.putObject(bucketName, key, path.toFile)
+
+  def copyObject(bucketName: String,
+                 key: String,
+                 sourceBucketName: String,
+                 sourceKey: String,
+                 maybeSourceVersionId: Option[String] = None): CopyObjectResult = {
+    var request = new CopyObjectRequest(sourceBucketName, sourceKey, bucketName, key)
+    request = maybeSourceVersionId.map(versionId => request.withSourceVersionId(versionId)).getOrElse(request)
+    s3Client.copyObject(request)
+  }
 
 
   private def initiateMultipartUpload(bucketName: String, key: String): InitiateMultipartUploadResult = {
