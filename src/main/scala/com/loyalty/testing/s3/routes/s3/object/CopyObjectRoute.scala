@@ -62,16 +62,6 @@ class CopyObjectRoute private(notificationRouterRef: ActorRef,
       ("x-amz-copy-source-version-id", maybeVersionId) +
       ("x-amz-version-id", maybeVersionId)
 
-    /* headers=
-       maybeSourceVersionId
-         .map(versionId => headers :+ RawHeader("x-amz-copy-source-version-id", versionId))
-         .getOrElse(headers)*/
-
-    /*headers=
-      maybeVersionId
-        .map(versionId => headers :+ RawHeader("x-amz-version-id", versionId))
-        .getOrElse(headers)*/
-
     val entity = HttpEntity(
       ContentType(MediaTypes.`application/xml`, HttpCharsets.`UTF-8`),
       copyObjectResult.toXml.toString())

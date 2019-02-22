@@ -117,6 +117,9 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
   private def getObjectPath(bucketMetadata: BucketMetadata, key: String,
                             maybeVersionId: Option[String] = None): Path = {
     val parentPath = bucketMetadata.path -> key
+    log.debug("event=GetObjectPath, bucket_name={}, key={}, version_id={}, parent_path={}",
+      bucketMetadata.bucketName, key, maybeVersionId.getOrElse("N/A"), parentPath)
+    log.debug("BucketMetadata={}", bucketMetadata)
 
     maybeVersionId.map(versionId => parentPath -> (versionId, ContentFileName))
       .getOrElse(bucketMetadata.getObject(key).get.path)
@@ -198,9 +201,10 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
                   case (etag, contentMD5) =>
                     if (Files.notExists(filePath)) Future.failed(new RuntimeException("unable to save file"))
                     else {
+                      log.debug("etag={}, contentMD5={}, etag={}", etag, contentMD5, result.eTag)
                       val contentLength = Files.size(filePath)
                       val response = ObjectMeta(filePath,
-                        createPutObjectResult(etag, contentMD5, contentLength, maybeVersionId))
+                        createPutObjectResult(result.eTag, contentMD5, contentLength, maybeVersionId))
                       bucketMetadata.putObject(key, response)
                       Future.successful(result.copy(contentLength = contentLength))
                     }
@@ -264,7 +268,9 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
           Files.createDirectories(destinationPath.getParent)
           fileStream.copyPart(meta.path, destinationPath, maybeSourceRange)
             .map {
-              case (etag, _) => CopyPartResult(etag)
+              case (etag, _) =>
+                log.debug("Copy part # {} for {} with etag {}", partNumber, key, etag)
+                CopyPartResult(etag)
             }
         }
     }
