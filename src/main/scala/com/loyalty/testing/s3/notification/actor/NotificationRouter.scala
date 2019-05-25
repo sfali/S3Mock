@@ -3,7 +3,6 @@ package com.loyalty.testing.s3.notification.actor
 import akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import com.loyalty.testing.s3.Settings
-import com.loyalty.testing.s3.notification.DestinationType.DestinationType
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationData}
 
 import scala.concurrent.duration._

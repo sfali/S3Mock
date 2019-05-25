@@ -1,15 +1,16 @@
 package com.loyalty.testing.s3.notification
 
-import io.circe.Decoder.enumDecoder
-import io.circe.Encoder.enumEncoder
-import io.circe.{Decoder, Encoder}
+import enumeratum.{CirceEnum, Enum, EnumEntry}
 
-object DestinationType extends Enumeration {
+import scala.collection.immutable
 
-  type DestinationType = Value
+sealed trait DestinationType extends EnumEntry
 
-  val Sqs, Sns = Value
+object DestinationType extends Enum[DestinationType] with CirceEnum[DestinationType] {
+  override def values: immutable.IndexedSeq[DestinationType] = findValues
 
-  implicit val encoder: Encoder[DestinationType] = enumEncoder(DestinationType)
-  implicit val decoder: Decoder[DestinationType] = enumDecoder(DestinationType)
+  case object Sqs extends DestinationType
+
+  case object Sns extends DestinationType
+
 }

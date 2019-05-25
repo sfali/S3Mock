@@ -14,7 +14,8 @@ import com.loyalty.testing.s3.repositories.{FileRepository, FileStore}
 import com.loyalty.testing.s3.request.{BucketVersioning, CreateBucketConfiguration}
 import com.loyalty.testing.s3.routes.S3Routes
 import com.typesafe.config.ConfigFactory
-import io.circe.parser.decode
+import io.circe.generic.auto._
+import io.circe.parser._
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
