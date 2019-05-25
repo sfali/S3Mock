@@ -13,4 +13,6 @@ object DestinationType extends Enum[DestinationType] with CirceEnum[DestinationT
 
   case object Sns extends DestinationType
 
+  case object Cloud extends DestinationType
+
 }
