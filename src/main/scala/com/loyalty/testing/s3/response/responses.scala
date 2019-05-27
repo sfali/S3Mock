@@ -79,6 +79,7 @@ object ErrorCodes {
   val NoSuchUpload: String = "NoSuchUpload"
   val InvalidPart = "InvalidPart"
   val InvalidPartOrder = "InvalidPartOrder"
+  val InvalidArgument = "InvalidArgument"
 }
 
 sealed trait ErrorResponse extends Throwable with XmlResponse {
@@ -143,6 +144,11 @@ case class InvalidPartOrderException(bucketName: String, key: String) extends Er
       |The list of parts was not in ascending order. The parts list must be specified in order by part number.
     """.stripMargin.replaceAll(System.lineSeparator(), "")
   override val resource: String = s"/$bucketName/$key"
+}
+
+case class InvalidNotificationConfigurationException(bucketName: String, override val message: String) extends ErrorResponse {
+  override val code: String = InvalidArgument
+  override val resource: String = bucketName
 }
 
 /*case class NoSuchBucketException(bucketName: String)

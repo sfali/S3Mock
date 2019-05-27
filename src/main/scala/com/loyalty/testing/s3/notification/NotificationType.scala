@@ -4,15 +4,14 @@ import enumeratum.{CirceEnum, Enum, EnumEntry}
 
 import scala.collection.immutable
 
-sealed trait NotificationType extends EnumEntry
+sealed abstract class NotificationType(operations: OperationType *) extends EnumEntry
 
 object NotificationType extends Enum[NotificationType] with CirceEnum[NotificationType] {
   override def values: immutable.IndexedSeq[NotificationType] = findValues
 
-  @deprecated
-  case object ObjectCreateAll extends NotificationType
+  import OperationType._
 
-  case object ObjectCreated extends NotificationType
+  case object ObjectCreated extends NotificationType(*, Put, Post, Copy, CompleteMultipartUpload)
 
-  case object ObjectRemoved extends NotificationType
+  case object ObjectRemoved extends NotificationType(*, Delete, DeleteMarkerCreated)
 }
