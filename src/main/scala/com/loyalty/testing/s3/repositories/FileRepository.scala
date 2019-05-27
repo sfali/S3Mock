@@ -2,11 +2,13 @@ package com.loyalty.testing.s3.repositories
 
 import java.nio.file._
 
+import akka.Done
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.request.BucketVersioning.BucketVersioning
 import com.loyalty.testing.s3.request._
 import com.loyalty.testing.s3.response._
@@ -61,6 +63,15 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
           BucketResponse(bucketName, bucketMetaData.location,
             bucketMetaData.maybeBucketVersioning.map(_.bucketVersioning))
         }
+    }
+
+  override def putBucketNotification(bucketName: String, notifications: List[Notification]): Future[Done] =
+    fileStore.get(bucketName) match {
+      case None => Future.failed(NoSuchBucketException(bucketName))
+      case Some(bucketMetadata) =>
+        bucketMetadata.notifications = notifications
+        fileStore.add(bucketName, bucketMetadata)
+        Future.successful(Done)
     }
 
   override def putObject(bucketName: String, key: String, contentSource: Source[ByteString, _]): Future[ObjectMeta] =
