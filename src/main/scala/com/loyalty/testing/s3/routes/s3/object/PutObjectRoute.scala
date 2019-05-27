@@ -12,10 +12,14 @@ import com.loyalty.testing.s3.notification.NotificationData
 import com.loyalty.testing.s3.notification.actor.NotificationRouter
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.response.NoSuchBucketException
+import com.loyalty.testing.s3.routes.CustomMarshallers
 
 import scala.util.{Failure, Success}
 
-class PutObjectRoute private(notificationRouterRef: ActorRef, log: LoggingAdapter, repository: Repository) {
+class PutObjectRoute private(notificationRouterRef: ActorRef,
+                             log: LoggingAdapter,
+                             repository: Repository)
+  extends CustomMarshallers {
 
   import Headers._
 
@@ -38,7 +42,7 @@ class PutObjectRoute private(notificationRouterRef: ActorRef, log: LoggingAdapte
               .map(versionId => response.addHeader(RawHeader("x-amz-version-id", versionId)))
               .getOrElse(response)
             complete(response)
-          case Failure(ex: NoSuchBucketException) => complete(HttpResponse(NotFound, entity = ex.toXml.toString()))
+          case Failure(ex: NoSuchBucketException) => complete(ex)
           case Failure(ex) =>
             log.error(ex, "Error happened while putting object {} in bucket: {}", key, bucketName)
             complete(HttpResponse(InternalServerError))
