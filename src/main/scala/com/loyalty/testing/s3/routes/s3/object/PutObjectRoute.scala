@@ -32,7 +32,7 @@ class PutObjectRoute private(notificationRouterRef: ActorRef,
             val putObjectResult = objectMeta.result
             val maybeVersionId = Option(putObjectResult.getVersionId)
             val notificationData = NotificationData(bucketName, key,
-              putObjectResult.getMetadata.getContentLength, putObjectResult.getETag, maybeVersionId)
+              putObjectResult.getMetadata.getContentLength, putObjectResult.getETag, "Put", maybeVersionId)
             notificationRouterRef ! NotificationRouter.SendNotification(notificationData)
 
             var response = HttpResponse(OK)

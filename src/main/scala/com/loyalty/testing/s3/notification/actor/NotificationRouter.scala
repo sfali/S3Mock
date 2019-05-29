@@ -3,11 +3,13 @@ package com.loyalty.testing.s3.notification.actor
 import akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import com.loyalty.testing.s3.Settings
-import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationData}
+import com.loyalty.testing.s3.notification.{DestinationType, NotificationData, NotificationMeta}
+import com.loyalty.testing.s3.repositories.FileStore
 
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 
-class NotificationRouter(notifications: List[Notification])(implicit settings: Settings)
+class NotificationRouter(fileStore: FileStore)(implicit settings: Settings)
   extends Actor
     with ActorLogging {
 
@@ -24,31 +26,51 @@ class NotificationRouter(notifications: List[Notification])(implicit settings: S
 
   override def receive: Receive = {
     case SendNotification(notificationData) =>
-      if (notifications.nonEmpty) {
-        notifications
-          .foreach {
-            notification =>
-              val bucketMatch = notification.bucketName == notificationData.bucketName
-              val prefixMatch = notification.prefix.exists(notificationData.key.startsWith)
-              val suffixMatch = notification.suffix.exists(notificationData.key.endsWith)
-              if (bucketMatch && prefixMatch && suffixMatch) {
-                self ! SendNotificationToDestination(notification.destinationType,
-                  notification.destinationName, notification.name, notificationData)
-              } else {
-                log.warning("No match for notification: {} : {}", notification, notificationData)
+      fileStore.get(notificationData.bucketName) match {
+        case Some(bucketMetadata) =>
+          val notifications = bucketMetadata.notifications
+          if (notifications.nonEmpty) {
+            notifications
+              .foreach {
+                notification =>
+                  val prefixMatch = notification.prefix.exists(notificationData.key.startsWith) || notification.prefix.isEmpty
+                  val suffixMatch = notification.suffix.exists(notificationData.key.endsWith) || notification.suffix.isEmpty
+                  if (prefixMatch && suffixMatch) {
+                    self ! SendNotificationToDestination(NotificationMeta(notification), notificationData)
+                  } else {
+                    val argArray = ArrayBuffer.empty[String]
+                    val msgArray = ArrayBuffer.empty[String]
+                    if(!prefixMatch) {
+                      argArray += notificationData.key
+                      argArray += notification.prefix.getOrElse("")
+                      msgArray += "Key prefix does not match key = {}, prefix = {}"
+                    }
+                    if(!suffixMatch) {
+                      argArray += notificationData.key
+                      argArray += notification.suffix.getOrElse("")
+                      msgArray += "Key suffix does not match key = {}, suffix = {}"
+                    }
+                    argArray += notification.bucketName
+                    val msg = s"${msgArray.mkString(", ")}, not sending notification for bucket: {}"
+                    log.warning(msg, argArray.toArray)
+                  }
               }
+          } else {
+            log.warning("No notification is setup for bucket: {}", notificationData.bucketName)
           }
-      } else {
-        log.warning("No notification is setup for bucket: {}", notificationData.bucketName)
+
+        case None =>
+          log.warning("Unable to get bucket meta data for bucket: {}, skipping notification",
+            notificationData.bucketName)
       }
 
-    case SendNotificationToDestination(destinationType, destinationName, configName, notificationData)
-      if destinationType == Sqs =>
-      routerState.router.route(SqsNotification(destinationName, configName, notificationData), sender())
+    case SendNotificationToDestination(notificationMeta, notificationData)
+      if notificationMeta.destinationType == Sqs =>
+      routerState.router.route(SqsNotification(notificationMeta, notificationData), sender())
 
-    case SendNotificationToDestination(destinationType, destinationName, configName, notificationData)
-      if destinationType == Sns =>
-      routerState.router.route(SnsNotification(destinationName, configName, notificationData), sender())
+    case SendNotificationToDestination(notificationMeta, notificationData)
+      if notificationMeta.destinationType == Sns =>
+      routerState.router.route(SnsNotification(notificationMeta, notificationData), sender())
 
     case Terminated(a) => routerState.removeRoutee(a)
 
@@ -58,14 +80,12 @@ class NotificationRouter(notifications: List[Notification])(implicit settings: S
 
 object NotificationRouter {
 
-  def props(notifications: List[Notification] = Nil)
-           (implicit settings: Settings): Props = Props(new NotificationRouter(notifications))
+  def props(fileStore: FileStore)
+           (implicit settings: Settings): Props = Props(new NotificationRouter(fileStore))
 
   case class SendNotification(notificationData: NotificationData)
 
-  private case class SendNotificationToDestination(destinationType: DestinationType,
-                                                   destinationName: String,
-                                                   configName: String,
+  private case class SendNotificationToDestination(notificationMeta: NotificationMeta,
                                                    notificationData: NotificationData)
 
   private class RouterState(context: ActorContext)(implicit settings: Settings) {

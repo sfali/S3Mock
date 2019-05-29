@@ -111,15 +111,16 @@ package object notification {
       deriveEncoder[UserIdentity]
   }
 
-  def generateSqsMessage(name: String,
+  def generateSqsMessage(notificationMeta: NotificationMeta,
                          notificationData: NotificationData): String = {
     val s3Object = S3Object(notificationData.key,
       notificationData.size,
       notificationData.eTag,
       notificationData.maybeVersionId)
     val bucket = Bucket(notificationData.bucketName)
-    val s3 = S3(configurationId = name, bucket = bucket, `object` = s3Object)
-    toJsonString(SqsEvent(SqsRecord(s3 = s3)))
+    val s3 = S3(configurationId = notificationMeta.configName, bucket = bucket, `object` = s3Object)
+    val eventName = s"${notificationMeta.notificationType}:${notificationData.operation}"
+    toJsonString(SqsEvent(SqsRecord(eventName = eventName, s3 = s3)))
   }
 
 }

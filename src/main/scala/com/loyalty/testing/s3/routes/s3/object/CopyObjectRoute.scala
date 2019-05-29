@@ -53,7 +53,7 @@ class CopyObjectRoute private(notificationRouterRef: ActorRef,
     val maybeVersionId = Option(putObjectResult.getVersionId)
     // send notification, if applicable
     val notificationData = NotificationData(bucketName, key,
-      putObjectResult.getMetadata.getContentLength, putObjectResult.getETag, maybeVersionId)
+      putObjectResult.getMetadata.getContentLength, putObjectResult.getETag, "Copy", maybeVersionId)
     notificationRouterRef ! NotificationRouter.SendNotification(notificationData)
 
     val headers = Nil +

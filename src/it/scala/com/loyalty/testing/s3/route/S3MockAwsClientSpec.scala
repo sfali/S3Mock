@@ -36,13 +36,12 @@ class S3MockAwsClientSpec
   private val log = system.log
   private implicit val mat: ActorMaterializer = ActorMaterializer()
   private val root: Path = Paths.get(System.getProperty("user.dir"), "tmp", "s3mock")
-  private implicit val repository: FileRepository = FileRepository(FileStore(root), log)
+  private val fileStore: FileStore = FileStore(root)
+  private implicit val repository: FileRepository = FileRepository(fileStore, log)
   private val s3Client = AwsClient(S3MockAwsClientSpec.AwsSettingsImpl)
 
   private val defaultBucketName = "data-transfer"
-  private val notification = Notification(destinationName = "queue1", bucketName = defaultBucketName,
-    prefix = Some("input/"), suffix = Some(".txt"))
-  private val s3Mock = S3Mock(notification :: Nil)
+  private val s3Mock = S3Mock(fileStore)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -59,6 +58,12 @@ class S3MockAwsClientSpec
     val result = s3Client.createBucket(defaultBucketName)
     Option(result) must not be empty
     result.getName must equal(defaultBucketName)
+  }
+
+  it should "put bucket notification" in {
+    val notification = Notification(destinationName = "queue1", bucketName = defaultBucketName,
+      prefix = Some("input/"), suffix = Some(".txt"))
+    s3Client.setBucketNotification(defaultBucketName, notification)
   }
 
   it should "not create bucket which is already exists" in {
@@ -91,7 +96,7 @@ class S3MockAwsClientSpec
     log.info("{} : {} : {}", result.getETag, result.getContentMd5, v)
   }
 
-  it should "copy object" in{
+  it should "copy object" in {
     val key = "output/upload1.txt"
     val sourceKey = "input/upload1.txt"
     val result = s3Client.copyObject(defaultBucketName, key, defaultBucketName, sourceKey)
@@ -118,6 +123,19 @@ class S3MockAwsClientSpec
     val key = "input/upload.txt"
     val metadata = s3Client.getObjectMetadata(defaultBucketName, key)
     log.info("((((( {}:{} )))))", metadata.getContentLength, metadata.getVersionId)
+  }
+
+  it should "get NoSuchBucket error" in {
+    val path = Paths.get("src", "it", "resources", "sample.txt").toAbsolutePath
+    Try(s3Client.putObject("dummy", "dummy", path)) match {
+      case Failure(ex) =>
+        ex match {
+          case e: AmazonS3Exception =>
+            log.error("Message: {}, Xml: {}", ex.getMessage, e.getErrorResponseXml)
+          case _ => ex.printStackTrace()
+        }
+      case Success(result) => log.info(">>>>>>>>>>>>>>>> {}", result)
+    }
   }
 
 }

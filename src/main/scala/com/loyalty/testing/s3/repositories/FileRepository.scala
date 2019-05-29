@@ -69,9 +69,11 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
     fileStore.get(bucketName) match {
       case None => Future.failed(NoSuchBucketException(bucketName))
       case Some(bucketMetadata) =>
-        bucketMetadata.notifications = notifications
-        fileStore.add(bucketName, bucketMetadata)
-        Future.successful(Done)
+        Future.successful {
+          bucketMetadata.notifications = notifications
+          fileStore.add(bucketName, bucketMetadata)
+          Done
+        }
     }
 
   override def putObject(bucketName: String, key: String, contentSource: Source[ByteString, _]): Future[ObjectMeta] =

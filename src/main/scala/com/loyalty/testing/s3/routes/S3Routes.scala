@@ -7,7 +7,7 @@ import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.routes.s3.`object`._
-import com.loyalty.testing.s3.routes.s3.bucket.{CreateBucketRoute, SetBucketVersioningRoute}
+import com.loyalty.testing.s3.routes.s3.bucket._
 
 trait S3Routes {
 
@@ -19,7 +19,12 @@ trait S3Routes {
   protected val notificationRouter: ActorRef
 
   lazy val s3Routes: Route =
-    pathPrefix(Segment) { bucketName =>
+    (path(Segment ~ Slash) & entity(as[String]) & parameter('notification)) {
+      (bucketName, xml, _) =>
+        concat(
+          PutBucketNotificationRoute().route(bucketName, xml)
+        )
+    } ~ pathPrefix(Segment) { bucketName =>
       pathSingleSlash {
         concat(
           SetBucketVersioningRoute().route(bucketName),
