@@ -59,7 +59,7 @@ lazy val root = (project in file("."))
         Beachape         %% EnumeratumCirce                     % EnumeratumCirceVersion,
         heikoseeberger   %% "akka-http-circe"                   % akkaHttpCirceVersion,
         scalaLangModules %% "scala-xml"                         % scalaXmlVersion,
-        amazonaws        % "aws-java-sdk-s3"                    % amazonawsVersion,
+        amazonaws        % "aws-java-sdk-s3"                    % amazonawsVersion  % "it, test",
         amazonaws        % "aws-java-sdk-sqs"                   % amazonawsVersion,
         amazonaws        % "aws-java-sdk-sns"                   % amazonawsVersion,
         akka             %% "akka-testkit"                      % akkaVersion       % "it, test",

@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import com.amazonaws.services.s3.Headers
+import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.notification.NotificationData
 import com.loyalty.testing.s3.notification.actor.NotificationRouter
 import com.loyalty.testing.s3.repositories.Repository
@@ -21,8 +21,6 @@ class PutObjectRoute private(notificationRouterRef: ActorRef,
                              repository: Repository)
   extends CustomMarshallers {
 
-  import Headers._
-
   def route(bucketName: String, key: String): Route = {
     put {
       extractRequest { request =>
@@ -30,14 +28,14 @@ class PutObjectRoute private(notificationRouterRef: ActorRef,
         onComplete(eventualResult) {
           case Success(objectMeta) =>
             val putObjectResult = objectMeta.result
-            val maybeVersionId = Option(putObjectResult.getVersionId)
+            val maybeVersionId = putObjectResult.maybeVersionId
             val notificationData = NotificationData(bucketName, key,
-              putObjectResult.getMetadata.getContentLength, putObjectResult.getETag, "Put", maybeVersionId)
+              putObjectResult.contentLength, putObjectResult.etag, "Put", maybeVersionId)
             notificationRouterRef ! NotificationRouter.SendNotification(notificationData)
 
             var response = HttpResponse(OK)
-              .withHeaders(RawHeader(CONTENT_MD5, putObjectResult.getContentMd5),
-                RawHeader(ETAG, s""""${putObjectResult.getETag}""""))
+              .withHeaders(RawHeader(CONTENT_MD5, putObjectResult.contentMd5),
+                RawHeader(ETAG, s""""${putObjectResult.etag}""""))
             response = maybeVersionId
               .map(versionId => response.addHeader(RawHeader("x-amz-version-id", versionId)))
               .getOrElse(response)

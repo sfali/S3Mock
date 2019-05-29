@@ -122,8 +122,8 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
         else {
           val meta = maybeObj.get
           val sourceTuple = fileStream.downloadFile(meta.path, maybeRange = maybeRange)
-          Future.successful(GetObjectResponse(bucketName, key, meta.result.getETag, meta.result.getContentMd5,
-            sourceTuple._1.capacity, sourceTuple._2, Option(meta.result.getVersionId)))
+          Future.successful(GetObjectResponse(bucketName, key, meta.result.etag, meta.result.contentMd5,
+            sourceTuple._1.capacity, sourceTuple._2, meta.result.maybeVersionId))
         }
     }
 

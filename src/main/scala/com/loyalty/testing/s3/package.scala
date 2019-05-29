@@ -9,12 +9,11 @@ import java.util.concurrent.CompletableFuture
 
 import akka.http.scaladsl.model.headers.ByteRange.{FromOffset, Slice, Suffix}
 import akka.http.scaladsl.model.headers.{ByteRange, RawHeader}
-import com.amazonaws.services.s3.model.{ObjectMetadata, PutObjectResult}
 import com.amazonaws.services.sns.AmazonSNSAsync
 import com.amazonaws.services.sqs.AmazonSQSAsync
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.request.UploadPart
-import com.loyalty.testing.s3.response.{CompleteMultipartUploadResult, InvalidNotificationConfigurationException}
+import com.loyalty.testing.s3.response.{CompleteMultipartUploadResult, InvalidNotificationConfigurationException, PutObjectResult}
 import javax.xml.bind.DatatypeConverter
 
 import scala.concurrent.Future
@@ -27,6 +26,9 @@ package object s3 {
   type JavaFuture[V] = java.util.concurrent.Future[V]
 
   val defaultRegion: String = "us-east-1"
+
+  val ETAG = "ETag"
+  val CONTENT_MD5 = "Content-MD5"
 
   private val md = MessageDigest.getInstance("MD5")
 
@@ -98,18 +100,7 @@ package object s3 {
                             contentMd5: String,
                             contentLength: Long,
                             maybeVersionId: Option[String] = None): PutObjectResult = {
-    val objectMetadata = new ObjectMetadata()
-    objectMetadata.setContentLength(contentLength)
-    objectMetadata.setContentMD5(contentMd5)
-    val result = new PutObjectResult()
-    result.setContentMd5(contentMd5)
-    result.setETag(eTag)
-    result.setMetadata(objectMetadata)
-    maybeVersionId.fold(result) {
-      versionId =>
-        result.setVersionId(versionId)
-        result
-    }
+    PutObjectResult(eTag, contentMd5, contentLength, maybeVersionId)
   }
 
   implicit class JavaFutureOps[T](future: JavaFuture[T]) {

@@ -6,7 +6,6 @@ import java.time.Instant
 import akka.stream.IOResult
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import com.amazonaws.services.s3.model.PutObjectResult
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.request.BucketVersioning.BucketVersioning
 
@@ -15,6 +14,11 @@ import scala.xml.Elem
 
 case class BucketResponse(bucketName: String, locationConstraint: String = defaultRegion,
                           maybeBucketVersioning: Option[BucketVersioning] = None)
+
+case class PutObjectResult(etag: String,
+                           contentMd5: String,
+                           contentLength: Long,
+                           maybeVersionId: Option[String])
 
 case class ObjectMeta(path: Path, result: PutObjectResult)
 
