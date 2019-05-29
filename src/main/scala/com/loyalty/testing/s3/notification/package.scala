@@ -4,7 +4,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
 
 import io.circe._
-import io.circe.generic.semiauto._
+import io.circe.generic.auto._
 import io.circe.java8.time.{decodeZonedDateTimeWithFormatter, encodeZonedDateTimeWithFormatter}
 
 package object notification {
@@ -21,9 +21,6 @@ package object notification {
 
   object SqsEvent {
     def apply(sqsRecord: SqsRecord): SqsEvent = SqsEvent(sqsRecord :: Nil)
-
-    implicit val SqsEventDecoder: Decoder[SqsEvent] = deriveDecoder[SqsEvent]
-    implicit val SqsEventEncoder: Encoder[SqsEvent] = deriveEncoder[SqsEvent]
   }
 
   case class SqsRecord(eventVersion: String = "2.0",
@@ -37,39 +34,17 @@ package object notification {
                        responseElements: ResponseElements = ResponseElements(),
                        s3: S3)
 
-  object SqsRecord {
-    implicit val SqsRecordDecoder: Decoder[SqsRecord] = deriveDecoder[SqsRecord]
-    implicit val SqsRecordEncoder: Encoder[SqsRecord] = deriveEncoder[SqsRecord]
-  }
-
   case class S3Object(key: String,
                       size: Long,
                       eTag: String,
                       versionId: Option[String] = None,
                       sequencer: String = "0055AED6DCD90281E5")
 
-  object S3Object {
-    implicit val S3ObjectDecoder: Decoder[S3Object] = deriveDecoder[S3Object]
-    implicit val S3ObjectEncoder: Encoder[S3Object] = deriveEncoder[S3Object]
-  }
-
   case class OwnerIdentity(principalId: String = "A3NL1KOZZKExample")
-
-  object OwnerIdentity {
-    implicit val OwnerIdentityDecoder: Decoder[OwnerIdentity] =
-      deriveDecoder[OwnerIdentity]
-    implicit val OwnerIdentityEncoder: Encoder[OwnerIdentity] =
-      deriveEncoder[OwnerIdentity]
-  }
 
   case class Bucket(name: String,
                     ownerIdentity: OwnerIdentity = OwnerIdentity()) {
     val arn: String = s"arn:aws:s3:::$name"
-  }
-
-  object Bucket {
-    implicit val BucketDecoder: Decoder[Bucket] = deriveDecoder[Bucket]
-    implicit val BucketEncoder: Encoder[Bucket] = deriveEncoder[Bucket]
   }
 
   case class S3(s3SchemaVersion: String = "1.0",
@@ -77,39 +52,13 @@ package object notification {
                 bucket: Bucket,
                 `object`: S3Object)
 
-  object S3 {
-    implicit val S3Decoder: Decoder[S3] = deriveDecoder[S3]
-    implicit val S3Encoder: Encoder[S3] = deriveEncoder[S3]
-  }
-
   case class ResponseElements(`x-amz-request-id`: String = "C3D13FE58DE4C810",
                               `x-amz-id-2`: String =
                               "FMyUVURIY8/IgAtTv8xRjskZQpcIZ9KG4V5Wp6S7S/JRWeUWerMUE5JgHvANOjpD")
 
-  object ResponseElements {
-    implicit val ResponseElementsDecoder: Decoder[ResponseElements] =
-      deriveDecoder[ResponseElements]
-    implicit val ResponseElementsEncoder: Encoder[ResponseElements] =
-      deriveEncoder[ResponseElements]
-  }
-
   case class RequestParameters(sourceIPAddress: String = "0.0.0.0")
 
-  object RequestParameters {
-    implicit val RequestParametersDecoder: Decoder[RequestParameters] =
-      deriveDecoder[RequestParameters]
-    implicit val RequestParametersEncoder: Encoder[RequestParameters] =
-      deriveEncoder[RequestParameters]
-  }
-
   case class UserIdentity(principalId: String = "AIDAJDPLRKLG7UEXAMPLE")
-
-  object UserIdentity {
-    implicit val UserIdentityDecoder: Decoder[UserIdentity] =
-      deriveDecoder[UserIdentity]
-    implicit val UserIdentityEncoder: Encoder[UserIdentity] =
-      deriveEncoder[UserIdentity]
-  }
 
   def generateSqsMessage(notificationMeta: NotificationMeta,
                          notificationData: NotificationData): String = {
