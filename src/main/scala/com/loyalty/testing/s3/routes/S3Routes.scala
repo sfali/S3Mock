@@ -19,38 +19,34 @@ trait S3Routes {
   protected val notificationRouter: ActorRef
 
   lazy val s3Routes: Route =
-    (path(Segment ~ Slash) & entity(as[Option[String]]) ) {
-      (bucketName, maybeXml) =>
-        parameter('versioning) {
-          _ =>
-            SetBucketVersioningRoute().route(bucketName, maybeXml)
-        } ~ parameter('notification) {
-          _ =>
-            SetBucketNotificationRoute().route(bucketName, maybeXml.getOrElse(""))
+    pathPrefix(Segment) {
+      bucketName =>
+        pathSingleSlash {
+          concat(
+            SetBucketVersioningRoute().route(bucketName),
+            SetBucketNotificationRoute().route(bucketName),
+            CreateBucketRoute().route(bucketName)
+          )
+        } ~ pathEnd {
+          concat(
+            SetBucketVersioningRoute().route(bucketName),
+            SetBucketNotificationRoute().route(bucketName),
+            CreateBucketRoute().route(bucketName)
+          )
+        } ~ path(RemainingPath) {
+          key =>
+            val objectName = key.toString().decode
+            concat(
+              GetObjectMetadataRoute().route(bucketName, objectName),
+              CompleteMultipartUploadRoute(notificationRouter).route(bucketName, objectName),
+              CopyMultipartRoute().route(bucketName, objectName),
+              CopyObjectRoute(notificationRouter, log, repository).route(bucketName, objectName),
+              UploadMultipartRoute().route(bucketName, objectName),
+              InitiateMultipartUploadRoute().route(bucketName, objectName),
+              PutObjectRoute(notificationRouter).route(bucketName, objectName),
+              GetObjectRoute().route(bucketName, objectName),
+              DeleteObjectRoute().route(bucketName, objectName)
+            )
         }
-
-    } ~ pathPrefix(Segment) { bucketName =>
-      pathSingleSlash {
-        concat(
-          CreateBucketRoute().route(bucketName)
-        )
-      } ~ pathEnd {
-        concat(
-          CreateBucketRoute().route(bucketName)
-        )
-      } ~ path(RemainingPath) { key =>
-        val objectName = key.toString().decode
-        concat(
-          GetObjectMetadataRoute().route(bucketName, objectName),
-          CompleteMultipartUploadRoute(notificationRouter).route(bucketName, objectName),
-          CopyMultipartRoute().route(bucketName, objectName),
-          CopyObjectRoute(notificationRouter, log, repository).route(bucketName, objectName),
-          UploadMultipartRoute().route(bucketName, objectName),
-          InitiateMultipartUploadRoute().route(bucketName, objectName),
-          PutObjectRoute(notificationRouter).route(bucketName, objectName),
-          GetObjectRoute().route(bucketName, objectName),
-          DeleteObjectRoute().route(bucketName, objectName)
-        )
-      }
     } /* end of bucket segment*/
 }

@@ -6,30 +6,44 @@ import akka.http.scaladsl.model.StatusCodes.{InternalServerError, NotFound, OK}
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Sink
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.request.{BucketVersioning, VersioningConfiguration}
 import com.loyalty.testing.s3.response.NoSuchBucketException
 
 import scala.util.{Failure, Success}
 
-class SetBucketVersioningRoute private(log: LoggingAdapter, repository: Repository) {
+class SetBucketVersioningRoute private(log: LoggingAdapter, repository: Repository)
+                                      (implicit mat: ActorMaterializer) {
 
-  def route(bucketName: String, maybeXml: Option[String]): Route =
-    put {
-      val maybeVersioningConfiguration = VersioningConfiguration(maybeXml)
-      val eventualResult = maybeVersioningConfiguration match {
-        case Some(versioningConfiguration) =>
-          log.info("Got request to set versioning on bucket {} with configuration: {}",
-            bucketName, versioningConfiguration)
-          repository.setBucketVersioning(bucketName, versioningConfiguration)
-        case None =>
-          log.warning(
-            """
-              |Got request to setBucketVersioning for bucket {} but no VersioningConfiguration
-              |provided in the body, suspended VersioningConfiguration.
-            """.stripMargin.replaceAll(System.lineSeparator(), ""), bucketName)
-          repository.setBucketVersioning(bucketName, VersioningConfiguration(BucketVersioning.Suspended))
-      }
+  import mat.executionContext
+
+  def route(bucketName: String): Route =
+    (put & extractRequest & parameter('versioning)) {
+      (request, _) =>
+      val eventualResult =
+        request
+          .entity
+          .dataBytes
+          .map(_.utf8String)
+          .runWith(Sink.head)
+          .map(s => if (s.isEmpty) None else Some(s))
+          .map(VersioningConfiguration(_))
+          .flatMap {
+            case Some(versioningConfiguration) =>
+              log.info("Got request to set versioning on bucket {} with configuration: {}",
+                bucketName, versioningConfiguration)
+              repository.setBucketVersioning(bucketName, versioningConfiguration)
+
+            case None =>
+              log.warning(
+                """
+                  |Got request to setBucketVersioning for bucket {} but no VersioningConfiguration
+                  |provided in the body, suspended VersioningConfiguration.
+                """.stripMargin.replaceAll(System.lineSeparator(), ""), bucketName)
+              repository.setBucketVersioning(bucketName, VersioningConfiguration(BucketVersioning.Suspended))
+          }
       onComplete(eventualResult) {
         case Success(response) =>
           complete(HttpResponse(OK).withHeaders(Location(s"/${response.bucketName}")))
@@ -42,6 +56,6 @@ class SetBucketVersioningRoute private(log: LoggingAdapter, repository: Reposito
 }
 
 object SetBucketVersioningRoute {
-  def apply()(implicit log: LoggingAdapter, repository: Repository): SetBucketVersioningRoute =
+  def apply()(implicit log: LoggingAdapter, repository: Repository, mat: ActorMaterializer): SetBucketVersioningRoute =
     new SetBucketVersioningRoute(log, repository)
 }

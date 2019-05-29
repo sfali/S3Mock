@@ -5,6 +5,8 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes.{InternalServerError, OK}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Sink
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.response.{InvalidNotificationConfigurationException, NoSuchBucketException}
@@ -13,13 +15,25 @@ import com.loyalty.testing.s3.routes.CustomMarshallers
 import scala.util.{Failure, Success}
 
 class SetBucketNotificationRoute private(log: LoggingAdapter, repository: Repository)
+                                        (implicit mat: ActorMaterializer)
   extends CustomMarshallers {
 
-  def route(bucketName: String, xml: String): Route =
-    put {
-      log.info("Got request to set bucket notification on bucket: {} with value: {}", bucketName, xml)
-      val notifications = parseNotificationConfiguration(bucketName, xml)
-      val eventualResult = repository.putBucketNotification(bucketName, notifications)
+  import mat.executionContext
+
+  def route(bucketName: String): Route =
+    (put & extractRequest & parameter('notification)) {
+      (request, _) =>
+      val eventualResult =
+        request
+          .entity
+          .dataBytes
+          .map(_.utf8String)
+          .runWith(Sink.head)
+          .map(s => parseNotificationConfiguration(bucketName, s))
+          .flatMap {
+            notifications =>
+              repository.putBucketNotification(bucketName, notifications)
+          }
       onComplete(eventualResult) {
         case Success(_) => complete(HttpResponse(OK))
 
@@ -39,6 +53,6 @@ class SetBucketNotificationRoute private(log: LoggingAdapter, repository: Reposi
 }
 
 object SetBucketNotificationRoute {
-  def apply()(implicit log: LoggingAdapter, repository: Repository): SetBucketNotificationRoute =
+  def apply()(implicit log: LoggingAdapter, repository: Repository, mat: ActorMaterializer): SetBucketNotificationRoute =
     new SetBucketNotificationRoute(log, repository)
 }
