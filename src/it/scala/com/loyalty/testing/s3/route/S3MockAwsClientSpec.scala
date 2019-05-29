@@ -75,6 +75,13 @@ class S3MockAwsClientSpec
     }
   }
 
+  it should "create bucket and set versioning" in {
+    val bucketName = "other-bucket"
+    val result = s3Client.createBucket(bucketName)
+    result.getName must equal(bucketName)
+    s3Client.setBucketVersioning(bucketName)
+  }
+
   /*it should "create bucket with a specified region" in {
     val result = s3Client.createBucket("data-transfer-2", Region.US_West)
     Option(result) must not be empty

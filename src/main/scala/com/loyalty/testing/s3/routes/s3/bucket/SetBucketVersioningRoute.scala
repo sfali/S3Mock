@@ -14,8 +14,8 @@ import scala.util.{Failure, Success}
 
 class SetBucketVersioningRoute private(log: LoggingAdapter, repository: Repository) {
 
-  def route(bucketName: String): Route = {
-    (put & entity(as[Option[String]]) & parameter("versioning")) { (maybeXml, versioning) =>
+  def route(bucketName: String, maybeXml: Option[String]): Route =
+    put {
       val maybeVersioningConfiguration = VersioningConfiguration(maybeXml)
       val eventualResult = maybeVersioningConfiguration match {
         case Some(versioningConfiguration) =>
@@ -39,7 +39,6 @@ class SetBucketVersioningRoute private(log: LoggingAdapter, repository: Reposito
           complete(HttpResponse(InternalServerError))
       }
     }
-  }
 }
 
 object SetBucketVersioningRoute {

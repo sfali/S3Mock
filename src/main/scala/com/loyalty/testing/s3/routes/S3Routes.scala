@@ -19,20 +19,23 @@ trait S3Routes {
   protected val notificationRouter: ActorRef
 
   lazy val s3Routes: Route =
-    (path(Segment ~ Slash) & entity(as[String]) & parameter('notification)) {
-      (bucketName, xml, _) =>
-        concat(
-          SetBucketNotificationRoute().route(bucketName, xml)
-        )
+    (path(Segment ~ Slash) & entity(as[Option[String]]) ) {
+      (bucketName, maybeXml) =>
+        parameter('versioning) {
+          _ =>
+            SetBucketVersioningRoute().route(bucketName, maybeXml)
+        } ~ parameter('notification) {
+          _ =>
+            SetBucketNotificationRoute().route(bucketName, maybeXml.getOrElse(""))
+        }
+
     } ~ pathPrefix(Segment) { bucketName =>
       pathSingleSlash {
         concat(
-          SetBucketVersioningRoute().route(bucketName),
           CreateBucketRoute().route(bucketName)
         )
       } ~ pathEnd {
         concat(
-          SetBucketVersioningRoute().route(bucketName),
           CreateBucketRoute().route(bucketName)
         )
       } ~ path(RemainingPath) { key =>

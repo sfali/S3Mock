@@ -17,6 +17,7 @@ class SetBucketNotificationRoute private(log: LoggingAdapter, repository: Reposi
 
   def route(bucketName: String, xml: String): Route =
     put {
+      log.info("Got request to set bucket notification on bucket: {} with value: {}", bucketName, xml)
       val notifications = parseNotificationConfiguration(bucketName, xml)
       val eventualResult = repository.putBucketNotification(bucketName, notifications)
       onComplete(eventualResult) {
