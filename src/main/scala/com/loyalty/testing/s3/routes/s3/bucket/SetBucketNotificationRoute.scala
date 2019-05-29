@@ -12,7 +12,7 @@ import com.loyalty.testing.s3.routes.CustomMarshallers
 
 import scala.util.{Failure, Success}
 
-class PutBucketNotificationRoute private(log: LoggingAdapter, repository: Repository)
+class SetBucketNotificationRoute private(log: LoggingAdapter, repository: Repository)
   extends CustomMarshallers {
 
   def route(bucketName: String, xml: String): Route =
@@ -38,7 +38,7 @@ class PutBucketNotificationRoute private(log: LoggingAdapter, repository: Reposi
     }
 }
 
-object PutBucketNotificationRoute {
-  def apply()(implicit log: LoggingAdapter, repository: Repository): PutBucketNotificationRoute =
-    new PutBucketNotificationRoute(log, repository)
+object SetBucketNotificationRoute {
+  def apply()(implicit log: LoggingAdapter, repository: Repository): SetBucketNotificationRoute =
+    new SetBucketNotificationRoute(log, repository)
 }

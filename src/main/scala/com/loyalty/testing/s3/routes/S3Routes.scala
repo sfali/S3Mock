@@ -22,7 +22,7 @@ trait S3Routes {
     (path(Segment ~ Slash) & entity(as[String]) & parameter('notification)) {
       (bucketName, xml, _) =>
         concat(
-          PutBucketNotificationRoute().route(bucketName, xml)
+          SetBucketNotificationRoute().route(bucketName, xml)
         )
     } ~ pathPrefix(Segment) { bucketName =>
       pathSingleSlash {
