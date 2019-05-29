@@ -6,7 +6,7 @@ import akka.Done
 import akka.actor.{ActorRef, ActorSystem}
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.server.HttpApp
-import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
+import akka.stream.{ActorMaterializer, ActorMaterializerSettings, Materializer}
 import com.loyalty.testing.s3.data.BootstrapConfiguration
 import com.loyalty.testing.s3.notification.actor.NotificationRouter
 import com.loyalty.testing.s3.repositories.{FileRepository, FileStore}
@@ -23,7 +23,7 @@ object Main extends HttpApp with App with S3Routes {
 
   private val config = ConfigFactory.load()
   private implicit val system: ActorSystem = ActorSystem(config.getString("app.name"), config)
-  override protected implicit val mat: ActorMaterializer = ActorMaterializer(ActorMaterializerSettings(system))
+  override protected implicit val materializer: Materializer = ActorMaterializer(ActorMaterializerSettings(system))
   private implicit val settings: Settings = Settings()
 
   import system.dispatcher

@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes.{InternalServerError, OK}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.stream.scaladsl.Sink
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.repositories.Repository
@@ -15,7 +15,7 @@ import com.loyalty.testing.s3.routes.CustomMarshallers
 import scala.util.{Failure, Success}
 
 class SetBucketNotificationRoute private(log: LoggingAdapter, repository: Repository)
-                                        (implicit mat: ActorMaterializer)
+                                        (implicit mat: Materializer)
   extends CustomMarshallers {
 
   import mat.executionContext
@@ -53,6 +53,6 @@ class SetBucketNotificationRoute private(log: LoggingAdapter, repository: Reposi
 }
 
 object SetBucketNotificationRoute {
-  def apply()(implicit log: LoggingAdapter, repository: Repository, mat: ActorMaterializer): SetBucketNotificationRoute =
+  def apply()(implicit log: LoggingAdapter, repository: Repository, mat: Materializer): SetBucketNotificationRoute =
     new SetBucketNotificationRoute(log, repository)
 }

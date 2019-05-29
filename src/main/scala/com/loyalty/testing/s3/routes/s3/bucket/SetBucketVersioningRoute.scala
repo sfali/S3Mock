@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.StatusCodes.{InternalServerError, NotFound, OK}
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.stream.scaladsl.Sink
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.request.{BucketVersioning, VersioningConfiguration}
@@ -15,7 +15,7 @@ import com.loyalty.testing.s3.response.NoSuchBucketException
 import scala.util.{Failure, Success}
 
 class SetBucketVersioningRoute private(log: LoggingAdapter, repository: Repository)
-                                      (implicit mat: ActorMaterializer) {
+                                      (implicit mat: Materializer) {
 
   import mat.executionContext
 
@@ -56,6 +56,6 @@ class SetBucketVersioningRoute private(log: LoggingAdapter, repository: Reposito
 }
 
 object SetBucketVersioningRoute {
-  def apply()(implicit log: LoggingAdapter, repository: Repository, mat: ActorMaterializer): SetBucketVersioningRoute =
+  def apply()(implicit log: LoggingAdapter, repository: Repository, mat: Materializer): SetBucketVersioningRoute =
     new SetBucketVersioningRoute(log, repository)
 }

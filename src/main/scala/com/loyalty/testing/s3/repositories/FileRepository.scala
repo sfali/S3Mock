@@ -5,7 +5,7 @@ import java.nio.file._
 import akka.Done
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.headers.ByteRange
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3.notification.Notification
@@ -17,7 +17,7 @@ import com.loyalty.testing.s3.streams.FileStream
 import scala.concurrent.Future
 
 class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingAdapter)
-                    (implicit mat: ActorMaterializer) extends Repository {
+                    (implicit mat: Materializer) extends Repository {
 
   import FileRepository._
   import com.loyalty.testing.s3._
@@ -309,6 +309,6 @@ object FileRepository {
   val NonVersionId: String = "null"
   val ContentFileName: String = "content"
 
-  def apply(fileStore: FileStore, log: LoggingAdapter)(implicit mat: ActorMaterializer): FileRepository =
+  def apply(fileStore: FileStore, log: LoggingAdapter)(implicit mat: Materializer): FileRepository =
     new FileRepository(fileStore, FileStream(), log)
 }

@@ -4,12 +4,12 @@ import java.nio.file.Path
 
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.{Broadcast, FileIO, Flow, GraphDSL, Keep, Merge, Sink, Source}
-import akka.stream.{ActorMaterializer, FlowShape, IOResult}
+import akka.stream.{FlowShape, IOResult, Materializer}
 import akka.util.ByteString
 
 import scala.concurrent.Future
 
-class FileStream private(implicit mat: ActorMaterializer) {
+class FileStream private(implicit mat: Materializer) {
 
   import com.loyalty.testing.s3._
 
@@ -60,5 +60,5 @@ class FileStream private(implicit mat: ActorMaterializer) {
 }
 
 object FileStream {
-  def apply()(implicit mat: ActorMaterializer): FileStream = new FileStream()
+  def apply()(implicit mat: Materializer): FileStream = new FileStream()
 }
