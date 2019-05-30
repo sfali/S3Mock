@@ -23,7 +23,7 @@ class CompleteMultipartUploadRoute private(notificationRouterRef: ActorRef, log:
       onComplete(repository.completeMultipart(bucketName, key, uploadId, parts)) {
         case Success(response) =>
           val notificationData = NotificationData(response.bucketName, response.key, response.contentLength,
-            response.eTag, response.versionId)
+            response.eTag, "CompleteMultipartUpload", response.versionId)
           notificationRouterRef ! NotificationRouter.SendNotification(notificationData)
 
           val headers: List[HttpHeader] =

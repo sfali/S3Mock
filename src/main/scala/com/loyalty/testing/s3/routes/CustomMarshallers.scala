@@ -2,11 +2,11 @@ package com.loyalty.testing.s3.routes
 
 import java.nio.charset.StandardCharsets
 
-import akka.http.scaladsl.marshalling.Marshaller.{fromStatusCodeAndHeadersAndValue, fromToEntityMarshaller}
+import akka.http.scaladsl.marshalling.Marshaller.fromToEntityMarshaller
 import akka.http.scaladsl.marshalling.{Marshaller, ToEntityMarshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, HttpHeader}
+import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity}
+import akka.util.ByteString
 import com.loyalty.testing.s3.response._
 import de.heikoseeberger.akkahttpcirce.ErrorAccumulatingCirceSupport
 
@@ -30,9 +30,15 @@ trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
   implicit val BucketAlreadyExistsExceptionMarshallers: ToEntityMarshaller[BucketAlreadyExistsException] =
     xmlResponseMarshallers(`application/octet-stream`)
 
+  implicit val NoSuchBucketExceptionMarshallers: ToEntityMarshaller[NoSuchBucketException] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
+  implicit val InvalidNotificationConfigurationExceptionMarshallers: ToEntityMarshaller[InvalidNotificationConfigurationException] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
   private def xmlResponseMarshallers(contentType: ContentType): ToEntityMarshaller[XmlResponse] =
     Marshaller.withFixedContentType(contentType) { result =>
-      HttpEntity(contentType, result.toXml.toString().getBytes(UTF_8))
+      HttpEntity(contentType, ByteString(result.toXml.toString().getBytes(UTF_8)))
     }
 
   implicit val InitiateMultipartUploadResultResponse: ToResponseMarshaller[InitiateMultipartUploadResult] =
@@ -58,6 +64,9 @@ trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
 
   implicit val CompleteMultipartUploadResultResponse: ToResponseMarshaller[CompleteMultipartUploadResult] =
     fromToEntityMarshaller[CompleteMultipartUploadResult](OK)
+
+  implicit val InvalidNotificationConfigurationExceptionResponse: ToResponseMarshaller[InvalidNotificationConfigurationException] =
+    fromToEntityMarshaller[InvalidNotificationConfigurationException](BadRequest)
 
   /*implicit val CompleteMultipartUploadResultResponse: ToResponseMarshaller[CompleteMultipartUploadResult] =
     fromStatusCodeAndHeadersAndValue[CompleteMultipartUploadResult]

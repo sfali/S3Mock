@@ -6,7 +6,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import com.amazonaws.services.s3.Headers.{CONTENT_MD5, ETAG}
+import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.response.{NoSuchBucketException, NoSuchUploadException}
 
@@ -20,10 +20,10 @@ class UploadMultipartRoute private(log: LoggingAdapter, repository: Repository) 
       onComplete(eventualResult) {
         case Success(objectMeta) =>
           val putObjectResult = objectMeta.result
-          var response = HttpResponse(OK,
+          val response = HttpResponse(OK,
             entity = HttpEntity(ContentType(MediaTypes.`application/xml`, HttpCharsets.`UTF-8`), ""))
-            .withHeaders(RawHeader(CONTENT_MD5, putObjectResult.getContentMd5),
-              RawHeader(ETAG, s""""${putObjectResult.getETag}""""))
+            .withHeaders(RawHeader(CONTENT_MD5, putObjectResult.contentMd5),
+              RawHeader(ETAG, s""""${putObjectResult.etag}""""))
           complete(response)
         case Failure(ex: NoSuchBucketException) => complete(HttpResponse(NotFound, entity = ex.toXml.toString()))
         case Failure(ex: NoSuchUploadException) => complete(HttpResponse(NotFound, entity = ex.toXml.toString()))

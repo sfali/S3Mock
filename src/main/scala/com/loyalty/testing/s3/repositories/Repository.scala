@@ -1,8 +1,10 @@
 package com.loyalty.testing.s3.repositories
 
+import akka.Done
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.request.BucketVersioning.BucketVersioning
 import com.loyalty.testing.s3.request.{CompleteMultipartUpload, CreateBucketConfiguration, VersioningConfiguration}
 import com.loyalty.testing.s3.response._
@@ -16,7 +18,13 @@ trait Repository {
 
   def createBucket(bucketName: String, bucketConfiguration: CreateBucketConfiguration): Future[BucketResponse]
 
+  def setBucketVersioning(bucketName: String, contentSource: Source[ByteString, _]): Future[BucketResponse]
+
   def setBucketVersioning(bucketName: String, versioningConfiguration: VersioningConfiguration): Future[BucketResponse]
+
+  def setBucketNotification(bucketName: String, contentSource: Source[ByteString, _]): Future[Done]
+
+  def setBucketNotification(bucketName: String, notifications: List[Notification]): Future[Done]
 
   def putObject(bucketName: String, key: String, contentSource: Source[ByteString, _]): Future[ObjectMeta]
 

@@ -1,11 +1,13 @@
 package com.loyalty.testing.s3.it.client
 
 import java.nio.file.{Files, Path}
+import java.util
 
 import akka.http.scaladsl.model.headers.ByteRange
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
 import com.amazonaws.services.s3.model._
 import com.loyalty.testing.s3.it.{AwsSettings, Settings}
+import com.loyalty.testing.s3.notification.Notification
 
 import scala.collection.JavaConverters._
 
@@ -29,6 +31,38 @@ class AwsClient(awsSettings: AwsSettings) {
 
   def createBucket(bucketName: String, region: Region = Region.US_Standard): Bucket =
     s3Client.createBucket(new CreateBucketRequest(bucketName, region))
+
+  def setBucketNotification(bucketName: String, notification: Notification): Unit = {
+    val queueArn = s"arn:aws:sqs:us-eat-1:444455556666:${notification.destinationName}"
+    val events = util.EnumSet.of(S3Event.ObjectCreated)
+    val queueConfiguration = new QueueConfiguration(queueArn, events)
+
+    (notification.prefix, notification.suffix) match {
+      case (None, None) => None
+
+      case (Some(prefix), None) =>
+        val filterRule = new FilterRule().withName("prefix").withValue(prefix)
+        val filter = new Filter().withS3KeyFilter(new S3KeyFilter().withFilterRules(filterRule))
+        queueConfiguration.setFilter(filter)
+
+      case (None, Some(suffix)) =>
+        val filterRule = new FilterRule().withName("suffix").withValue(suffix)
+        val filter = new Filter().withS3KeyFilter(new S3KeyFilter().withFilterRules(filterRule))
+        queueConfiguration.setFilter(filter)
+
+      case (Some(prefix), Some(suffix)) =>
+        val prefixFilterRule = new FilterRule().withName("prefix").withValue(prefix)
+        val suffixFilterRule = new FilterRule().withName("suffix").withValue(suffix)
+        val filter = new Filter().withS3KeyFilter(new S3KeyFilter().withFilterRules(prefixFilterRule, suffixFilterRule))
+        queueConfiguration.setFilter(filter)
+    }
+
+    val bucketNotificationConfiguration = new BucketNotificationConfiguration()
+      .addConfiguration(notification.name, queueConfiguration)
+
+    val bucketNotificationConfigurationRequest = new SetBucketNotificationConfigurationRequest(bucketName, bucketNotificationConfiguration)
+    s3Client.setBucketNotificationConfiguration(bucketNotificationConfigurationRequest)
+  }
 
   def setBucketVersioning(bucketName: String): Unit = {
     val config = new BucketVersioningConfiguration(BucketVersioningConfiguration.ENABLED)

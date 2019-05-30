@@ -8,7 +8,6 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpHeader}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.testkit.TestProbe
 import com.amazonaws.services.s3.Headers
@@ -31,7 +30,6 @@ class RoutesSpec
 
   private val dataPath: Path = Paths.get(System.getProperty("user.dir"), ".s3mock")
 
-  override protected implicit val mat: ActorMaterializer = ActorMaterializer()
   override protected val log: LoggingAdapter = system.log
   override protected val repository: FileRepository = FileRepository(FileStore(dataPath), log)
   private implicit val settings: Settings = Settings()
