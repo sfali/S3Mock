@@ -2,6 +2,7 @@ package com.loyalty.testing.s3.repositories
 
 import java.nio.file.Path
 
+import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.request.{UploadPart, VersioningConfiguration}
 import com.loyalty.testing.s3.response.ObjectMeta
 
@@ -12,6 +13,7 @@ class BucketMetadata(val bucketName: String, val path: Path) {
 
   private var _location: String = _
   private var _maybeBucketVersioning: Option[VersioningConfiguration] = None
+  private var _notifications: List[Notification] = Nil
   private val objectMetaMap: mutable.Map[String, ObjectMeta] = mutable.Map.empty
   private val multiPartUploads = mutable.Map[String, List[UploadPart]]()
 
@@ -23,11 +25,15 @@ class BucketMetadata(val bucketName: String, val path: Path) {
 
   def maybeBucketVersioning_=(value: VersioningConfiguration): Unit = _maybeBucketVersioning = Option(value)
 
-  def putObject(key: String, metadata: ObjectMeta): Unit = objectMetaMap += (convertkey(key) -> metadata)
+  def notifications: List[Notification] = _notifications
 
-  def getObject(key: String): Option[ObjectMeta] = objectMetaMap.get(convertkey(key))
+  def notifications_=(ls: List[Notification]): Unit = _notifications = ls
 
-  def removeMetadata(key: String): Unit = objectMetaMap -= convertkey(key)
+  def putObject(key: String, metadata: ObjectMeta): Unit = objectMetaMap += (convertKey(key) -> metadata)
+
+  def getObject(key: String): Option[ObjectMeta] = objectMetaMap.get(convertKey(key))
+
+  def removeMetadata(key: String): Unit = objectMetaMap -= convertKey(key)
 
   def addPart(uploadId: String, part: UploadPart): Unit = {
     val parts = multiPartUploads.getOrElse(uploadId, List())
@@ -47,7 +53,7 @@ class BucketMetadata(val bucketName: String, val path: Path) {
      """.stripMargin
   }
 
-  private def convertkey(key: String) = if (key.startsWith("/")) key else s"/$key"
+  private def convertKey(key: String) = if (key.startsWith("/")) key else s"/$key"
 }
 
 object BucketMetadata {

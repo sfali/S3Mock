@@ -2,18 +2,16 @@ package com.loyalty.testing.s3.routes.s3.`object`
 
 import akka.actor.ActorRef
 import akka.event.LoggingAdapter
-import com.loyalty.testing.s3.repositories.Repository
-import com.loyalty.testing.s3.routes.CustomMarshallers
-import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import com.amazonaws.services.s3.Headers.{CONTENT_MD5, ETAG}
+import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.notification.NotificationData
 import com.loyalty.testing.s3.notification.actor.NotificationRouter
+import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.response.{CopyObjectResult, NoSuchBucketException, ObjectMeta}
-
-import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.routes.CustomMarshallers
 
 import scala.util.Failure
 
@@ -50,15 +48,15 @@ class CopyObjectRoute private(notificationRouterRef: ActorRef,
                              maybeSourceVersionId: Option[String]) = {
     val putObjectResult = objectMeta.result
 
-    val maybeVersionId = Option(putObjectResult.getVersionId)
+    val maybeVersionId = putObjectResult.maybeVersionId
     // send notification, if applicable
     val notificationData = NotificationData(bucketName, key,
-      putObjectResult.getMetadata.getContentLength, putObjectResult.getETag, maybeVersionId)
+      putObjectResult.contentLength, putObjectResult.etag, "Copy", maybeVersionId)
     notificationRouterRef ! NotificationRouter.SendNotification(notificationData)
 
     val headers = Nil +
-      (ETAG, s""""${putObjectResult.getETag}"""") +
-      (CONTENT_MD5, putObjectResult.getContentMd5) +
+      (ETAG, s""""${putObjectResult.etag}"""") +
+      (CONTENT_MD5, putObjectResult.contentMd5) +
       ("x-amz-copy-source-version-id", maybeVersionId) +
       ("x-amz-version-id", maybeVersionId)
 

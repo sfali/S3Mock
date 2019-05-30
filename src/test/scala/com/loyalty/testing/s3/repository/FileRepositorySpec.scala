@@ -91,9 +91,9 @@ class FileRepositorySpec
         objectMeta.path must equal(expectedPath)
         Files.exists(expectedPath.toAbsolutePath) mustBe true
         val putObjectResult = objectMeta.result
-        putObjectResult.getETag must equal(etagDigest)
-        putObjectResult.getContentMd5 must equal(md5Digest)
-        Option(putObjectResult.getVersionId) mustBe empty
+        putObjectResult.etag must equal(etagDigest)
+        putObjectResult.contentMd5 must equal(md5Digest)
+        putObjectResult.maybeVersionId mustBe empty
     }
   }
 
@@ -107,9 +107,9 @@ class FileRepositorySpec
         objectMeta.path must equal(expectedPath)
         Files.exists(expectedPath.toAbsolutePath) mustBe true
         val putObjectResult = objectMeta.result
-        putObjectResult.getETag must equal(etagDigest)
-        putObjectResult.getContentMd5 must equal(md5Digest)
-        Option(putObjectResult.getVersionId) mustBe empty
+        putObjectResult.etag must equal(etagDigest)
+        putObjectResult.contentMd5 must equal(md5Digest)
+        putObjectResult.maybeVersionId mustBe empty
     }
   }
 
@@ -119,12 +119,12 @@ class FileRepositorySpec
     whenReady(repository.putObject(versionedBucketName, key, contentSource)) {
       objectMeta =>
         val putObjectResult = objectMeta.result
-        Option(putObjectResult.getVersionId) mustBe defined
-        val expectedPath = dataPath -> ("data", versionedBucketName, key, putObjectResult.getVersionId, ContentFileName)
+        putObjectResult.maybeVersionId mustBe defined
+        val expectedPath = dataPath -> ("data", versionedBucketName, key, putObjectResult.maybeVersionId.get, ContentFileName)
         objectMeta.path must equal(expectedPath)
         Files.exists(expectedPath.toAbsolutePath) mustBe true
-        putObjectResult.getETag must equal(etagDigest)
-        putObjectResult.getContentMd5 must equal(md5Digest)
+        putObjectResult.etag must equal(etagDigest)
+        putObjectResult.contentMd5 must equal(md5Digest)
     }
   }
 
@@ -135,12 +135,13 @@ class FileRepositorySpec
     whenReady(repository.putObject(versionedBucketName, key, contentSource)) {
       objectMeta =>
         val putObjectResult = objectMeta.result
-        Option(putObjectResult.getVersionId) mustBe defined
-        val expectedPath = dataPath -> ("data", versionedBucketName, "input", fileName, putObjectResult.getVersionId, ContentFileName)
+        putObjectResult.maybeVersionId mustBe defined
+        val expectedPath = dataPath -> ("data", versionedBucketName, "input", fileName,
+          putObjectResult.maybeVersionId.get, ContentFileName)
         objectMeta.path must equal(expectedPath)
         Files.exists(expectedPath.toAbsolutePath) mustBe true
-        putObjectResult.getETag must equal(etagDigest)
-        putObjectResult.getContentMd5 must equal(md5Digest)
+        putObjectResult.etag must equal(etagDigest)
+        putObjectResult.contentMd5 must equal(md5Digest)
     }
   }
 
@@ -203,7 +204,7 @@ class FileRepositorySpec
 
   it should "get object with version provided" in {
     val key = "sample1.txt"
-    val versionId = fileStore.get(versionedBucketName).get.getObject(key).get.result.getVersionId
+    val versionId = fileStore.get(versionedBucketName).get.getObject(key).get.result.maybeVersionId.get
     whenReady(repository.getObject(versionedBucketName, key, Some(versionId))) {
       response =>
         response.contentMd5 must equal(md5Digest)
@@ -215,7 +216,7 @@ class FileRepositorySpec
 
   it should "get object from versioned bucket without providing version" in {
     val key = "sample1.txt"
-    val versionId = fileStore.get(versionedBucketName).get.getObject(key).get.result.getVersionId
+    val versionId = fileStore.get(versionedBucketName).get.getObject(key).get.result.maybeVersionId.get
     whenReady(repository.getObject(versionedBucketName, key)) {
       response =>
         response.contentMd5 must equal(md5Digest)
@@ -245,7 +246,7 @@ class FileRepositorySpec
     whenReady(eventualResponse) {
       case (objectMetadata, copyResult) =>
         Files.exists(objectMetadata.path) mustEqual true
-        copyResult.eTag mustEqual objectMetadata.result.getETag
+        copyResult.eTag mustEqual objectMetadata.result.etag
     }
   }
 
@@ -257,7 +258,7 @@ class FileRepositorySpec
     whenReady(eventualResponse) {
       case (objectMetadata, copyResult) =>
         Files.exists(objectMetadata.path) mustEqual true
-        copyResult.eTag mustEqual objectMetadata.result.getETag
+        copyResult.eTag mustEqual objectMetadata.result.etag
     }
   }
 

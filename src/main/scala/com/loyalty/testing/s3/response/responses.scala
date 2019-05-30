@@ -6,7 +6,6 @@ import java.time.Instant
 import akka.stream.IOResult
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import com.amazonaws.services.s3.model.PutObjectResult
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.request.BucketVersioning.BucketVersioning
 
@@ -15,6 +14,11 @@ import scala.xml.Elem
 
 case class BucketResponse(bucketName: String, locationConstraint: String = defaultRegion,
                           maybeBucketVersioning: Option[BucketVersioning] = None)
+
+case class PutObjectResult(etag: String,
+                           contentMd5: String,
+                           contentLength: Long,
+                           maybeVersionId: Option[String])
 
 case class ObjectMeta(path: Path, result: PutObjectResult)
 
@@ -79,6 +83,7 @@ object ErrorCodes {
   val NoSuchUpload: String = "NoSuchUpload"
   val InvalidPart = "InvalidPart"
   val InvalidPartOrder = "InvalidPartOrder"
+  val InvalidArgument = "InvalidArgument"
 }
 
 sealed trait ErrorResponse extends Throwable with XmlResponse {
@@ -143,6 +148,11 @@ case class InvalidPartOrderException(bucketName: String, key: String) extends Er
       |The list of parts was not in ascending order. The parts list must be specified in order by part number.
     """.stripMargin.replaceAll(System.lineSeparator(), "")
   override val resource: String = s"/$bucketName/$key"
+}
+
+case class InvalidNotificationConfigurationException(bucketName: String, override val message: String) extends ErrorResponse {
+  override val code: String = InvalidArgument
+  override val resource: String = bucketName
 }
 
 /*case class NoSuchBucketException(bucketName: String)

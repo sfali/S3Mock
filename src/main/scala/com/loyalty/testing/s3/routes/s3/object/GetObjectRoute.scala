@@ -1,21 +1,18 @@
 package com.loyalty.testing.s3.routes.s3.`object`
 
 import akka.event.LoggingAdapter
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
-import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import com.amazonaws.services.s3.Headers
+import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.response.{NoSuchBucketException, NoSuchKeyException}
 
-import scala.util.Success
-import scala.util.Failure
+import scala.util.{Failure, Success}
 
 class GetObjectRoute private(log: LoggingAdapter, repository: Repository) {
-
-  import Headers._
 
   def route(bucketName: String, key: String): Route = {
     (get & parameters("versionId".?) & optionalHeaderValueByType[Range]()) { (maybeVersionId, maybeRanges) =>
