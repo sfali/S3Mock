@@ -6,6 +6,7 @@
 # IDEA
 .idea/**
 s3/initial.json
+password.txt
 
 # sbt specific
 project/.sbtserver
