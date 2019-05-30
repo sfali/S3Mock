@@ -82,7 +82,7 @@ object Main extends HttpApp with App with S3Routes {
           (for {
             bucketResponse <- repository.createBucketWithVersioning(bucketName, CreateBucketConfiguration(),
               maybeBucketVersioning)
-            _ <- repository.putBucketNotification(bucketName, notifications)
+            _ <- repository.setBucketNotification(bucketName, notifications)
           } yield bucketResponse)
             .onComplete {
               case Success(bucketResponse) =>

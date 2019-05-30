@@ -6,7 +6,7 @@ import akka.Done
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.Materializer
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.request.BucketVersioning.BucketVersioning
@@ -51,6 +51,29 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
       case Some(_) => Future.failed(BucketAlreadyExistsException(bucketName))
     }
 
+  override def setBucketVersioning(bucketName: String, contentSource: Source[ByteString, _]): Future[BucketResponse] =
+    fileStore.get(bucketName) match {
+      case None => Future.failed(NoSuchBucketException(bucketName))
+      case Some(bucketMetaData) =>
+        contentSource
+          .map(_.utf8String)
+          .map(s => if (s.isEmpty) None else Some(s))
+          .map(VersioningConfiguration(_))
+          .map {
+            case Some(versioningConfiguration) => versioningConfiguration
+            case None => VersioningConfiguration(BucketVersioning.Suspended)
+          }
+          .runWith(Sink.head)
+          .map {
+            versioningConfiguration =>
+              log.info("Setting versioning of bucket {} to: {}", bucketName,
+                versioningConfiguration.bucketVersioning)
+              bucketMetaData.maybeBucketVersioning = versioningConfiguration
+              BucketResponse(bucketName, bucketMetaData.location,
+                bucketMetaData.maybeBucketVersioning.map(_.bucketVersioning))
+          }
+    }
+
   override def setBucketVersioning(bucketName: String,
                                    versioningConfiguration: VersioningConfiguration): Future[BucketResponse] =
     fileStore.get(bucketName) match {
@@ -65,7 +88,24 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
         }
     }
 
-  override def putBucketNotification(bucketName: String, notifications: List[Notification]): Future[Done] =
+  override def setBucketNotification(bucketName: String, contentSource: Source[ByteString, _]): Future[Done] =
+    fileStore.get(bucketName) match {
+      case None => Future.failed(NoSuchBucketException(bucketName))
+      case Some(bucketMetadata) =>
+        contentSource
+          .map(_.utf8String)
+          .map(s => parseNotificationConfiguration(bucketName, s))
+          .runWith(Sink.head)
+          .map {
+            notifications =>
+              log.info("Setting bucket notification for: {}", bucketName)
+              bucketMetadata.notifications = notifications
+              fileStore.add(bucketName, bucketMetadata)
+              Done
+          }
+    }
+
+  override def setBucketNotification(bucketName: String, notifications: List[Notification]): Future[Done] =
     fileStore.get(bucketName) match {
       case None => Future.failed(NoSuchBucketException(bucketName))
       case Some(bucketMetadata) =>

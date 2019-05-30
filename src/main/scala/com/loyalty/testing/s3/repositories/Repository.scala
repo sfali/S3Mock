@@ -18,9 +18,13 @@ trait Repository {
 
   def createBucket(bucketName: String, bucketConfiguration: CreateBucketConfiguration): Future[BucketResponse]
 
+  def setBucketVersioning(bucketName: String, contentSource: Source[ByteString, _]): Future[BucketResponse]
+
   def setBucketVersioning(bucketName: String, versioningConfiguration: VersioningConfiguration): Future[BucketResponse]
 
-  def putBucketNotification(bucketName: String, notifications: List[Notification]): Future[Done]
+  def setBucketNotification(bucketName: String, contentSource: Source[ByteString, _]): Future[Done]
+
+  def setBucketNotification(bucketName: String, notifications: List[Notification]): Future[Done]
 
   def putObject(bucketName: String, key: String, contentSource: Source[ByteString, _]): Future[ObjectMeta]
 
