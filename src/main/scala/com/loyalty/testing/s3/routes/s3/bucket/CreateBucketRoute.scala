@@ -2,21 +2,20 @@ package com.loyalty.testing.s3.routes.s3.bucket
 
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.ContentTypes.`application/octet-stream`
-import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.request.CreateBucketConfiguration
 import com.loyalty.testing.s3.response.BucketAlreadyExistsException
-import com.loyalty.testing.s3.routes.CustomMarshallers
 
 import scala.util.{Failure, Success}
 
-class CreateBucketRoute private(log: LoggingAdapter, repository: Repository)  {
+class CreateBucketRoute private(log: LoggingAdapter, repository: Repository) {
 
-  def route(bucketName: String): Route = {
+  def route(bucketName: String): Route =
     (put & entity(as[Option[String]])) { maybeXml =>
 
       val bucketConfiguration = CreateBucketConfiguration(maybeXml)
@@ -34,7 +33,6 @@ class CreateBucketRoute private(log: LoggingAdapter, repository: Repository)  {
           complete(HttpResponse(InternalServerError))
       }
     }
-  }
 }
 
 object CreateBucketRoute {

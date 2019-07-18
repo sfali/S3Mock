@@ -116,6 +116,22 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
         }
     }
 
+  override def listBucket(bucketName: String, params: ListBucketParams): Future[ListBucketResult] =
+    fileStore.get(bucketName) match {
+      case None => Future.failed(NoSuchBucketException(bucketName))
+      case Some(bucketMetadata) => Future.successful {
+        val contents = bucketMetadata
+          .getObjects
+          .map(om => BucketContent(key = "???", eTag = om.result.etag, size = om.result.contentLength))
+        ListBucketResult(
+          bucketName = bucketName,
+          keyCount = contents.length,
+          maxKeys = params.maxKeys,
+          contents = contents
+        )
+      }
+    }
+
   override def putObject(bucketName: String, key: String, contentSource: Source[ByteString, _]): Future[ObjectMeta] =
     fileStore.get(bucketName) match {
       case None => Future.failed(NoSuchBucketException(bucketName))

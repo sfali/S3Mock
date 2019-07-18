@@ -36,6 +36,47 @@ trait XmlResponse {
   def toXml: Elem
 }
 
+case class ListBucketResult(bucketName: String,
+                            keyCount: Int,
+                            maxKeys: Int,
+                            maybePrefix: Option[String] = None,
+                            isTruncated: Boolean = false,
+                            contents: List[BucketContent])
+  extends XmlResponse {
+  override def toXml: Elem = {
+    val _contents =
+      contents match {
+        case Nil => <Contents/>
+        case _ => contents.map(_.toXml)
+      }
+    <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+      <Name>{bucketName}</Name>
+      <Prefix>{maybePrefix.getOrElse("")}</Prefix>
+      <KeyCount>{keyCount}</KeyCount>
+      <MaxKeys>{maxKeys}</MaxKeys>
+      <IsTruncated>{isTruncated}</IsTruncated>
+      {_contents}
+    </ListBucketResult>
+  }
+
+
+}
+
+case class BucketContent(key: String,
+                         size: Long,
+                         eTag: String,
+                         lastModifiedDate: Instant = Instant.now(),
+                         storageClass: String = "STANDARD") extends XmlResponse {
+  override def toXml: Elem =
+    <Contents>
+      <Key>{key}</Key>
+      <LastModified>{lastModifiedDate.toString}</LastModified>
+      <Size>{size}</Size>
+      <StorageClass>{storageClass}</StorageClass>
+      <ETag>"{eTag}"</ETag>
+    </Contents>
+}
+
 case class InitiateMultipartUploadResult(bucketName: String, key: String, uploadId: String) extends XmlResponse {
   override def toXml: Elem =
     <InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
@@ -100,7 +141,6 @@ sealed trait ErrorResponse extends Throwable with XmlResponse {
       <Resource>{resource}</Resource>
     </Error>
 }
-
 
 import com.loyalty.testing.s3.response.ErrorCodes._
 

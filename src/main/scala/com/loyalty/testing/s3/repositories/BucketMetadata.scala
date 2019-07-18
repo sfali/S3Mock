@@ -33,6 +33,11 @@ class BucketMetadata(val bucketName: String, val path: Path) {
 
   def getObject(key: String): Option[ObjectMeta] = objectMetaMap.get(convertKey(key))
 
+  def getObjects: List[ObjectMeta] = {
+    println(objectMetaMap)
+    objectMetaMap.values.toList
+  }
+
   def removeMetadata(key: String): Unit = objectMetaMap -= convertKey(key)
 
   def addPart(uploadId: String, part: UploadPart): Unit = {
