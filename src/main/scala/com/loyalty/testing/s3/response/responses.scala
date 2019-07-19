@@ -163,26 +163,3 @@ case class InvalidNotificationConfigurationException(bucketName: String, overrid
   override val code: String = InvalidArgument
   override val resource: String = bucketName
 }
-
-/*case class NoSuchBucketException(bucketName: String)
-  extends Exception(s"The specified bucket `$bucketName` does not exist") {
-  def toXml: Elem =
-    <Error>
-      <Code>NoSuchBucket</Code>
-      <Message>The specified bucket does not exist</Message>
-      <BucketName>{bucketName}</BucketName>
-    </Error>
-}*/
-
-/*case class NoSuckKeyException(bucketName: String, key: String)
-  extends Exception(s"The resource `/$bucketName/$key` does not exist") {
-  val resource: String = s"/$bucketName/$key"
-
-  def toXml: Elem =
-    <Error>
-      <Code>NoSuchKey</Code>
-      <Message>The resource you requested does not exist</Message>
-      <Resource>{resource}</Resource>
-    </Error>
-}*/
-
