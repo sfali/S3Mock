@@ -88,5 +88,5 @@ releaseProcess := Seq[ReleaseStep](
 
 dockerRepository := Some("loyaltyone")
 dockerExposedVolumes := Seq("/opt/docker/s3")
-dockerBaseImage := "loyaltyone/docker-slim-java-node:jre-8-node-8"
+dockerBaseImage := "loyaltyone/docker-slim-java-node:jre8-node8-190509"
 dockerEntrypoint := "/usr/local/bin/env-decrypt" +: dockerEntrypoint.value
