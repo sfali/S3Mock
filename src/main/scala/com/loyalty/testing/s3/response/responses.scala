@@ -1,7 +1,7 @@
 package com.loyalty.testing.s3.response
 
 import java.nio.file.{Path, Paths}
-import java.time.Instant
+import java.time.{Instant, LocalDateTime}
 
 import akka.stream.IOResult
 import akka.stream.scaladsl.Source
@@ -15,12 +15,14 @@ import scala.xml.Elem
 case class BucketResponse(bucketName: String, locationConstraint: String = defaultRegion,
                           maybeBucketVersioning: Option[BucketVersioning] = None)
 
-case class PutObjectResult(etag: String,
+case class PutObjectResult(prefix: String,
+                           key: String,
+                           etag: String,
                            contentMd5: String,
                            contentLength: Long,
                            maybeVersionId: Option[String])
 
-case class ObjectMeta(path: Path, result: PutObjectResult)
+case class ObjectMeta(path: Path, result: PutObjectResult, lastModifiedDate: LocalDateTime = LocalDateTime.now())
 
 case class GetObjectResponse(bucketName: String,
                              key: String,
@@ -44,37 +46,25 @@ case class ListBucketResult(bucketName: String,
                             contents: List[BucketContent])
   extends XmlResponse {
   override def toXml: Elem = {
-    val _contents =
-      contents match {
-        case Nil => <Contents/>
-        case _ => contents.map(_.toXml)
-      }
-    <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-      <Name>{bucketName}</Name>
-      <Prefix>{maybePrefix.getOrElse("")}</Prefix>
-      <KeyCount>{keyCount}</KeyCount>
-      <MaxKeys>{maxKeys}</MaxKeys>
-      <IsTruncated>{isTruncated}</IsTruncated>
-      {_contents}
-    </ListBucketResult>
+    val prefixElem = maybePrefix match {
+      case Some(prefix) => <Prefix>{prefix}</Prefix>
+      case None => <Prefix/>
+    }
+
+    <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>{bucketName}</Name>{prefixElem}<KeyCount>{keyCount}</KeyCount><MaxKeys>{maxKeys}</MaxKeys><EncodingType>url</EncodingType><IsTruncated>{isTruncated}</IsTruncated>{contents.map(_.toXml)}</ListBucketResult>
   }
-
-
 }
 
-case class BucketContent(key: String,
+case class BucketContent(expand: Boolean,
+                         key: String,
                          size: Long,
                          eTag: String,
                          lastModifiedDate: Instant = Instant.now(),
                          storageClass: String = "STANDARD") extends XmlResponse {
   override def toXml: Elem =
-    <Contents>
-      <Key>{key}</Key>
-      <LastModified>{lastModifiedDate.toString}</LastModified>
-      <Size>{size}</Size>
-      <StorageClass>{storageClass}</StorageClass>
-      <ETag>"{eTag}"</ETag>
-    </Contents>
+    if(expand || size > 0)
+      <Contents><Key>{key}</Key><LastModified>{lastModifiedDate.toString}</LastModified><Size>{size}</Size><StorageClass>{storageClass}</StorageClass><ETag>"{eTag}"</ETag></Contents>
+    else <CommonPrefixes><Prefix>{key}</Prefix></CommonPrefixes>
 }
 
 case class InitiateMultipartUploadResult(bucketName: String, key: String, uploadId: String) extends XmlResponse {

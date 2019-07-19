@@ -63,7 +63,7 @@ package object request {
   }
 
   case class ListBucketParams(maxKeys: Int,
-                              maybeDelimiter: Option[String] = None,
-                              maybePrefix: Option[String] = None)
+                              maybePrefix: Option[String] = None,
+                              maybeDelimiter: Option[String] = None)
 
 }

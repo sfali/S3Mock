@@ -120,11 +120,46 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
     fileStore.get(bucketName) match {
       case None => Future.failed(NoSuchBucketException(bucketName))
       case Some(bucketMetadata) => Future.successful {
-        val contents = bucketMetadata
-          .getObjects
-          .map(om => BucketContent(key = "???", eTag = om.result.etag, size = om.result.contentLength))
+        val objects = bucketMetadata.getObjects
+        val recursive = params.maybeDelimiter.isEmpty
+        val filteredObjects =
+          (params.maybePrefix, params.maybeDelimiter) match {
+            case (None, None) =>
+              log.debug("Case 1: Prefix: None, Delimiter: None")
+              objects
+            case (Some(prefix), None) =>
+              log.debug("Case 2: Prefix: {}, Delimiter: None", prefix)
+              objects.filter {
+                om =>
+                  val result = om.result
+                  result.key == prefix || result.prefix.startsWith(prefix)
+              }
+            case (None, Some(delimiter)) =>
+              log.debug("Case 3: Prefix: None, Delimiter: {}", delimiter)
+              objects.filter(_.result.prefix == "/")
+            case (Some(prefix), Some(delimiter)) =>
+              log.debug("Case 4: Prefix: {}, Delimiter: {}", prefix, delimiter)
+              objects.filter {
+                om =>
+                  val result = om.result
+                  result.key == prefix || result.prefix == prefix
+              }
+          }
+
+        val _prefix = params.maybePrefix.getOrElse("")
+
+        log.debug("FilteredObjects: {}", filteredObjects.map(_.result.key))
+        val contents = filteredObjects
+          .map {
+            om =>
+              val result = om.result
+              val key = result.key
+              val expand = recursive || key == _prefix
+              BucketContent(expand = expand, key = key, eTag = result.etag, size = result.contentLength)
+          }
         ListBucketResult(
           bucketName = bucketName,
+          maybePrefix = params.maybePrefix,
           keyCount = contents.length,
           maxKeys = params.maxKeys,
           contents = contents
@@ -143,7 +178,7 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
               if (Files.notExists(filePath)) Future.failed(new RuntimeException("unable to save file"))
               else {
                 val response = ObjectMeta(filePath,
-                  createPutObjectResult(etag, contentMD5, Files.size(filePath), maybeVersionId))
+                  createPutObjectResult(key, etag, contentMD5, Files.size(filePath), maybeVersionId))
                 bucketMetadata.putObject(key, response)
                 Future.successful(response)
               }
@@ -238,7 +273,7 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
                 if (Files.notExists(filePath)) Future.failed(new RuntimeException("unable to save file"))
                 else {
                   bucketMetadata.addPart(uploadId, UploadPart(partNumber, etag))
-                  val response = ObjectMeta(filePath, createPutObjectResult(etag, contentMD5, Files.size(filePath)))
+                  val response = ObjectMeta(filePath, createPutObjectResult(key, etag, contentMD5, Files.size(filePath)))
                   bucketMetadata.putObject(key, response)
                   Future.successful(response)
                 }
@@ -273,7 +308,7 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
                       log.debug("etag={}, contentMD5={}, etag={}", etag, contentMD5, result.eTag)
                       val contentLength = Files.size(filePath)
                       val response = ObjectMeta(filePath,
-                        createPutObjectResult(result.eTag, contentMD5, contentLength, maybeVersionId))
+                        createPutObjectResult(key, result.eTag, contentMD5, contentLength, maybeVersionId))
                       bucketMetadata.putObject(key, response)
                       Future.successful(result.copy(contentLength = contentLength))
                     }
@@ -306,7 +341,7 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
           fileStream.copyPart(sourceObject.path, filePath)
             .map {
               case (etag, contentMD5) =>
-                val response = ObjectMeta(filePath, createPutObjectResult(etag, contentMD5, Files.size(filePath),
+                val response = ObjectMeta(filePath, createPutObjectResult(key, etag, contentMD5, Files.size(filePath),
                   maybeVersionId))
                 destBucketMetadata.putObject(key, response)
                 (response, CopyObjectResult(etag))
