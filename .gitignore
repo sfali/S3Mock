@@ -6,6 +6,7 @@
 # IDEA
 .idea/**
 s3/initial.json
+.s3mock/
 password.txt
 
 # sbt specific
