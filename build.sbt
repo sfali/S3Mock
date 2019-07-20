@@ -74,6 +74,8 @@ lazy val root = (project in file("."))
   )
   .enablePlugins(JavaAppPackaging)
 
+releaseIgnoreUntrackedFiles := true
+
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
   inquireVersions,
