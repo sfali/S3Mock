@@ -157,6 +157,7 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
               val expand = recursive || key == _prefix
               BucketContent(expand = expand, key = key, eTag = result.etag, size = result.contentLength)
           }
+          .sortBy(_.key)
         ListBucketResult(
           bucketName = bucketName,
           maybePrefix = params.maybePrefix,
