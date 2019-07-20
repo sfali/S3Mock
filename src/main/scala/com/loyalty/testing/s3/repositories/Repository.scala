@@ -6,7 +6,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.request.BucketVersioning.BucketVersioning
-import com.loyalty.testing.s3.request.{CompleteMultipartUpload, CreateBucketConfiguration, VersioningConfiguration}
+import com.loyalty.testing.s3.request.{CompleteMultipartUpload, CreateBucketConfiguration, ListBucketParams, VersioningConfiguration}
 import com.loyalty.testing.s3.response._
 
 import scala.concurrent.Future
@@ -26,6 +26,8 @@ trait Repository {
 
   def setBucketNotification(bucketName: String, notifications: List[Notification]): Future[Done]
 
+  def listBucket(bucketName: String, params: ListBucketParams): Future[ListBucketResult]
+
   def putObject(bucketName: String, key: String, contentSource: Source[ByteString, _]): Future[ObjectMeta]
 
   def getObject(bucketName: String, key: String, maybeVersionId: Option[String] = None,
@@ -42,7 +44,7 @@ trait Repository {
                  key: String,
                  sourceBucketName: String,
                  sourceKey: String,
-                 maybeSourceVersionId: Option[String] = None) : Future[(ObjectMeta, CopyObjectResult)]
+                 maybeSourceVersionId: Option[String] = None): Future[(ObjectMeta, CopyObjectResult)]
 
   def copyMultipart(bucketName: String,
                     key: String,

@@ -61,6 +61,8 @@ package object s3 {
       val lastColon = s.lastIndexOf(':')
       if (lastColon > -1) s.substring(lastColon + 1) else s
     }
+
+    def toPath: Path = Paths.get(s)
   }
 
   implicit class PathOps(path: Path) {
@@ -84,6 +86,8 @@ package object s3 {
     }
 
     def ->(other: String*): Path = Paths.get(path.toString, other: _*)
+
+    def toUnixPath: String = path.toString.replaceAll("\\\\", "/")
   }
 
   def createCompleteMultipartUploadResult(bucketName: String,
@@ -96,11 +100,19 @@ package object s3 {
     CompleteMultipartUploadResult(bucketName, key, eTag, 0L, maybeVersionId)
   }
 
-  def createPutObjectResult(eTag: String,
+  def createPutObjectResult(filePath: String,
+                            eTag: String,
                             contentMd5: String,
                             contentLength: Long,
                             maybeVersionId: Option[String] = None): PutObjectResult = {
-    PutObjectResult(eTag, contentMd5, contentLength, maybeVersionId)
+    val path = filePath.toPath
+    val key = if (contentLength == 0) path.toUnixPath + "/" else path.toUnixPath
+    val parentPath = Option(path.getParent)
+    val prefix = parentPath match {
+      case Some(value) => value.toUnixPath + "/"
+      case None => "/"
+    }
+    PutObjectResult(prefix, key, eTag, contentMd5, contentLength, maybeVersionId)
   }
 
   implicit class JavaFutureOps[T](future: JavaFuture[T]) {
@@ -196,11 +208,11 @@ package object s3 {
       else {
         val parsedFilters = filterRuleNodeSeq.map(parseFilterRule(bucketName))
         val filterPrefix = parsedFilters.filter(_._1 == "prefix").map(_._2).toSet.toList
-        if(filterPrefix.length > 1) {
+        if (filterPrefix.length > 1) {
           throw InvalidNotificationConfigurationException(bucketName, "Cannot specify more than one prefix rule in a filter")
         }
         val filterSuffix = parsedFilters.filter(_._1 == "suffix").map(_._2).toSet.toList
-        if(filterSuffix.length > 1) {
+        if (filterSuffix.length > 1) {
           throw InvalidNotificationConfigurationException(bucketName, "Cannot specify more than one prefix rule in a filter")
         }
         (filterPrefix.headOption, filterSuffix.headOption)
@@ -210,13 +222,13 @@ package object s3 {
 
   private def parseFilterRule(bucketName: String)(node: Node) = {
     val nameNodeSeq = node \ "Name"
-    if(nameNodeSeq.isEmpty) throw InvalidNotificationConfigurationException(bucketName, "Missing required parameter: Name")
+    if (nameNodeSeq.isEmpty) throw InvalidNotificationConfigurationException(bucketName, "Missing required parameter: Name")
     val valueNodeSeq = node \ "Value"
-    if(nameNodeSeq.isEmpty) throw InvalidNotificationConfigurationException(bucketName, "Missing required parameter: Value")
+    if (nameNodeSeq.isEmpty) throw InvalidNotificationConfigurationException(bucketName, "Missing required parameter: Value")
 
     val name = nameNodeSeq.head.text
     val value = valueNodeSeq.head.text
-    if(name != "prefix" && name != "suffix")
+    if (name != "prefix" && name != "suffix")
       throw InvalidNotificationConfigurationException(bucketName, "filter rule name must be either prefix or suffix")
     (name, value)
   }

@@ -25,13 +25,15 @@ trait S3Routes {
           concat(
             SetBucketVersioningRoute().route(bucketName),
             SetBucketNotificationRoute().route(bucketName),
-            CreateBucketRoute().route(bucketName)
+            CreateBucketRoute().route(bucketName),
+            ListBucketRoute().route(bucketName)
           )
         } ~ pathEnd {
           concat(
             SetBucketVersioningRoute().route(bucketName),
             SetBucketNotificationRoute().route(bucketName),
-            CreateBucketRoute().route(bucketName)
+            CreateBucketRoute().route(bucketName),
+            ListBucketRoute().route(bucketName)
           )
         } ~ path(RemainingPath) {
           key =>

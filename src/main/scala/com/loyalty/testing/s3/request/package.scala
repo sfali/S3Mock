@@ -62,4 +62,8 @@ package object request {
     def fromNode(node: NodeSeq): Option[request.BucketVersioning.Value] = Try(withName(node.text)).toOption
   }
 
+  case class ListBucketParams(maxKeys: Int,
+                              maybePrefix: Option[String] = None,
+                              maybeDelimiter: Option[String] = None)
+
 }
