@@ -22,11 +22,11 @@ lazy val root = (project in file("."))
     parallelExecution in IntegrationTest := false,
     libraryDependencies ++= {
 
-      val akkaVersion = "2.5.21"
-      val akkaHttpVersion = "10.1.7"
+      val akkaVersion = "2.5.23"
+      val akkaHttpVersion = "10.1.8"
       val circeVersion = "0.11.1"
       val amazonawsVersion = "1.11.502"
-      val akkaHttpCirceVersion = "1.25.2"
+      val akkaHttpCirceVersion = "1.27.0"
       val scalaXmlVersion = "1.1.1"
       val EnumeratumVersion = "1.5.13"
       val EnumeratumCirceVersion = "1.5.20"
