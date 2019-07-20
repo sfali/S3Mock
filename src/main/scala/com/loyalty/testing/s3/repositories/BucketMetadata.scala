@@ -1,13 +1,14 @@
 package com.loyalty.testing.s3.repositories
 
 import java.nio.file.Path
+import java.time.LocalDateTime
 
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.request.{UploadPart, VersioningConfiguration}
 import com.loyalty.testing.s3.response.ObjectMeta
+import com.loyalty.testing.s3._
 
 import scala.collection.mutable
-
 
 class BucketMetadata(val bucketName: String, val path: Path) {
 
@@ -29,9 +30,26 @@ class BucketMetadata(val bucketName: String, val path: Path) {
 
   def notifications_=(ls: List[Notification]): Unit = _notifications = ls
 
-  def putObject(key: String, metadata: ObjectMeta): Unit = objectMetaMap += (convertKey(key) -> metadata)
+  def putObject(key: String, metadata: ObjectMeta): Unit = {
+    val path = key.toPath
+    val parentPath = path.getParent
+    if (parentPath != null) {
+      val parentKey = parentPath.toString
+      val om =
+        objectMetaMap.get(parentKey) match {
+          case Some(value) => value.copy(lastModifiedDate = LocalDateTime.now())
+          case None =>
+            val result = createPutObjectResult(parentKey, toBase16(parentPath.getFileName.toString), "", 0)
+            ObjectMeta(parentPath, result)
+        }
+      putObject(parentKey, om)
+    }
+    objectMetaMap += (convertKey(key) -> metadata)
+  }
 
   def getObject(key: String): Option[ObjectMeta] = objectMetaMap.get(convertKey(key))
+
+  def getObjects: List[ObjectMeta] = objectMetaMap.values.toList
 
   def removeMetadata(key: String): Unit = objectMetaMap -= convertKey(key)
 

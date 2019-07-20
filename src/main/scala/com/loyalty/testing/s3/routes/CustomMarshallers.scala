@@ -27,6 +27,9 @@ trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
   implicit val CompleteMultipartUploadResultMarshallers: ToEntityMarshaller[CompleteMultipartUploadResult] =
     xmlResponseMarshallers(`application/octet-stream`)
 
+  implicit val ListBucketResultMarshallers: ToEntityMarshaller[ListBucketResult] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
   implicit val BucketAlreadyExistsExceptionMarshallers: ToEntityMarshaller[BucketAlreadyExistsException] =
     xmlResponseMarshallers(`application/octet-stream`)
 
@@ -64,6 +67,9 @@ trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
 
   implicit val CompleteMultipartUploadResultResponse: ToResponseMarshaller[CompleteMultipartUploadResult] =
     fromToEntityMarshaller[CompleteMultipartUploadResult](OK)
+
+  implicit val ListBucketResultResponse: ToResponseMarshaller[ListBucketResult] =
+    fromToEntityMarshaller[ListBucketResult](OK)
 
   implicit val InvalidNotificationConfigurationExceptionResponse: ToResponseMarshaller[InvalidNotificationConfigurationException] =
     fromToEntityMarshaller[InvalidNotificationConfigurationException](BadRequest)

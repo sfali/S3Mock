@@ -1,7 +1,7 @@
 package com.loyalty.testing.s3.response
 
 import java.nio.file.{Path, Paths}
-import java.time.Instant
+import java.time.{Instant, LocalDateTime}
 
 import akka.stream.IOResult
 import akka.stream.scaladsl.Source
@@ -15,12 +15,14 @@ import scala.xml.Elem
 case class BucketResponse(bucketName: String, locationConstraint: String = defaultRegion,
                           maybeBucketVersioning: Option[BucketVersioning] = None)
 
-case class PutObjectResult(etag: String,
+case class PutObjectResult(prefix: String,
+                           key: String,
+                           etag: String,
                            contentMd5: String,
                            contentLength: Long,
                            maybeVersionId: Option[String])
 
-case class ObjectMeta(path: Path, result: PutObjectResult)
+case class ObjectMeta(path: Path, result: PutObjectResult, lastModifiedDate: LocalDateTime = LocalDateTime.now())
 
 case class GetObjectResponse(bucketName: String,
                              key: String,
@@ -36,31 +38,48 @@ trait XmlResponse {
   def toXml: Elem
 }
 
+case class ListBucketResult(bucketName: String,
+                            keyCount: Int,
+                            maxKeys: Int,
+                            maybePrefix: Option[String] = None,
+                            isTruncated: Boolean = false,
+                            contents: List[BucketContent])
+  extends XmlResponse {
+  override def toXml: Elem = {
+    val prefixElem = maybePrefix match {
+      case Some(prefix) => <Prefix>{prefix}</Prefix>
+      case None => <Prefix/>
+    }
+
+    <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>{bucketName}</Name>{prefixElem}<KeyCount>{keyCount}</KeyCount><MaxKeys>{maxKeys}</MaxKeys><EncodingType>url</EncodingType><IsTruncated>{isTruncated}</IsTruncated>{contents.map(_.toXml)}</ListBucketResult>
+  }
+}
+
+case class BucketContent(expand: Boolean,
+                         key: String,
+                         size: Long,
+                         eTag: String,
+                         lastModifiedDate: Instant = Instant.now(),
+                         storageClass: String = "STANDARD") extends XmlResponse {
+  override def toXml: Elem =
+    if(expand || size > 0)
+      <Contents><Key>{key}</Key><LastModified>{lastModifiedDate.toString}</LastModified><Size>{size}</Size><StorageClass>{storageClass}</StorageClass><ETag>"{eTag}"</ETag></Contents>
+    else <CommonPrefixes><Prefix>{key}</Prefix></CommonPrefixes>
+}
+
 case class InitiateMultipartUploadResult(bucketName: String, key: String, uploadId: String) extends XmlResponse {
   override def toXml: Elem =
-    <InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-      <Bucket>{bucketName}</Bucket>
-      <Key>{key.decode}</Key>
-      <UploadId>{uploadId}</UploadId>
-    </InitiateMultipartUploadResult>
+    <InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>{bucketName}</Bucket><Key>{key.decode}</Key><UploadId>{uploadId}</UploadId></InitiateMultipartUploadResult>
 }
 
 case class CopyObjectResult(eTag: String,
                             lastModifiedDate: Instant = Instant.now()) extends XmlResponse {
-  override def toXml: Elem =
-    <CopyObjectResult>
-      <LastModified>{lastModifiedDate.toString}</LastModified>
-      <ETag>"{eTag}"</ETag>
-    </CopyObjectResult>
+  override def toXml: Elem = <CopyObjectResult><LastModified>{lastModifiedDate.toString}</LastModified><ETag>"{eTag}"</ETag></CopyObjectResult>
 }
 
 case class CopyPartResult(eTag: String, lastModifiedDate: Instant = Instant.now(),
                           maybeVersionId: Option[String] = None) extends XmlResponse {
-  override def toXml: Elem =
-    <CopyPartResult>
-      <LastModified>{lastModifiedDate.toString}</LastModified>
-      <ETag>"{eTag}"</ETag>
-    </CopyPartResult>
+  override def toXml: Elem = <CopyPartResult><LastModified>{lastModifiedDate.toString}</LastModified><ETag>"{eTag}"</ETag></CopyPartResult>
 }
 
 case class CompleteMultipartUploadResult(bucketName: String, key: String, eTag: String, contentLength: Long,
@@ -68,12 +87,7 @@ case class CompleteMultipartUploadResult(bucketName: String, key: String, eTag: 
   val location = s"http://s3.amazonaws.com/${Paths.get(bucketName, key.decode).toString}"
 
   override def toXml: Elem =
-    <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-      <Location>{location}</Location>
-      <Bucket>{bucketName}</Bucket>
-      <Key>{key.decode}</Key>
-      <ETag>"{eTag}"</ETag>
-    </CompleteMultipartUploadResult>
+    <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Location>{location}</Location><Bucket>{bucketName}</Bucket><Key>{key.decode}</Key><ETag>"{eTag}"</ETag></CompleteMultipartUploadResult>
 }
 
 object ErrorCodes {
@@ -94,13 +108,8 @@ sealed trait ErrorResponse extends Throwable with XmlResponse {
   override def getMessage: String = message
 
   override def toXml: Elem =
-    <Error xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-      <Code>{code}</Code>
-      <Message>{message}</Message>
-      <Resource>{resource}</Resource>
-    </Error>
+    <Error xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Code>{code}</Code><Message>{message}</Message><Resource>{resource}</Resource></Error>
 }
-
 
 import com.loyalty.testing.s3.response.ErrorCodes._
 
@@ -154,26 +163,3 @@ case class InvalidNotificationConfigurationException(bucketName: String, overrid
   override val code: String = InvalidArgument
   override val resource: String = bucketName
 }
-
-/*case class NoSuchBucketException(bucketName: String)
-  extends Exception(s"The specified bucket `$bucketName` does not exist") {
-  def toXml: Elem =
-    <Error>
-      <Code>NoSuchBucket</Code>
-      <Message>The specified bucket does not exist</Message>
-      <BucketName>{bucketName}</BucketName>
-    </Error>
-}*/
-
-/*case class NoSuckKeyException(bucketName: String, key: String)
-  extends Exception(s"The resource `/$bucketName/$key` does not exist") {
-  val resource: String = s"/$bucketName/$key"
-
-  def toXml: Elem =
-    <Error>
-      <Code>NoSuchKey</Code>
-      <Message>The resource you requested does not exist</Message>
-      <Resource>{resource}</Resource>
-    </Error>
-}*/
-

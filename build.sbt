@@ -22,11 +22,11 @@ lazy val root = (project in file("."))
     parallelExecution in IntegrationTest := false,
     libraryDependencies ++= {
 
-      val akkaVersion = "2.5.21"
-      val akkaHttpVersion = "10.1.7"
+      val akkaVersion = "2.5.23"
+      val akkaHttpVersion = "10.1.8"
       val circeVersion = "0.11.1"
       val amazonawsVersion = "1.11.502"
-      val akkaHttpCirceVersion = "1.25.2"
+      val akkaHttpCirceVersion = "1.27.0"
       val scalaXmlVersion = "1.1.1"
       val EnumeratumVersion = "1.5.13"
       val EnumeratumCirceVersion = "1.5.20"
@@ -88,5 +88,5 @@ releaseProcess := Seq[ReleaseStep](
 
 dockerRepository := Some("loyaltyone")
 dockerExposedVolumes := Seq("/opt/docker/s3")
-dockerBaseImage := "loyaltyone/docker-slim-java-node:jre-8-node-8"
+dockerBaseImage := "loyaltyone/docker-slim-java-node:jre8-node8-190509"
 dockerEntrypoint := "/usr/local/bin/env-decrypt" +: dockerEntrypoint.value
