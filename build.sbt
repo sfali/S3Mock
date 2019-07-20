@@ -3,7 +3,7 @@ import sbtrelease.ReleaseStateTransformations._
 name := "s3mock"
 
 lazy val commonSettings =
-  Seq(organization := "com.loyalty.testing", scalaVersion := "2.12.6")
+  Seq(organization := "com.loyalty.testing", scalaVersion := "2.12.8")
 
 scalacOptions += "-Ypartial-unification"
 
