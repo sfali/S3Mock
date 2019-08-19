@@ -30,6 +30,7 @@ lazy val root = (project in file("."))
       val scalaXmlVersion = "1.1.1"
       val EnumeratumVersion = "1.5.13"
       val EnumeratumCirceVersion = "1.5.20"
+      val NitriteVersion = "3.2.0"
 
       val akka = "com.typesafe.akka"
       val scalaTest = "org.scalatest"
@@ -44,6 +45,7 @@ lazy val root = (project in file("."))
       val Beachape = "com.beachape"
       val Enumeratum = "enumeratum"
       val EnumeratumCirce = "enumeratum-circe"
+      val Dizitart = "org.dizitart"
 
       Seq(
         akka             %% "akka-http"                         % akkaHttpVersion,
@@ -59,6 +61,7 @@ lazy val root = (project in file("."))
         Beachape         %% EnumeratumCirce                     % EnumeratumCirceVersion,
         heikoseeberger   %% "akka-http-circe"                   % akkaHttpCirceVersion,
         scalaLangModules %% "scala-xml"                         % scalaXmlVersion,
+        Dizitart         %  "nitrite"                           % NitriteVersion,
         amazonaws        % "aws-java-sdk-s3"                    % amazonawsVersion  % "it, test",
         amazonaws        % "aws-java-sdk-sqs"                   % amazonawsVersion,
         amazonaws        % "aws-java-sdk-sns"                   % amazonawsVersion,
