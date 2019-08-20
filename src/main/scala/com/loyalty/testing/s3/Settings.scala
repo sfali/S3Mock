@@ -15,6 +15,12 @@ class Settings(config: Config) {
     val port: Int = config.getInt("app.http.port")
   }
 
+  val dbSettings: DBSettings = new DBSettings {
+    override val filePath: String = config.getString("app.db.file-path")
+    override val userName: Option[String] = getOptionalString("app.db-user-name")
+    override val password: Option[String] = getOptionalString("app.db-password")
+  }
+
   object aws {
     val region: String = config.getString("app.aws.region")
     val credentialsProvider: AWSCredentialsProvider = {
@@ -64,8 +70,14 @@ class Settings(config: Config) {
   }
 
   private def getOptionalString(keyPath: String): Option[String] = {
-    val value = config.getString(keyPath)
-    if (Option(value).isDefined && value.trim.nonEmpty) Some(value.trim) else None
+    val maybeValue =
+      if (config.hasPath(keyPath)) Some(config.getString(keyPath))
+      else None
+
+    maybeValue match {
+      case Some(value) => if (value.trim.nonEmpty) Some(value.trim) else None
+      case None => None
+    }
   }
 
   private def getOptionalEndpointConfiguration(keyPath: String): Option[EndpointConfiguration] = {
