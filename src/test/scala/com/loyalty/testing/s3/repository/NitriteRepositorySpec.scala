@@ -1,6 +1,8 @@
 package com.loyalty.testing.s3.repository
 
-import java.nio.file.{Files, Path, Paths}
+import java.io.IOException
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.{FileVisitResult, Files, Path, Paths, SimpleFileVisitor}
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
@@ -8,7 +10,8 @@ import akka.testkit.TestKit
 import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.repositories.NitriteRepository
-import com.loyalty.testing.s3.request.CreateBucketConfiguration
+import com.loyalty.testing.s3.request.{BucketVersioning, CreateBucketConfiguration, VersioningConfiguration}
+import com.loyalty.testing.s3.response.BucketAlreadyExistsException
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, MustMatchers}
@@ -34,6 +37,7 @@ class NitriteRepositorySpec
   override protected def afterAll(): Unit = {
     super.afterAll()
     repository.clean()
+    clean()
     TestKit.shutdownActorSystem(system)
   }
 
@@ -42,6 +46,30 @@ class NitriteRepositorySpec
     bucketResponse.bucketName must equal(defaultBucketName)
     bucketResponse.locationConstraint must equal(defaultRegion)
     bucketResponse.maybeBucketVersioning mustBe empty
+  }
+
+  it should "raise BucketAlreadyExistsException when attempt to create bucket which is already exists" in {
+    val eventualResponse = repository.createBucket(defaultBucketName, CreateBucketConfiguration())
+    whenReady(eventualResponse.failed) {
+      ex => ex mustBe a[BucketAlreadyExistsException]
+    }
+  }
+
+  it should "create a bucket in region other than default region" in {
+    val bucketResponse = repository.createBucket(versionedBucketName, CreateBucketConfiguration("us-west-1")).futureValue
+    bucketResponse.bucketName must equal(versionedBucketName)
+    bucketResponse.locationConstraint must equal("us-west-1")
+    bucketResponse.maybeBucketVersioning mustBe empty
+  }
+
+  it should "set versioning on a bucket" in {
+    val bucketResponse = repository.setBucketVersioning(versionedBucketName,
+      VersioningConfiguration(BucketVersioning.Enabled)).futureValue
+    bucketResponse.bucketName must equal(versionedBucketName)
+    bucketResponse.locationConstraint must equal("us-west-1")
+    bucketResponse.maybeBucketVersioning.fold(fail("unable to get bucket version information")) {
+      bucketVersioning => bucketVersioning must equal(BucketVersioning.Enabled)
+    }
   }
 }
 
@@ -57,4 +85,19 @@ object NitriteRepositorySpec {
 
   private val etagDigest = "37099e6f8b99c52cd81df0041543e5b0"
   private val md5Digest = "Nwmeb4uZxSzYHfAEFUPlsA=="
+
+  private def clean() =
+    Files.walkFileTree(dataPath, new SimpleFileVisitor[Path] {
+      override def visitFile(file: Path,
+                             attrs: BasicFileAttributes): FileVisitResult = {
+        Files.delete(file)
+        FileVisitResult.CONTINUE
+      }
+
+      override def postVisitDirectory(dir: Path,
+                                      exc: IOException): FileVisitResult = {
+        Files.delete(dir)
+        FileVisitResult.CONTINUE
+      }
+    })
 }
