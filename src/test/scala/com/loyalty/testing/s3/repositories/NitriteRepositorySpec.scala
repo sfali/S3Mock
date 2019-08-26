@@ -1,8 +1,8 @@
 package com.loyalty.testing.s3.repositories
 
 import java.io.IOException
-import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file._
+import java.nio.file.attribute.BasicFileAttributes
 
 import akka.Done
 import akka.actor.ActorSystem
@@ -11,7 +11,6 @@ import akka.testkit.TestKit
 import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
-import com.loyalty.testing.s3.repositories.NitriteRepository
 import com.loyalty.testing.s3.request.{BucketVersioning, CreateBucketConfiguration, VersioningConfiguration}
 import com.loyalty.testing.s3.response.BucketAlreadyExistsException
 import org.scalatest.concurrent.ScalaFutures
@@ -86,7 +85,11 @@ class NitriteRepositorySpec
     val result = repository.setBucketNotification(defaultBucketName, notification :: Nil).futureValue
     result must equal(Done)
 
-    // repository.notificationCollection.findNotification(defaultBucketName, "sample-notification")
+    val maybeNotification = repository.notificationCollection
+      .findNotification(defaultBucketName, "sample-notification")
+
+    maybeNotification mustBe defined
+    notification must equal(maybeNotification.get)
   }
 }
 
