@@ -12,7 +12,7 @@ import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.request.{BucketVersioning, CreateBucketConfiguration, VersioningConfiguration}
-import com.loyalty.testing.s3.response.BucketAlreadyExistsException
+import com.loyalty.testing.s3.response.{BucketAlreadyExistsException, NoSuchBucketException}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, MustMatchers}
@@ -79,7 +79,7 @@ class NitriteRepositorySpec
       notificationType = NotificationType.ObjectCreated,
       operationType = OperationType.*,
       destinationType = DestinationType.Sqs,
-      destinationName = "",
+      destinationName = "some-destination",
       bucketName = defaultBucketName,
     )
     val result = repository.setBucketNotification(defaultBucketName, notification :: Nil).futureValue
@@ -91,6 +91,22 @@ class NitriteRepositorySpec
     maybeNotification mustBe defined
     notification must equal(maybeNotification.get)
   }
+
+  it should "fail set bucket notification for non-existing bucket" in {
+    val notification = Notification(
+      name = "sample-notification",
+      notificationType = NotificationType.ObjectCreated,
+      operationType = OperationType.*,
+      destinationType = DestinationType.Sqs,
+      destinationName = "no-destination",
+      bucketName = nonExistentBucketName,
+    )
+    val eventualResponse = repository.setBucketNotification(nonExistentBucketName, notification :: Nil)
+    whenReady(eventualResponse.failed){
+      ex => ex mustBe a[NoSuchBucketException]
+    }
+  }
+
 }
 
 object NitriteRepositorySpec {
@@ -98,6 +114,7 @@ object NitriteRepositorySpec {
   private val dataPath: Path = Paths.get(userDir, "target", ".s3mock")
   private val defaultBucketName = "actor-non-version"
   private val versionedBucketName = "actor-with-version"
+  private val nonExistentBucketName = "dummy"
 
   private val dBSettings: DBSettings = new DBSettings {
     override val filePath: String = (dataPath -> "s3mock.db").toString
