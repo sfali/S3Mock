@@ -98,6 +98,7 @@ object ErrorCodes {
   val InvalidPart = "InvalidPart"
   val InvalidPartOrder = "InvalidPartOrder"
   val InvalidArgument = "InvalidArgument"
+  val InvalidRequest = "InvalidRequest"
 }
 
 sealed trait ErrorResponse extends Throwable with XmlResponse {
@@ -161,5 +162,10 @@ case class InvalidPartOrderException(bucketName: String, key: String) extends Er
 
 case class InvalidNotificationConfigurationException(bucketName: String, override val message: String) extends ErrorResponse {
   override val code: String = InvalidArgument
+  override val resource: String = bucketName
+}
+
+case class InvalidRequest(bucketName: String, override val message: String) extends ErrorResponse {
+  override val code: String = InvalidRequest
   override val resource: String = bucketName
 }

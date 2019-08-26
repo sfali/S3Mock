@@ -39,6 +39,13 @@ class BucketCollection(db: Nitrite, dataDir: Path) {
       case _ => throw new IllegalStateException(s"More than one document found: $bucketName")
     }
 
+  def findBucket(bucketName: String): Bucket =
+    findByName(bucketName) match {
+      case Nil => throw NoSuchBucketException(bucketName)
+      case document :: Nil => Bucket(document)
+      case _ => throw new IllegalStateException(s"More than one document found: $bucketName")
+    }
+
   private def findByName(bucketName: String): List[Document] =
     collection.find(feq(BucketNameField, bucketName)).toScalaList
 }

@@ -44,7 +44,8 @@ class NitriteRepository(dbSettings: DBSettings,
     }
   }
 
-  private val bucketCollection = BucketCollection(db, dataDir)
+  private[repositories] val bucketCollection = BucketCollection(db, dataDir)
+  private[repositories] val notificationCollection = NotificationCollection(db)
 
   override def createBucketWithVersioning(bucketName: String,
                                           bucketConfiguration: CreateBucketConfiguration,
@@ -83,10 +84,29 @@ class NitriteRepository(dbSettings: DBSettings,
     }
 
   override def setBucketNotification(bucketName: String,
-                                     contentSource: Source[ByteString, _]): Future[Done] = ???
+                                     contentSource: Source[ByteString, _]): Future[Done] =
+    Try(bucketCollection.findBucket(bucketName)) match {
+      case Failure(ex) => Future.failed(ex)
+      case Success(_) =>
+        contentSource
+          .map(_.utf8String)
+          .map(s => parseNotificationConfiguration(bucketName, s))
+          .runWith(Sink.head)
+          .flatMap {
+            notifications => setBucketNotification(bucketName, notifications)
+          }
+    }
 
   override def setBucketNotification(bucketName: String,
-                                     notifications: List[Notification]): Future[Done] = ???
+                                     notifications: List[Notification]): Future[Done] = {
+    def createNotification(notification: Notification) =
+      Future.successful(notificationCollection.createNotification(notification))
+
+    Try(bucketCollection.findBucket(bucketName)) match {
+      case Failure(ex) => Future.failed(ex)
+      case Success(_) => Future.sequence(notifications.map(createNotification)).map(_ => Done)
+    }
+  }
 
   override def listBucket(bucketName: String,
                           params: ListBucketParams): Future[ListBucketResult] = ???
