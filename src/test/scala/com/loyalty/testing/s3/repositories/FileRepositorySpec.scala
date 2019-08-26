@@ -1,4 +1,4 @@
-package com.loyalty.testing.s3.repository
+package com.loyalty.testing.s3.repositories
 
 import java.nio.file.{Files, Path, Paths}
 

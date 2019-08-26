@@ -1,4 +1,4 @@
-package com.loyalty.testing.s3.repository
+package com.loyalty.testing.s3.repositories
 
 import java.io.IOException
 import java.nio.file.attribute.BasicFileAttributes
