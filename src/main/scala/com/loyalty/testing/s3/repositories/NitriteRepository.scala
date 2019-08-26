@@ -6,7 +6,7 @@ import akka.Done
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.Materializer
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.notification.Notification
@@ -63,15 +63,7 @@ class NitriteRepository(dbSettings: DBSettings,
 
   override def setBucketVersioning(bucketName: String,
                                    contentSource: Source[ByteString, _]): Future[BucketResponse] =
-    contentSource
-      .map(_.utf8String)
-      .map(s => if (s.isEmpty) None else Some(s))
-      .map(VersioningConfiguration(_))
-      .map {
-        case Some(versioningConfiguration) => versioningConfiguration
-        case None => VersioningConfiguration(BucketVersioning.Suspended)
-      }
-      .runWith(Sink.head)
+    toVersionConfiguration(contentSource)
       .flatMap(versioningConfiguration => setBucketVersioning(bucketName, versioningConfiguration))
 
   override def setBucketVersioning(bucketName: String,
@@ -85,17 +77,10 @@ class NitriteRepository(dbSettings: DBSettings,
 
   override def setBucketNotification(bucketName: String,
                                      contentSource: Source[ByteString, _]): Future[Done] =
-    Try(bucketCollection.findBucket(bucketName)) match {
-      case Failure(ex) => Future.failed(ex)
-      case Success(_) =>
-        contentSource
-          .map(_.utf8String)
-          .map(s => parseNotificationConfiguration(bucketName, s))
-          .runWith(Sink.head)
-          .flatMap {
-            notifications => setBucketNotification(bucketName, notifications)
-          }
-    }
+    toBucketNotification(bucketName, contentSource)
+      .flatMap {
+        notifications => setBucketNotification(bucketName, notifications)
+      }
 
   override def setBucketNotification(bucketName: String,
                                      notifications: List[Notification]): Future[Done] = {
