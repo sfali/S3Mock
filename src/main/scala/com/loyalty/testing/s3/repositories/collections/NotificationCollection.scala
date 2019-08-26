@@ -1,7 +1,7 @@
 package com.loyalty.testing.s3.repositories.collections
 
 import com.loyalty.testing.s3.notification.Notification
-import com.loyalty.testing.s3.repositories.{BucketNameField, DestinationNameField, DestinationTypeField, NotificationNameField, NotificationTypeField, OperationTypeField, PrefixField, SuffixField}
+import com.loyalty.testing.s3.repositories._
 import com.loyalty.testing.s3.response.InvalidRequestException
 import org.dizitart.no2.filters.Filters.{eq => feq, _}
 import org.dizitart.no2.{Document, IndexOptions, IndexType, Nitrite}

@@ -3,8 +3,8 @@ package com.loyalty.testing.s3.repositories.collections
 import java.nio.file.Path
 
 import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.repositories._
 import com.loyalty.testing.s3.repositories.model.Bucket
-import com.loyalty.testing.s3.repositories.{BucketNameField, BucketPathField, RegionField, VersionField}
 import com.loyalty.testing.s3.response._
 import org.dizitart.no2.filters.Filters.{eq => feq}
 import org.dizitart.no2.{Document, Nitrite}
