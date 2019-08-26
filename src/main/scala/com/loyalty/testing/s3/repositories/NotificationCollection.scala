@@ -2,7 +2,7 @@ package com.loyalty.testing.s3.repositories
 
 import org.dizitart.no2.filters.Filters.{eq => feq, _}
 import com.loyalty.testing.s3.notification.Notification
-import com.loyalty.testing.s3.response.InvalidRequest
+import com.loyalty.testing.s3.response.InvalidRequestException
 import org.dizitart.no2.{IndexOptions, IndexType, Nitrite, Document}
 
 class NotificationCollection(db: Nitrite) {
@@ -32,7 +32,7 @@ class NotificationCollection(db: Nitrite) {
         notification
       case document :: Nil =>
         // should never happen
-        throw InvalidRequest(bucketName, s"Notification $notificationName already exists with document id ${document.getId}")
+        throw InvalidRequestException(bucketName, s"Notification $notificationName already exists with document id ${document.getId}")
       case _ => throw new IllegalStateException(s"multiple bucket-notification pair found: $bucketName/$notificationName")
     }
   }

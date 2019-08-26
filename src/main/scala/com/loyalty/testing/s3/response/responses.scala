@@ -165,7 +165,7 @@ case class InvalidNotificationConfigurationException(bucketName: String, overrid
   override val resource: String = bucketName
 }
 
-case class InvalidRequest(bucketName: String, override val message: String) extends ErrorResponse {
+case class InvalidRequestException(bucketName: String, override val message: String) extends ErrorResponse {
   override val code: String = InvalidRequest
   override val resource: String = bucketName
 }
