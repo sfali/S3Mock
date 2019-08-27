@@ -1,6 +1,6 @@
 package com.loyalty.testing.s3
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 import java.time.{Instant, OffsetDateTime, ZoneId}
 import java.{lang, util}
 
@@ -10,10 +10,11 @@ import akka.util.ByteString
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.request.{BucketVersioning, VersioningConfiguration}
 import com.loyalty.testing.s3.response.{ObjectMeta, PutObjectResult}
+import com.loyalty.testing.s3.streams.FileStream
 import org.dizitart.no2.{Cursor, Document}
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 package object repositories {
 
@@ -35,10 +36,11 @@ package object repositories {
   val ContentLengthField = "contentLength"
   val VersionIdField = "version-id"
   val DeleteMarkerField = "deleted"
-  val NoVersionValue = "NO_VERSION"
+  val NonVersionId = "NO_VERSION"
+  val ContentFileName: String = "content"
 
   implicit class LongOps(src: Long) {
-    def toOffsetDateTime: OffsetDateTime = Instant.ofEpochSecond(src).atZone(ZoneId.systemDefault()).toOffsetDateTime
+    def toOffsetDateTime: OffsetDateTime = Instant.ofEpochMilli(src).atZone(ZoneId.systemDefault()).toOffsetDateTime
   }
 
   implicit class CursorOps(src: Cursor) {
@@ -79,7 +81,7 @@ package object repositories {
         etag = src.getString(ETagField),
         contentMd5 = src.getString(ContentMd5Field),
         contentLength = src.getLong(ContentLengthField),
-        maybeVersionId = if (NoVersionValue == version) None else Some(version)
+        maybeVersionId = if (NonVersionId == version) None else Some(version)
       )
       ObjectMeta(
         path = src.getString(ObjectPathField).toPath,
@@ -107,5 +109,39 @@ package object repositories {
       .map(_.utf8String)
       .map(s => parseNotificationConfiguration(bucketName, s))
       .runWith(Sink.head)
+
+  def getDestinationPathWithVersionId(key: String,
+                                      bucketPath: Path,
+                                      maybeBucketVersioning: Option[BucketVersioning]): (Option[String], Path) = {
+    val parentPath = bucketPath -> key
+
+    val maybeVersioningConfiguration = maybeBucketVersioning.filter(_ == BucketVersioning.Enabled)
+    val (maybeVersionId, filePath) =
+      maybeVersioningConfiguration match {
+        case Some(_) =>
+          val versionId = toBase16FromRandomUUID
+          (Some(versionId), parentPath -> (versionId, ContentFileName))
+        case None =>
+          (None, parentPath -> (NonVersionId, ContentFileName))
+      }
+    Files.createDirectories(filePath.getParent)
+    (maybeVersionId, filePath)
+  }
+
+  def saveObject(fileStream: FileStream,
+                 key: String,
+                 bucketPath: Path,
+                 maybeBucketVersioning: Option[BucketVersioning],
+                 contentSource: Source[ByteString, _])
+                (implicit ec: ExecutionContext): Future[ObjectMeta] = {
+    val (maybeVersionId, filePath) = getDestinationPathWithVersionId(key, bucketPath, maybeBucketVersioning)
+    fileStream.saveContent(contentSource, filePath)
+      .flatMap {
+        case (etag, contentMD5) =>
+          if (Files.notExists(filePath)) Future.failed(new RuntimeException("unable to save file"))
+          else Future.successful(ObjectMeta(filePath,
+            createPutObjectResult(key, etag, contentMD5, Files.size(filePath), maybeVersionId)))
+      }
+  }
 
 }

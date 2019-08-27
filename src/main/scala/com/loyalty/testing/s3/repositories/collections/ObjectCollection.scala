@@ -21,7 +21,7 @@ class ObjectCollection(db: Nitrite) {
     collection.createIndex(VersionIdField, indexOptions(Fulltext))
   }
 
-  def createObject(bucket: Bucket, objectMeta: ObjectMeta): Long = {
+  def createObject(bucket: Bucket, objectMeta: ObjectMeta): ObjectMeta = {
     val bucketName = bucket.bucketName
     val result = objectMeta.result
     val prefix = result.prefix
@@ -41,14 +41,20 @@ class ObjectCollection(db: Nitrite) {
       .put(ETagField, result.etag)
       .put(ContentMd5Field, result.contentMd5)
       .put(ContentLengthField, result.contentLength)
-      .put(VersionIdField, result.maybeVersionId.getOrElse(NoVersionValue))
-    collection.update(updatedDocument, true)
+      .put(VersionIdField, result.maybeVersionId.getOrElse(NonVersionId))
+    val docId = collection
+      .update(updatedDocument, true)
       .iterator()
       .asScala
       .toList
       .headOption
-      .map(_.getIdValue.toLong)
-      .getOrElse(throw new IllegalStateException(s"unable to get document id for $bucketName/$prefix/$key"))
+
+    if (docId.isEmpty) {
+      throw new IllegalStateException(s"unable to get document id for $bucketName/$prefix/$key")
+    }
+
+    val lastModifiedTime = collection.getById(docId.get).getLastModifiedTime.toOffsetDateTime.toLocalDateTime
+    objectMeta.copy(lastModifiedDate = lastModifiedTime)
   }
 
   def findObject(bucketName: String, prefix: String, key: String): ObjectMeta = {

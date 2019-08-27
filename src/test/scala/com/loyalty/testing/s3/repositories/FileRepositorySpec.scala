@@ -8,7 +8,6 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{FileIO, Keep, Sink}
 import akka.testkit.TestKit
 import akka.util.{ByteString, Timeout}
-import com.loyalty.testing.s3.repositories.{FileRepository, FileStore}
 import com.loyalty.testing.s3.request.{BucketVersioning, CreateBucketConfiguration, VersioningConfiguration}
 import com.loyalty.testing.s3.response.{BucketAlreadyExistsException, NoSuchKeyException}
 import org.scalatest.concurrent.ScalaFutures
@@ -24,7 +23,6 @@ class FileRepositorySpec
     with ScalaFutures {
 
   import com.loyalty.testing.s3._
-  import FileRepository._
 
   private val dataPath: Path = Paths.get(System.getProperty("user.dir"), ".s3mock")
   private val defaultBucketName = "actor-non-version"

@@ -99,7 +99,11 @@ class NitriteRepository(dbSettings: DBSettings,
 
   override def putObject(bucketName: String,
                          key: String,
-                         contentSource: Source[ByteString, _]): Future[ObjectMeta] = ???
+                         contentSource: Source[ByteString, _]): Future[ObjectMeta] = {
+    val bucket = bucketCollection.findBucket(bucketName)
+    saveObject(fileStream, key, bucket.bucketPath, bucket.version, contentSource)
+      .map(response => objectCollection.createObject(bucket, response))
+  }
 
   override def getObject(bucketName: String,
                          key: String,

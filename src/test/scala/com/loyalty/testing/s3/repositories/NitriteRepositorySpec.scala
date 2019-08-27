@@ -3,10 +3,12 @@ package com.loyalty.testing.s3.repositories
 import java.io.IOException
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
+import java.time.LocalDate
 
 import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.FileIO
 import akka.testkit.TestKit
 import akka.util.Timeout
 import com.loyalty.testing.s3._
@@ -102,9 +104,23 @@ class NitriteRepositorySpec
       bucketName = nonExistentBucketName,
     )
     val eventualResponse = repository.setBucketNotification(nonExistentBucketName, notification :: Nil)
-    whenReady(eventualResponse.failed){
+    whenReady(eventualResponse.failed) {
       ex => ex mustBe a[NoSuchBucketException]
     }
+  }
+
+  it should "put an object in the specified non-version bucket" in {
+    val key = "sample.txt"
+    val contentSource = FileIO.fromPath(Paths.get("src", "test", "resources", key))
+    val objectMeta = repository.putObject(defaultBucketName, key, contentSource).futureValue
+    val expectedPath = dataPath -> ("data", defaultBucketName, key, NonVersionId, ContentFileName)
+    objectMeta.path must equal(expectedPath)
+    Files.exists(expectedPath.toAbsolutePath) mustBe true
+    val putObjectResult = objectMeta.result
+    putObjectResult.etag must equal(etagDigest)
+    putObjectResult.contentMd5 must equal(md5Digest)
+    putObjectResult.maybeVersionId mustBe empty
+    objectMeta.lastModifiedDate.toLocalDate must equal(LocalDate.now())
   }
 
 }

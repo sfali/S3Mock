@@ -18,7 +18,6 @@ import scala.concurrent.Future
 class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingAdapter)
                     (implicit mat: Materializer) extends Repository {
 
-  import FileRepository._
   import com.loyalty.testing.s3._
   import mat.executionContext
 
@@ -146,38 +145,14 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
     fileStore.get(bucketName) match {
       case None => Future.failed(NoSuchBucketException(bucketName))
       case Some(bucketMetadata) =>
-        val (maybeVersionId, filePath) = getDestinationPathWithVersionId(key, bucketMetadata.path,
-          bucketMetadata.maybeBucketVersioning.map(_.bucketVersioning))
-        fileStream.saveContent(contentSource, filePath)
-          .flatMap {
-            case (etag, contentMD5) =>
-              if (Files.notExists(filePath)) Future.failed(new RuntimeException("unable to save file"))
-              else {
-                val response = ObjectMeta(filePath,
-                  createPutObjectResult(key, etag, contentMD5, Files.size(filePath), maybeVersionId))
-                bucketMetadata.putObject(key, response)
-                Future.successful(response)
-              }
+        val maybeVersioning = bucketMetadata.maybeBucketVersioning.map(_.bucketVersioning)
+        saveObject(fileStream, key, bucketMetadata.path, maybeVersioning, contentSource)
+          .map {
+            response =>
+              bucketMetadata.putObject(key, response)
+              response
           }
     }
-
-  private def getDestinationPathWithVersionId(key: String,
-                                              bucketPath: Path,
-                                              maybeBucketVersioning: Option[BucketVersioning]): (Option[String], Path) = {
-    val parentPath = bucketPath -> key
-
-    val maybeVersioningConfiguration = maybeBucketVersioning.filter(_ == BucketVersioning.Enabled)
-    val (maybeVersionId, filePath) =
-      maybeVersioningConfiguration match {
-        case Some(_) =>
-          val versionId = toBase16FromRandomUUID
-          (Some(versionId), parentPath -> (versionId, ContentFileName))
-        case None =>
-          (None, parentPath -> (NonVersionId, ContentFileName))
-      }
-    Files.createDirectories(filePath.getParent)
-    (maybeVersionId, filePath)
-  }
 
   override def getObject(bucketName: String, key: String, maybeVersionId: Option[String] = None,
                          maybeRange: Option[ByteRange] = None): Future[GetObjectResponse] =
@@ -375,10 +350,6 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
 }
 
 object FileRepository {
-
-  val NonVersionId: String = "null"
-  val ContentFileName: String = "content"
-
   def apply(fileStore: FileStore, log: LoggingAdapter)(implicit mat: Materializer): FileRepository =
     new FileRepository(fileStore, FileStream(), log)
 }
