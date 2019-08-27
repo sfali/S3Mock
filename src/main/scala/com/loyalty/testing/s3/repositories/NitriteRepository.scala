@@ -55,7 +55,7 @@ class NitriteRepository(dbSettings: DBSettings,
       maybeBucketVersioning.map(_.toString))) match {
       case Failure(ex) => Future.failed(ex)
       case Success(response) => Future.successful(BucketResponse(bucketName, response.region,
-        response.version.map(BucketVersioning.withName)))
+        response.version))
     }
 
   override def createBucket(bucketName: String,
@@ -73,7 +73,7 @@ class NitriteRepository(dbSettings: DBSettings,
       versioningConfiguration.bucketVersioning.toString)) match {
       case Failure(ex) => Future.failed(ex)
       case Success(response) => Future.successful(BucketResponse(bucketName, response.region,
-        response.version.map(BucketVersioning.withName)))
+        response.version))
     }
 
   override def setBucketNotification(bucketName: String,
