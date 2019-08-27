@@ -140,11 +140,14 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
       }
     }
 
-  override def putObject(bucketName: String, key: String, contentSource: Source[ByteString, _]): Future[ObjectMeta] =
+  override def putObject(bucketName: String,
+                         key: String,
+                         contentSource: Source[ByteString, _]): Future[ObjectMeta] =
     fileStore.get(bucketName) match {
       case None => Future.failed(NoSuchBucketException(bucketName))
       case Some(bucketMetadata) =>
-        val (maybeVersionId, filePath) = getDestinationPathWithVersionId(key, bucketMetadata)
+        val (maybeVersionId, filePath) = getDestinationPathWithVersionId(key, bucketMetadata.path,
+          bucketMetadata.maybeBucketVersioning.map(_.bucketVersioning))
         fileStream.saveContent(contentSource, filePath)
           .flatMap {
             case (etag, contentMD5) =>
@@ -158,11 +161,12 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
           }
     }
 
-  private def getDestinationPathWithVersionId(key: String, bucketMetadata: BucketMetadata): (Option[String], Path) = {
-    val parentPath = bucketMetadata.path -> key
+  private def getDestinationPathWithVersionId(key: String,
+                                              bucketPath: Path,
+                                              maybeBucketVersioning: Option[BucketVersioning]): (Option[String], Path) = {
+    val parentPath = bucketPath -> key
 
-    val maybeVersioningConfiguration = bucketMetadata.maybeBucketVersioning
-      .filter(_.bucketVersioning == BucketVersioning.Enabled)
+    val maybeVersioningConfiguration = maybeBucketVersioning.filter(_ == BucketVersioning.Enabled)
     val (maybeVersionId, filePath) =
       maybeVersioningConfiguration match {
         case Some(_) =>
@@ -271,7 +275,8 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
             if (invalidParts.nonEmpty)
               Future.failed(InvalidPartException(bucketName, key, invalidParts.head._1, uploadId))
             else {
-              val (maybeVersionId, filePath) = getDestinationPathWithVersionId(key, bucketMetadata)
+              val (maybeVersionId, filePath) = getDestinationPathWithVersionId(key, bucketMetadata.path,
+                bucketMetadata.maybeBucketVersioning.map(_.bucketVersioning))
               val result = createCompleteMultipartUploadResult(bucketName, key, parts, maybeVersionId)
               fileStream.mergeFiles(filePath, tuples.map(_._2))
                 .flatMap {
@@ -310,7 +315,8 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
           Future.failed(NoSuchKeyException(bucketName, key))
         else {
           val sourceObject = maybeSourceObject.get
-          val (maybeVersionId, filePath) = getDestinationPathWithVersionId(key, destBucketMetadata)
+          val (maybeVersionId, filePath) = getDestinationPathWithVersionId(key, destBucketMetadata.path,
+            destBucketMetadata.maybeBucketVersioning.map(_.bucketVersioning))
           fileStream.copyPart(sourceObject.path, filePath)
             .map {
               case (etag, contentMD5) =>
