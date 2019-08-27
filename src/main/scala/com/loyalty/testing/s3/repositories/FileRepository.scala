@@ -9,7 +9,6 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3.notification.Notification
-import com.loyalty.testing.s3.request.BucketVersioning.BucketVersioning
 import com.loyalty.testing.s3.request._
 import com.loyalty.testing.s3.response._
 import com.loyalty.testing.s3.streams.FileStream

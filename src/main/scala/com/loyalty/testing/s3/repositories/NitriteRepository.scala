@@ -11,7 +11,6 @@ import akka.util.ByteString
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.collections.{BucketCollection, NotificationCollection, ObjectCollection}
-import com.loyalty.testing.s3.request.BucketVersioning.BucketVersioning
 import com.loyalty.testing.s3.response._
 import com.loyalty.testing.s3.streams.FileStream
 import org.dizitart.no2.Nitrite

@@ -1,10 +1,10 @@
 package com.loyalty.testing.s3
 
-import com.loyalty.testing.s3.request.BucketVersioning.BucketVersioning
+import enumeratum.{CirceEnum, Enum, EnumEntry}
 
+import scala.collection.immutable
 import scala.util.Try
 import scala.xml.NodeSeq
-
 
 package object request {
 
@@ -55,11 +55,17 @@ package object request {
       } else None
   }
 
-  object BucketVersioning extends Enumeration {
-    type BucketVersioning = Value
-    val Enabled, Suspended = Value
+  sealed trait BucketVersioning extends EnumEntry
 
-    def fromNode(node: NodeSeq): Option[request.BucketVersioning.Value] = Try(withName(node.text)).toOption
+  object BucketVersioning extends Enum[BucketVersioning] with CirceEnum[BucketVersioning] {
+    override def values: immutable.IndexedSeq[BucketVersioning] = findValues
+
+    def fromNode(node: NodeSeq): Option[BucketVersioning] = Try(withName(node.text)).toOption
+
+    case object Enabled extends BucketVersioning
+
+    case object Suspended extends BucketVersioning
+
   }
 
   case class ListBucketParams(maxKeys: Int,

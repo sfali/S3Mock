@@ -7,7 +7,7 @@ import akka.stream.IOResult
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.request.BucketVersioning.BucketVersioning
+import com.loyalty.testing.s3.request.BucketVersioning
 
 import scala.concurrent.Future
 import scala.xml.Elem
