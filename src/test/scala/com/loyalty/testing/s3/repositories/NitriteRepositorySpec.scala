@@ -113,6 +113,7 @@ class NitriteRepositorySpec
     val key = "sample.txt"
     val contentSource = FileIO.fromPath(Paths.get("src", "test", "resources", key))
     val objectMeta = repository.putObject(defaultBucketName, key, contentSource).futureValue
+
     val expectedPath = dataPath -> ("data", defaultBucketName, key, NonVersionId, ContentFileName)
     objectMeta.path must equal(expectedPath)
     Files.exists(expectedPath.toAbsolutePath) mustBe true
@@ -121,6 +122,51 @@ class NitriteRepositorySpec
     putObjectResult.contentMd5 must equal(md5Digest)
     putObjectResult.maybeVersionId mustBe empty
     objectMeta.lastModifiedDate.toLocalDate must equal(LocalDate.now())
+  }
+
+  it should "put a multi-path object in the specified non-version bucket" in {
+    val fileName = "sample.txt"
+    val key = s"/input/$fileName"
+    val contentSource = FileIO.fromPath(Paths.get("src", "test", "resources", fileName))
+    val objectMeta = repository.putObject(defaultBucketName, key, contentSource).futureValue
+
+    val expectedPath = dataPath -> ("data", defaultBucketName, "input", fileName, NonVersionId, ContentFileName)
+    objectMeta.path must equal(expectedPath)
+    Files.exists(expectedPath.toAbsolutePath) mustBe true
+    val putObjectResult = objectMeta.result
+    putObjectResult.etag must equal(etagDigest)
+    putObjectResult.contentMd5 must equal(md5Digest)
+    putObjectResult.maybeVersionId mustBe empty
+  }
+
+  it should "put an object in the specified bucket with bucket versioning on" in {
+    val key = "sample1.txt"
+    val contentSource = FileIO.fromPath(Paths.get("src", "test", "resources", key))
+    val objectMeta = repository.putObject(versionedBucketName, key, contentSource).futureValue
+
+    val putObjectResult = objectMeta.result
+    putObjectResult.maybeVersionId mustBe defined
+    val expectedPath = dataPath -> ("data", versionedBucketName, key, putObjectResult.maybeVersionId.get, ContentFileName)
+    objectMeta.path must equal(expectedPath)
+    Files.exists(expectedPath.toAbsolutePath) mustBe true
+    putObjectResult.etag must equal(etagDigest)
+    putObjectResult.contentMd5 must equal(md5Digest)
+  }
+
+  it should "put a multi-path object in the specified versioned bucket" in {
+    val fileName = "sample1.txt"
+    val key = s"/input/$fileName"
+    val contentSource = FileIO.fromPath(Paths.get("src", "test", "resources", fileName))
+    val objectMeta = repository.putObject(versionedBucketName, key, contentSource).futureValue
+
+    val putObjectResult = objectMeta.result
+    putObjectResult.maybeVersionId mustBe defined
+    val expectedPath = dataPath -> ("data", versionedBucketName, "input", fileName, putObjectResult.maybeVersionId.get,
+      ContentFileName)
+    objectMeta.path must equal(expectedPath)
+    Files.exists(expectedPath.toAbsolutePath) mustBe true
+    putObjectResult.etag must equal(etagDigest)
+    putObjectResult.contentMd5 must equal(md5Digest)
   }
 
 }
