@@ -10,7 +10,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.notification.Notification
-import com.loyalty.testing.s3.repositories.collections.{BucketCollection, NotificationCollection}
+import com.loyalty.testing.s3.repositories.collections.{BucketCollection, NotificationCollection, ObjectCollection}
 import com.loyalty.testing.s3.request.BucketVersioning.BucketVersioning
 import com.loyalty.testing.s3.response._
 import com.loyalty.testing.s3.streams.FileStream
@@ -47,6 +47,7 @@ class NitriteRepository(dbSettings: DBSettings,
 
   private[repositories] val bucketCollection = BucketCollection(db, dataDir)
   private[repositories] val notificationCollection = NotificationCollection(db)
+  private[repositories] val objectCollection = ObjectCollection(db)
 
   override def createBucketWithVersioning(bucketName: String,
                                           bucketConfiguration: CreateBucketConfiguration,

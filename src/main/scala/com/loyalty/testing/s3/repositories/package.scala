@@ -1,13 +1,15 @@
 package com.loyalty.testing.s3
 
 import java.nio.file.{Path, Paths}
-import java.util
+import java.time.{Instant, OffsetDateTime, ZoneId}
+import java.{lang, util}
 
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.request.{BucketVersioning, VersioningConfiguration}
+import com.loyalty.testing.s3.response.{ObjectMeta, PutObjectResult}
 import org.dizitart.no2.{Cursor, Document}
 
 import scala.collection.JavaConverters._
@@ -26,6 +28,18 @@ package object repositories {
   val DestinationNameField = "destination-name"
   val PrefixField = "prefix"
   val SuffixField = "suffix"
+  val ObjectPathField = "object-path"
+  val KeyField = "key"
+  val ETagField = "etag"
+  val ContentMd5Field = "contentMd5"
+  val ContentLengthField = "contentLength"
+  val VersionIdField = "version-id"
+  val DeleteMarkerField = "deleted"
+  val NoVersionValue = "NO_VERSION"
+
+  implicit class LongOps(src: Long) {
+    def toOffsetDateTime: OffsetDateTime = Instant.ofEpochSecond(src).atZone(ZoneId.systemDefault()).toOffsetDateTime
+  }
 
   implicit class CursorOps(src: Cursor) {
     def toScalaList: List[Document] = src.asScala.toList
@@ -33,6 +47,8 @@ package object repositories {
 
   implicit class DocumentOps(src: Document) {
     def getString(key: String): String = src.get(key, classOf[String])
+
+    def getLong(key: String): Long = src.get(key, classOf[lang.Long]).toLong
 
     def getBoolean(key: String): Boolean = src.get(key, classOf[Boolean])
 
@@ -54,6 +70,23 @@ package object repositories {
         prefix = src.getOptionalString(PrefixField),
         suffix = src.getOptionalString(SuffixField)
       )
+
+    def toObjectMeta: ObjectMeta = {
+      val version = src.getString(VersionIdField)
+      val result = PutObjectResult(
+        prefix = src.getString(PrefixField),
+        key = src.getString(KeyField),
+        etag = src.getString(ETagField),
+        contentMd5 = src.getString(ContentMd5Field),
+        contentLength = src.getLong(ContentLengthField),
+        maybeVersionId = if (NoVersionValue == version) None else Some(version)
+      )
+      ObjectMeta(
+        path = src.getString(ObjectPathField).toPath,
+        result = result,
+        lastModifiedDate = src.getLastModifiedTime.toOffsetDateTime.toLocalDateTime
+      )
+    }
   }
 
   def toVersionConfiguration(contentSource: Source[ByteString, _])
