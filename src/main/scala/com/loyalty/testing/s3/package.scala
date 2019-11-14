@@ -63,6 +63,8 @@ package object s3 {
     }
 
     def toPath: Path = Paths.get(s)
+
+    def toUUID: UUID = UUID.nameUUIDFromBytes(s.getBytes)
   }
 
   implicit class PathOps(path: Path) {
@@ -105,14 +107,7 @@ package object s3 {
                             contentMd5: String,
                             contentLength: Long,
                             maybeVersionId: Option[String] = None): PutObjectResult = {
-    val path = filePath.toPath
-    val key = if (contentLength == 0) path.toUnixPath + "/" else path.toUnixPath
-    val parentPath = Option(path.getParent)
-    val prefix = parentPath match {
-      case Some(value) => value.toUnixPath + "/"
-      case None => "/"
-    }
-    PutObjectResult(prefix, key, eTag, contentMd5, contentLength, maybeVersionId)
+    PutObjectResult(filePath, eTag, contentMd5, contentLength, maybeVersionId)
   }
 
   implicit class JavaFutureOps[T](future: JavaFuture[T]) {

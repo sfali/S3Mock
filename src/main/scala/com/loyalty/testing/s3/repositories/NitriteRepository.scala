@@ -107,7 +107,18 @@ class NitriteRepository(dbSettings: DBSettings,
 
   override def getObject(bucketName: String,
                          key: String,
-                         maybeVersionId: Option[String], maybeRange: Option[ByteRange]): Future[GetObjectResponse] = ???
+                         maybeVersionId: Option[String],
+                         maybeRange: Option[ByteRange]): Future[GetObjectResponse] = {
+    val bucket = bucketCollection.findBucket(bucketName)
+    val objectMeta = objectCollection.findObject(bucketName, key, maybeVersionId)
+    getObjectPath(bucketName, key, bucket.bucketPath, objectMeta.path, maybeVersionId) match {
+      case Failure(ex) => Future.failed(ex)
+      case Success(_) =>
+        val sourceTuple = fileStream.downloadFile(objectMeta.path, maybeRange = maybeRange)
+        Future.successful(GetObjectResponse(bucketName, key, objectMeta.result.etag, objectMeta.result.contentMd5,
+          sourceTuple._1.capacity, sourceTuple._2, objectMeta.result.maybeVersionId))
+    }
+  }
 
   override def deleteObject(bucketName: String,
                             key: String,

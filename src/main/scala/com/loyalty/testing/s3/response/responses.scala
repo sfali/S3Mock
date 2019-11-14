@@ -15,12 +15,12 @@ import scala.xml.Elem
 case class BucketResponse(bucketName: String, locationConstraint: String = defaultRegion,
                           maybeBucketVersioning: Option[BucketVersioning] = None)
 
-case class PutObjectResult(prefix: String,
-                           key: String,
+case class PutObjectResult(key: String,
                            etag: String,
                            contentMd5: String,
                            contentLength: Long,
-                           maybeVersionId: Option[String])
+                           maybeVersionId: Option[String],
+                           prefix: String = "") // TODO: remove this
 
 case class ObjectMeta(path: Path, result: PutObjectResult, lastModifiedDate: LocalDateTime = LocalDateTime.now())
 
@@ -47,11 +47,23 @@ case class ListBucketResult(bucketName: String,
   extends XmlResponse {
   override def toXml: Elem = {
     val prefixElem = maybePrefix match {
-      case Some(prefix) => <Prefix>{prefix}</Prefix>
+      case Some(prefix) => <Prefix>
+        {prefix}
+      </Prefix>
       case None => <Prefix/>
     }
 
-    <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>{bucketName}</Name>{prefixElem}<KeyCount>{keyCount}</KeyCount><MaxKeys>{maxKeys}</MaxKeys><EncodingType>url</EncodingType><IsTruncated>{isTruncated}</IsTruncated>{contents.map(_.toXml)}</ListBucketResult>
+    <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+      <Name>
+        {bucketName}
+      </Name>{prefixElem}<KeyCount>
+      {keyCount}
+    </KeyCount> <MaxKeys>
+      {maxKeys}
+    </MaxKeys> <EncodingType>url</EncodingType> <IsTruncated>
+      {isTruncated}
+    </IsTruncated>{contents.map(_.toXml)}
+    </ListBucketResult>
   }
 }
 
@@ -62,24 +74,60 @@ case class BucketContent(expand: Boolean,
                          lastModifiedDate: Instant = Instant.now(),
                          storageClass: String = "STANDARD") extends XmlResponse {
   override def toXml: Elem =
-    if(expand || size > 0)
-      <Contents><Key>{key}</Key><LastModified>{lastModifiedDate.toString}</LastModified><Size>{size}</Size><StorageClass>{storageClass}</StorageClass><ETag>"{eTag}"</ETag></Contents>
-    else <CommonPrefixes><Prefix>{key}</Prefix></CommonPrefixes>
+    if (expand || size > 0)
+      <Contents>
+        <Key>
+          {key}
+        </Key> <LastModified>
+        {lastModifiedDate.toString}
+      </LastModified> <Size>
+        {size}
+      </Size> <StorageClass>
+        {storageClass}
+      </StorageClass> <ETag>"
+        {eTag}
+        "</ETag>
+      </Contents>
+    else <CommonPrefixes>
+      <Prefix>
+        {key}
+      </Prefix>
+    </CommonPrefixes>
 }
 
 case class InitiateMultipartUploadResult(bucketName: String, key: String, uploadId: String) extends XmlResponse {
   override def toXml: Elem =
-    <InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>{bucketName}</Bucket><Key>{key.decode}</Key><UploadId>{uploadId}</UploadId></InitiateMultipartUploadResult>
+    <InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+      <Bucket>
+        {bucketName}
+      </Bucket> <Key>
+      {key.decode}
+    </Key> <UploadId>
+      {uploadId}
+    </UploadId>
+    </InitiateMultipartUploadResult>
 }
 
 case class CopyObjectResult(eTag: String,
                             lastModifiedDate: Instant = Instant.now()) extends XmlResponse {
-  override def toXml: Elem = <CopyObjectResult><LastModified>{lastModifiedDate.toString}</LastModified><ETag>"{eTag}"</ETag></CopyObjectResult>
+  override def toXml: Elem = <CopyObjectResult>
+    <LastModified>
+      {lastModifiedDate.toString}
+    </LastModified> <ETag>"
+      {eTag}
+      "</ETag>
+  </CopyObjectResult>
 }
 
 case class CopyPartResult(eTag: String, lastModifiedDate: Instant = Instant.now(),
                           maybeVersionId: Option[String] = None) extends XmlResponse {
-  override def toXml: Elem = <CopyPartResult><LastModified>{lastModifiedDate.toString}</LastModified><ETag>"{eTag}"</ETag></CopyPartResult>
+  override def toXml: Elem = <CopyPartResult>
+    <LastModified>
+      {lastModifiedDate.toString}
+    </LastModified> <ETag>"
+      {eTag}
+      "</ETag>
+  </CopyPartResult>
 }
 
 case class CompleteMultipartUploadResult(bucketName: String, key: String, eTag: String, contentLength: Long,
@@ -87,7 +135,17 @@ case class CompleteMultipartUploadResult(bucketName: String, key: String, eTag: 
   val location = s"http://s3.amazonaws.com/${Paths.get(bucketName, key.decode).toString}"
 
   override def toXml: Elem =
-    <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Location>{location}</Location><Bucket>{bucketName}</Bucket><Key>{key.decode}</Key><ETag>"{eTag}"</ETag></CompleteMultipartUploadResult>
+    <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+      <Location>
+        {location}
+      </Location> <Bucket>
+      {bucketName}
+    </Bucket> <Key>
+      {key.decode}
+    </Key> <ETag>"
+      {eTag}
+      "</ETag>
+    </CompleteMultipartUploadResult>
 }
 
 object ErrorCodes {
@@ -109,7 +167,15 @@ sealed trait ErrorResponse extends Throwable with XmlResponse {
   override def getMessage: String = message
 
   override def toXml: Elem =
-    <Error xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Code>{code}</Code><Message>{message}</Message><Resource>{resource}</Resource></Error>
+    <Error xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+      <Code>
+        {code}
+      </Code> <Message>
+      {message}
+    </Message> <Resource>
+      {resource}
+    </Resource>
+    </Error>
 }
 
 import com.loyalty.testing.s3.response.ErrorCodes._

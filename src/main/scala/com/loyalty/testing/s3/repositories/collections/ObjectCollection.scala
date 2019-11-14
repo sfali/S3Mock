@@ -5,6 +5,8 @@ import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.response.{NoSuchKeyException, ObjectMeta}
 import org.dizitart.no2.filters.Filters.{eq => feq, _}
 import org.dizitart.no2.{Document, IndexOptions, IndexType, Nitrite}
+import org.slf4j.LoggerFactory
+import com.loyalty.testing.s3._
 
 import scala.collection.JavaConverters._
 
@@ -14,9 +16,11 @@ class ObjectCollection(db: Nitrite) {
   import IndexOptions._
   import IndexType._
 
+  private val log = LoggerFactory.getLogger(classOf[ObjectCollection])
+
   private[repositories] val collection = db.getCollection("objects")
-  if (!collection.hasIndex(KeyField)) {
-    collection.createIndex(PrefixField, indexOptions(Fulltext))
+  if (!collection.hasIndex(BucketNameField)) {
+    collection.createIndex(BucketNameField, indexOptions(Fulltext))
     collection.createIndex(KeyField, indexOptions(Fulltext))
     collection.createIndex(VersionIdField, indexOptions(Fulltext))
   }
@@ -24,16 +28,16 @@ class ObjectCollection(db: Nitrite) {
   def createObject(bucket: Bucket, objectMeta: ObjectMeta): ObjectMeta = {
     val bucketName = bucket.bucketName
     val result = objectMeta.result
-    val prefix = result.prefix
     val key = result.key
+    log.info("Request to create object, key={}, bucket={}", Array(key, bucketName): _*)
     val doc =
-      findById(bucketName, prefix, key) match {
+      findById(bucketName, key) match {
         case Nil =>
-          createDocument(BucketNameField, bucketName)
-            .put(PrefixField, prefix)
+          createDocument(ObjectIdField, createObjectId(bucketName, key))
+            .put(BucketNameField, bucketName)
             .put(KeyField, key)
         case document :: Nil => document
-        case _ => throw new IllegalStateException(s"Multiple documents found for $bucketName/$prefix/$key")
+        case _ => throw new IllegalStateException(s"Multiple documents found for $bucketName/$key")
       }
 
     val updatedDocument = doc
@@ -49,25 +53,40 @@ class ObjectCollection(db: Nitrite) {
       .toList
       .headOption
 
-    if (docId.isEmpty) {
-      throw new IllegalStateException(s"unable to get document id for $bucketName/$prefix/$key")
-    }
+    if (docId.isEmpty)
+      throw new IllegalStateException(s"unable to get document id for $bucketName/$key")
+    else
+      log.info("Object created/updated, key={}, bucket={}, object_path={}, doc_id={}", key, bucketName,
+        objectMeta.path.toString, docId.get.getIdValue)
 
     val lastModifiedTime = collection.getById(docId.get).getLastModifiedTime.toOffsetDateTime.toLocalDateTime
     objectMeta.copy(lastModifiedDate = lastModifiedTime)
   }
 
-  def findObject(bucketName: String, prefix: String, key: String): ObjectMeta = {
-    findById(bucketName, prefix, key) match {
-      case Nil => throw NoSuchKeyException(bucketName, s"$prefix/$key")
+  def findObject(bucketName: String,
+                 key: String,
+                 maybeVersionId: Option[String] = None): ObjectMeta = {
+    log.info("Finding object, key={}, bucket={}", Array(key, bucketName): _*)
+    findById(bucketName, key, maybeVersionId) match {
+      case Nil =>
+        log.warn("No object found, key={}, bucket={}", Array(key, bucketName): _*)
+        throw NoSuchKeyException(bucketName, s"$key")
       case document :: Nil => document.toObjectMeta
-      case _ => throw new IllegalStateException(s"Multiple documents found for $bucketName/$prefix/$key")
+      case _ => throw new IllegalStateException(s"Multiple documents found for $bucketName/$key")
     }
   }
 
-  private def findById(bucketName: String, prefix: String, key: String): List[Document] =
-    collection.find(and(feq(BucketNameField, bucketName), feq(PrefixField, prefix), feq(KeyField, key))).toScalaList
+  private def findById(bucketName: String,
+                       key: String,
+                       maybeVersionId: Option[String] = None): List[Document] = {
+    val idFilter = feq(ObjectIdField, createObjectId(bucketName, key))
+    val searchFilter = maybeVersionId
+      .map(versionId => and(idFilter, text(VersionIdField, s"*$versionId*")))
+      .getOrElse(idFilter)
+    collection.find(searchFilter).toScalaList
+  }
 
+  private def createObjectId(bucketName: String, key: String) = s"$bucketName-$key".toUUID.toString
 }
 
 object ObjectCollection {

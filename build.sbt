@@ -51,7 +51,7 @@ lazy val root = (project in file("."))
         akka             %% "akka-http"                         % akkaHttpVersion,
         akka             %% "akka-http-xml"                     % akkaHttpVersion,
         akka 				     %% "akka-stream" 					            % akkaVersion,
-        slf4j            %  "jcl-over-slf4j"                    % "1.7.25",
+        akka             %% "akka-slf4j"                        % akkaVersion,
         logback          %  "logback-classic"                   % "1.2.3",
         circe            %% "circe-core"                        % circeVersion,
         circe            %% "circe-generic"                     % circeVersion,

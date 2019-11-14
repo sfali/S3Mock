@@ -9,16 +9,18 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.request.{BucketVersioning, VersioningConfiguration}
-import com.loyalty.testing.s3.response.{ObjectMeta, PutObjectResult}
+import com.loyalty.testing.s3.response.{NoSuchKeyException, ObjectMeta, PutObjectResult}
 import com.loyalty.testing.s3.streams.FileStream
 import org.dizitart.no2.{Cursor, Document}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 package object repositories {
 
   val BucketNameField = "bucket-name"
+  val ObjectIdField = "object-id"
   val RegionField = "region"
   val BucketPathField = "bucket-path"
   val VersionField = "version"
@@ -69,14 +71,12 @@ package object repositories {
         destinationType = DestinationType.withName(src.getString(DestinationTypeField)),
         destinationName = src.getString(DestinationNameField),
         bucketName = src.getString(BucketNameField),
-        prefix = src.getOptionalString(PrefixField),
         suffix = src.getOptionalString(SuffixField)
       )
 
     def toObjectMeta: ObjectMeta = {
       val version = src.getString(VersionIdField)
       val result = PutObjectResult(
-        prefix = src.getString(PrefixField),
         key = src.getString(KeyField),
         etag = src.getString(ETagField),
         contentMd5 = src.getString(ContentMd5Field),
@@ -143,5 +143,17 @@ package object repositories {
             createPutObjectResult(key, etag, contentMD5, Files.size(filePath), maybeVersionId)))
       }
   }
+
+  def getObjectPath(bucketName: String,
+                    key: String,
+                    bucketPath: Path,
+                    objectPath: Path,
+                    maybeVersionId: Option[String] = None): Try[Path] = {
+    val _objectPath = maybeVersionId.map(versionId => (bucketPath -> key) -> (versionId, ContentFileName))
+      .getOrElse(objectPath)
+    if (Files.notExists(_objectPath)) Failure(NoSuchKeyException(bucketName, key))
+    else Success(_objectPath)
+  }
+
 
 }

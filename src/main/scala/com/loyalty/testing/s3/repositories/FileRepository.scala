@@ -14,6 +14,7 @@ import com.loyalty.testing.s3.response._
 import com.loyalty.testing.s3.streams.FileStream
 
 import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingAdapter)
                     (implicit mat: Materializer) extends Repository {
@@ -159,40 +160,35 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
     fileStore.get(bucketName) match {
       case None => Future.failed(NoSuchBucketException(bucketName))
       case Some(bucketMetadata) =>
-        val objectPath = getObjectPath(bucketMetadata, key, maybeVersionId)
         val maybeObj = bucketMetadata.getObject(key)
-        if (maybeObj.isEmpty || Files.notExists(objectPath)) Future.failed(NoSuchKeyException(bucketName, key))
+        if (maybeObj.isEmpty) Future.failed(NoSuchKeyException(bucketName, key))
         else {
           val meta = maybeObj.get
-          val sourceTuple = fileStream.downloadFile(meta.path, maybeRange = maybeRange)
-          Future.successful(GetObjectResponse(bucketName, key, meta.result.etag, meta.result.contentMd5,
-            sourceTuple._1.capacity, sourceTuple._2, meta.result.maybeVersionId))
+          getObjectPath(bucketName, key, bucketMetadata.path, meta.path, maybeVersionId) match {
+            case Failure(ex) => Future.failed(ex)
+            case Success(_) =>
+              val sourceTuple = fileStream.downloadFile(meta.path, maybeRange = maybeRange)
+              Future.successful(GetObjectResponse(bucketName, key, meta.result.etag, meta.result.contentMd5,
+                sourceTuple._1.capacity, sourceTuple._2, meta.result.maybeVersionId))
+          }
         }
     }
-
-  private def getObjectPath(bucketMetadata: BucketMetadata, key: String,
-                            maybeVersionId: Option[String] = None): Path = {
-    val parentPath = bucketMetadata.path -> key
-    log.debug("event=GetObjectPath, bucket_name={}, key={}, version_id={}, parent_path={}",
-      bucketMetadata.bucketName, key, maybeVersionId.getOrElse("N/A"), parentPath)
-    log.debug("BucketMetadata={}", bucketMetadata)
-
-    maybeVersionId.map(versionId => parentPath -> (versionId, ContentFileName))
-      .getOrElse(bucketMetadata.getObject(key).get.path)
-  }
 
   def deleteObject(bucketName: String, key: String,
                    maybeVersionId: Option[String] = None): Future[DeleteObjectResponse.type] =
     fileStore.get(bucketName) match {
       case None => Future.failed(NoSuchBucketException(bucketName))
       case Some(bucketMetadata) =>
-        val objectPath = getObjectPath(bucketMetadata, key, maybeVersionId)
         val maybeObj = bucketMetadata.getObject(key)
-        if (maybeObj.isEmpty || Files.notExists(objectPath)) Future.failed(NoSuchKeyException(bucketName, key))
+        if (maybeObj.isEmpty) Future.failed(NoSuchKeyException(bucketName, key))
         else {
-          fileStore.removeObject(bucketName, key)
-          fileStore.clean(objectPath.getParent)
-          Future.successful(DeleteObjectResponse)
+          getObjectPath(bucketName, key, bucketMetadata.path, maybeObj.get.path, maybeVersionId) match {
+            case Failure(ex) => Future.failed(ex)
+            case Success(objectPath) =>
+              fileStore.removeObject(bucketName, key)
+              fileStore.clean(objectPath.getParent)
+              Future.successful(DeleteObjectResponse)
+          }
         }
     }
 
@@ -284,23 +280,27 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
       case (None, _) => Future.failed(NoSuchBucketException(sourceBucketName))
       case (_, None) => Future.failed(NoSuchBucketException(bucketName))
       case (Some(sourceBucketMetadata), Some(destBucketMetadata)) =>
-        val sourceObjectPath = getObjectPath(sourceBucketMetadata, sourceKey, maybeSourceVersionId)
         val maybeSourceObject = sourceBucketMetadata.getObject(sourceKey)
-        if (maybeSourceObject.isEmpty || Files.notExists(sourceObjectPath))
-          Future.failed(NoSuchKeyException(bucketName, key))
+        if (maybeSourceObject.isEmpty) Future.failed(NoSuchKeyException(bucketName, key))
         else {
           val sourceObject = maybeSourceObject.get
-          val (maybeVersionId, filePath) = getDestinationPathWithVersionId(key, destBucketMetadata.path,
-            destBucketMetadata.maybeBucketVersioning.map(_.bucketVersioning))
-          fileStream.copyPart(sourceObject.path, filePath)
-            .map {
-              case (etag, contentMD5) =>
-                val response = ObjectMeta(filePath, createPutObjectResult(key, etag, contentMD5, Files.size(filePath),
-                  maybeVersionId))
-                destBucketMetadata.putObject(key, response)
-                (response, CopyObjectResult(etag))
-            }
+          getObjectPath(sourceBucketName, sourceKey, sourceBucketMetadata.path, sourceObject.path,
+            maybeSourceVersionId) match {
+            case Failure(ex) => Future.failed(ex)
+            case Success(_) =>
+              val (maybeVersionId, filePath) = getDestinationPathWithVersionId(key, destBucketMetadata.path,
+                destBucketMetadata.maybeBucketVersioning.map(_.bucketVersioning))
+              fileStream.copyPart(sourceObject.path, filePath)
+                .map {
+                  case (etag, contentMD5) =>
+                    val response = ObjectMeta(filePath, createPutObjectResult(key, etag, contentMD5, Files.size(filePath),
+                      maybeVersionId))
+                    destBucketMetadata.putObject(key, response)
+                    (response, CopyObjectResult(etag))
+                }
+          }
         }
+
     }
   }
 
@@ -315,21 +315,27 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
     fileStore.get(sourceBucketName) match {
       case None => Future.failed(NoSuchBucketException(bucketName))
       case Some(bucketMetadata) =>
-        val objectPath = getObjectPath(bucketMetadata, sourceKey, maybeSourceVersionId)
         val maybeObj = bucketMetadata.getObject(sourceKey)
-        val uploadPath = fileStore.uploadsDir -> (bucketName, key, uploadId)
-        if (maybeObj.isEmpty || Files.notExists(objectPath)) Future.failed(NoSuchKeyException(bucketName, key))
-        else if (Files.notExists(uploadPath)) Future.failed(NoSuchUploadException(bucketName, key))
+        if (maybeObj.isEmpty) Future.failed(NoSuchKeyException(bucketName, key))
         else {
           val meta = maybeObj.get
-          val destinationPath = uploadPath -> partNumber.toString
-          Files.createDirectories(destinationPath.getParent)
-          fileStream.copyPart(meta.path, destinationPath, maybeSourceRange)
-            .map {
-              case (etag, _) =>
-                log.debug("Copy part # {} for {} with etag {}", partNumber, key, etag)
-                CopyPartResult(etag)
-            }
+          getObjectPath(sourceBucketName, sourceKey, bucketMetadata.path, meta.path,
+            maybeSourceVersionId) match {
+            case Failure(ex) => Future.failed(ex)
+            case Success(_) =>
+              val uploadPath = fileStore.uploadsDir -> (bucketName, key, uploadId)
+              if (Files.notExists(uploadPath)) Future.failed(NoSuchUploadException(bucketName, key))
+              else {
+                val destinationPath = uploadPath -> partNumber.toString
+                Files.createDirectories(destinationPath.getParent)
+                fileStream.copyPart(meta.path, destinationPath, maybeSourceRange)
+                  .map {
+                    case (etag, _) =>
+                      log.debug("Copy part # {} for {} with etag {}", partNumber, key, etag)
+                      CopyPartResult(etag)
+                  }
+              }
+          }
         }
     }
   }
