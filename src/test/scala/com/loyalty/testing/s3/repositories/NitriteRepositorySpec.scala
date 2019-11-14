@@ -7,10 +7,11 @@ import java.time.LocalDate
 
 import akka.Done
 import akka.actor.ActorSystem
+import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.FileIO
+import akka.stream.scaladsl.{FileIO, Keep, Sink}
 import akka.testkit.TestKit
-import akka.util.Timeout
+import akka.util.{ByteString, Timeout}
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.request.{BucketVersioning, CreateBucketConfiguration, VersioningConfiguration}
@@ -126,7 +127,7 @@ class NitriteRepositorySpec
 
   it should "put a multi-path object in the specified non-version bucket" in {
     val fileName = "sample.txt"
-    val key = s"/input/$fileName"
+    val key = s"input/$fileName"
     val contentSource = FileIO.fromPath(Paths.get("src", "test", "resources", fileName))
     val objectMeta = repository.putObject(defaultBucketName, key, contentSource).futureValue
 
@@ -155,7 +156,7 @@ class NitriteRepositorySpec
 
   it should "put a multi-path object in the specified versioned bucket" in {
     val fileName = "sample1.txt"
-    val key = s"/input/$fileName"
+    val key = s"input/$fileName"
     val contentSource = FileIO.fromPath(Paths.get("src", "test", "resources", fileName))
     val objectMeta = repository.putObject(versionedBucketName, key, contentSource).futureValue
 
@@ -167,6 +168,59 @@ class NitriteRepositorySpec
     Files.exists(expectedPath.toAbsolutePath) mustBe true
     putObjectResult.etag must equal(etagDigest)
     putObjectResult.contentMd5 must equal(md5Digest)
+  }
+
+  it should "get entire object when range is not specified" in {
+    val key = "sample.txt"
+    val response = repository.getObject(defaultBucketName, key).futureValue
+    response.contentMd5 must equal(md5Digest)
+    response.maybeVersionId mustBe empty
+  }
+
+  it should "get object with range between two positions from the start of file" in {
+    val key = "sample.txt"
+    val response = repository.getObject(defaultBucketName, key, None, Some(ByteRange(0, 53))).futureValue
+    val content = response.content.toMat(Sink.seq)(Keep.right).run().futureValue.fold(ByteString(""))(_ ++ _).utf8String
+    content must equal("1. A quick brown fox jumps over the silly lazy dog.\r\n")
+    response.maybeVersionId mustBe empty
+  }
+
+  it should "get object with range between two positions from the middle of file" in {
+    val key = "sample.txt"
+    val response = repository.getObject(defaultBucketName, key, None, Some(ByteRange(265, 318))).futureValue
+    val content = response.content.toMat(Sink.seq)(Keep.right).run().futureValue.fold(ByteString(""))(_ ++ _).utf8String
+    content must equal("6. A quick brown fox jumps over the silly lazy dog.\r\n")
+    response.maybeVersionId mustBe empty
+  }
+
+  it should "get object with suffix range" in {
+    val key = "sample.txt"
+    val response = repository.getObject(defaultBucketName, key, None, Some(ByteRange.suffix(53))).futureValue
+    val content = response.content.toMat(Sink.seq)(Keep.right).run().futureValue.fold(ByteString(""))(_ ++ _).utf8String
+    content must equal("7. A quick brown fox jumps over the silly lazy dog.\r\n")
+    response.maybeVersionId mustBe empty
+  }
+
+  it should "get object with range with offset" in {
+    val key = "sample.txt"
+    val response = repository.getObject(defaultBucketName, key, None, Some(ByteRange.fromOffset(318))).futureValue
+    val content = response.content.toMat(Sink.seq)(Keep.right).run().futureValue.fold(ByteString(""))(_ ++ _).utf8String
+    content must equal("7. A quick brown fox jumps over the silly lazy dog.\r\n")
+    response.maybeVersionId mustBe empty
+  }
+
+  it should "get object with version provided" in {
+    val key = "sample1.txt"
+    val versionId = repository.getObject(versionedBucketName, key).futureValue.maybeVersionId.get
+    val response = repository.getObject(versionedBucketName, key, Some(versionId)).futureValue
+    response.contentMd5 must equal(md5Digest)
+    response.maybeVersionId.fold(fail("unable to get version id")) {
+      vId => vId mustEqual versionId
+    }
+  }
+
+  it should "" in {
+
   }
 
 }
@@ -182,8 +236,8 @@ object NitriteRepositorySpec {
     override val filePath: String = (dataPath -> "s3mock.db").toString
   }
 
-  private val etagDigest = "37099e6f8b99c52cd81df0041543e5b0"
-  private val md5Digest = "Nwmeb4uZxSzYHfAEFUPlsA=="
+  private val etagDigest = "6b4bb2a848f1fac797e320d7b9030f3e"
+  private val md5Digest = "a0uyqEjx+seX4yDXuQMPPg=="
 
   private def clean() =
     Files.walkFileTree(dataPath, new SimpleFileVisitor[Path] {
