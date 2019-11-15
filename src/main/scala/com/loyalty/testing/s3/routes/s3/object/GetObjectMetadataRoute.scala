@@ -12,8 +12,8 @@ import com.loyalty.testing.s3.repositories.Repository
 class GetObjectMetadataRoute private(log: LoggingAdapter, repository: Repository) {
 
   def route(bucketName: String, key: String): Route = {
-    (head & parameter("versionId".?)) { maybeVersionId =>
-      log.info("*" * 50)
+    (head & parameter("versionId".?)) { _ =>
+      log.info("GetObjectMetadata, bucket_name={}, key={}", bucketName, key)
       val entity = HttpEntity(ContentTypes.`text/plain(UTF-8)`, 121, Source.empty)
       val httpResponse = HttpResponse(OK, entity = entity).addHeader(RawHeader("x-amz-version-id", "asdfqwer"))
       complete(httpResponse)

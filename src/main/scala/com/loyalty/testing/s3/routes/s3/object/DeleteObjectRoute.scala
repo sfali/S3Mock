@@ -14,7 +14,8 @@ import scala.util.Success
 class DeleteObjectRoute private(log: LoggingAdapter, repository: Repository) {
 
   def route(bucketName: String, key: String): Route = {
-    (delete & parameters("versionId".?)) { maybeVersionId =>
+    (delete & parameters("versionId".?)) { _ =>
+      // TODO: use versionId
       onComplete(repository.deleteObject(bucketName, key)) {
         case Success(_) => complete(HttpResponse(NoContent))
         case Failure(ex: NoSuchBucketException) => complete(HttpResponse(NotFound, entity = ex.toXml.toString()))

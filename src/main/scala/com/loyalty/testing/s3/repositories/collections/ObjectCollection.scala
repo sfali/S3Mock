@@ -8,7 +8,7 @@ import org.dizitart.no2.{Document, IndexOptions, IndexType, Nitrite}
 import org.slf4j.LoggerFactory
 import com.loyalty.testing.s3._
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 class ObjectCollection(db: Nitrite) {
 

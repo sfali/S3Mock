@@ -11,15 +11,16 @@ import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.stream.scaladsl.Sink
 import akka.testkit.TestProbe
 import com.amazonaws.services.s3.Headers
-import com.loyalty.testing.s3.Settings
 import com.loyalty.testing.s3.repositories.{FileRepository, FileStore}
 import com.loyalty.testing.s3.routes.S3Routes
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, MustMatchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.must.Matchers
 
 class RoutesSpec
-  extends FlatSpecLike
-    with MustMatchers
+  extends AnyFlatSpec
+    with Matchers
     with ScalatestRouteTest
     with S3Routes
     with BeforeAndAfterAll
@@ -32,7 +33,6 @@ class RoutesSpec
 
   override protected val log: LoggingAdapter = system.log
   override protected val repository: FileRepository = FileRepository(FileStore(dataPath), log)
-  private implicit val settings: Settings = Settings()
   override protected val notificationRouter: ActorRef = TestProbe().ref
 
   override protected def afterAll(): Unit = {

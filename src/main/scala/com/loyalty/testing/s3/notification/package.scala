@@ -1,21 +1,12 @@
 package com.loyalty.testing.s3
 
 import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
 
-import io.circe._
+import com.loyalty.testing.s3.parser._
+import io.circe.Encoder._
 import io.circe.generic.auto._
-import io.circe.java8.time.{decodeZonedDateTimeWithFormatter, encodeZonedDateTimeWithFormatter}
 
 package object notification {
-
-  import parser._
-
-  implicit final val decodeZonedDateTimeDefault: Decoder[ZonedDateTime] =
-    decodeZonedDateTimeWithFormatter(ISO_OFFSET_DATE_TIME)
-
-  implicit final val encodeZonedDateTimeDefault: Encoder[ZonedDateTime] =
-    encodeZonedDateTimeWithFormatter(ISO_OFFSET_DATE_TIME)
 
   case class SqsEvent(Records: List[SqsRecord])
 

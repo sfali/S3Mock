@@ -13,7 +13,7 @@ import com.loyalty.testing.s3.response.{NoSuchKeyException, ObjectMeta, PutObjec
 import com.loyalty.testing.s3.streams.FileStream
 import org.dizitart.no2.{Cursor, Document}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 

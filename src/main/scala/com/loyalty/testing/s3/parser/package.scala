@@ -5,22 +5,8 @@ import io.circe.{Encoder, Printer}
 
 package object parser {
 
-  private val printer =
-    Printer(
-      preserveOrder = true,
-      dropNullValues = true,
-      indent = " ",
-      lbraceRight = " ",
-      rbraceLeft = " ",
-      lbracketRight = System.lineSeparator(),
-      rbracketLeft = System.lineSeparator(),
-      lrbracketsEmpty = System.lineSeparator(),
-      arrayCommaRight = System.lineSeparator(),
-      objectCommaRight = " ",
-      colonLeft = " ",
-      colonRight = " "
-    )
+  private val printer = Printer.noSpaces.copy(dropNullValues = true)
 
-  def toJsonString[A](entity: A)(implicit encoder: Encoder[A]): String = printer.pretty(entity.asJson)
+  def toJsonString[A](entity: A)(implicit encoder: Encoder[A]): String = printer.print(entity.asJson)
 
 }

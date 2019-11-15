@@ -8,33 +8,30 @@ import java.time.LocalDate
 import akka.Done
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.headers.ByteRange
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{FileIO, Keep, Sink}
 import akka.testkit.TestKit
-import akka.util.{ByteString, Timeout}
+import akka.util.ByteString
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.request.{BucketVersioning, CreateBucketConfiguration, VersioningConfiguration}
 import com.loyalty.testing.s3.response.{BucketAlreadyExistsException, NoSuchBucketException}
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Millis, Seconds, Span}
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, MustMatchers}
-
-import scala.concurrent.duration._
 
 class NitriteRepositorySpec
   extends TestKit(ActorSystem("test"))
-    with FlatSpecLike
-    with MustMatchers
+    with AnyFlatSpecLike
+    with Matchers
     with BeforeAndAfterAll
     with ScalaFutures {
 
   import NitriteRepositorySpec._
 
-  private implicit val mat: ActorMaterializer = ActorMaterializer()
   private implicit val defaultPatience: PatienceConfig = PatienceConfig(timeout = Span(15, Seconds),
     interval = Span(500, Millis))
-  private implicit val timeout: Timeout = Timeout(5.seconds)
 
   private val repository = NitriteRepository(dBSettings, dataPath, system.log)
 

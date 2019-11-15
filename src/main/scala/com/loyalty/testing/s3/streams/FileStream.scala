@@ -37,7 +37,7 @@ class FileStream private(implicit mat: Materializer) {
     })
 
   def mergeFiles(destinationPath: Path, paths: List[Path]): Future[(String, String)] =
-    Source.fromIterator(() => paths.toIterator)
+    Source.fromIterator(() => paths.iterator)
       .flatMapConcat(path => FileIO.fromPath(path))
       .via(saveAndCalculateDigest(destinationPath))
       .toMat(Sink.head)(Keep.right)

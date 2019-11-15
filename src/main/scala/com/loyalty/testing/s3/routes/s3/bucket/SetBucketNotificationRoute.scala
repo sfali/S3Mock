@@ -15,7 +15,7 @@ class SetBucketNotificationRoute private(log: LoggingAdapter, repository: Reposi
   extends CustomMarshallers {
 
   def route(bucketName: String): Route =
-    (put & extractRequest & parameter('notification)) {
+    (put & extractRequest & parameter(Symbol("notification"))) {
       (request, _) =>
         onComplete(repository.setBucketNotification(bucketName, request.entity.dataBytes)) {
           case Success(_) => complete(HttpResponse(OK))

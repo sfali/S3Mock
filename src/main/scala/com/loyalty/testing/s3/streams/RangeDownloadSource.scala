@@ -36,7 +36,7 @@ class RangeDownloadSource(path: Path, chunkSize: Int = 8192, downloadRange: Down
     val ioResultPromise = Promise[IOResult]()
 
     val logic: GraphStageLogic with OutHandler = new GraphStageLogic(shape) with OutHandler {
-      handler ⇒
+      handler =>
       private val maxReadAhead = inheritedAttributes.getAttribute(classOf[InputBuffer], InputBuffer(16, 16)).max
       private var channel: FileChannel = _
       private var position = startPosition
@@ -64,7 +64,7 @@ class RangeDownloadSource(path: Path, chunkSize: Int = 8192, downloadRange: Down
         Try(if (Option(channel).isDefined && channel.isOpen) channel.close())
       }
 
-      override def onDownstreamFinish(): Unit = success()
+      override def onDownstreamFinish(cause: Throwable): Unit = success()
 
       override def onPull(): Unit = {
         if (availableChunks.size < maxReadAhead && !endOfReadEncountered)

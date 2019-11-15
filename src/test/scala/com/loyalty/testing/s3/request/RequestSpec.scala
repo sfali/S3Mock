@@ -1,10 +1,10 @@
 package com.loyalty.testing.s3.request
 
 import com.loyalty.testing.s3.defaultRegion
-import org.scalatest.Matchers._
-import org.scalatest.{FlatSpec, MustMatchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.must.Matchers
 
-class RequestSpec extends FlatSpec with MustMatchers {
+class RequestSpec extends AnyFlatSpec with Matchers {
 
   it should "create `CreateBucketConfiguration` with valid xml" in {
     val xml =
@@ -15,7 +15,7 @@ class RequestSpec extends FlatSpec with MustMatchers {
       """.stripMargin
 
     val config = CreateBucketConfiguration(Some(xml))
-    config.locationConstraint should equal("us-west-1")
+    config.locationConstraint mustEqual "us-west-1"
   }
 
   it should "create `CreateBucketConfiguration` with no `locationConstraint` contains default region" in {
@@ -26,12 +26,12 @@ class RequestSpec extends FlatSpec with MustMatchers {
       """.stripMargin
 
     val config = CreateBucketConfiguration(Some(xml))
-    config.locationConstraint should equal(defaultRegion)
+    config.locationConstraint mustEqual defaultRegion
   }
 
   it should "create `CreateBucketConfiguration` without any xml" in {
     val config = CreateBucketConfiguration(None)
-    config.locationConstraint should equal(defaultRegion)
+    config.locationConstraint mustEqual defaultRegion
   }
 
   it should "create `VersioningConfiguration` with valid xml" in {

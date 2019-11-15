@@ -4,12 +4,12 @@ import java.nio.file.{Files, Path}
 import java.util
 
 import akka.http.scaladsl.model.headers.ByteRange
-import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
 import com.amazonaws.services.s3.model._
+import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
 import com.loyalty.testing.s3.it.{AwsSettings, Settings}
 import com.loyalty.testing.s3.notification.Notification
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 class AwsClient(awsSettings: AwsSettings) {
 

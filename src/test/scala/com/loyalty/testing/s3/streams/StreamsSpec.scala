@@ -5,25 +5,25 @@ import java.nio.file.{Files, Paths}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.http.scaladsl.model.{HttpEntity, HttpRequest}
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{FileIO, Keep, Sink}
 import akka.testkit.TestKit
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, MustMatchers}
+import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.matchers.must.Matchers
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success}
 
 class StreamsSpec
   extends TestKit(ActorSystem("test"))
-    with FlatSpecLike
-    with MustMatchers
+    with AnyFlatSpecLike
+    with Matchers
     with BeforeAndAfterAll
     with ScalaFutures {
 
   import com.loyalty.testing.s3._
 
-  private implicit val mat: ActorMaterializer = ActorMaterializer()
   private val fileStream = FileStream()
   private val basePath = "src/test/resources/"
   private val srcPath = Paths.get(basePath, "sample.txt").toAbsolutePath

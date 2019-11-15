@@ -1,15 +1,14 @@
 package com.loyalty.testing.s3.route
 
-import java.nio.charset.StandardCharsets
 import java.nio.file.{Path, Paths}
 
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
 import akka.testkit.TestKit
 import com.amazonaws.auth.{AWSCredentialsProvider, AWSStaticCredentialsProvider, AnonymousAWSCredentials}
 import com.amazonaws.client.builder.AwsClientBuilder
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.services.s3.model.AmazonS3Exception
+import com.amazonaws.util.IOUtils
 import com.loyalty.testing.s3.it.client.AwsClient
 import com.loyalty.testing.s3.it.{AwsSettings, S3Settings}
 import com.loyalty.testing.s3.notification.Notification
@@ -17,24 +16,24 @@ import com.loyalty.testing.s3.repositories.{FileRepository, FileStore}
 import com.loyalty.testing.s3.response.ErrorCodes
 import com.typesafe.config.ConfigFactory
 import javax.xml.bind.DatatypeConverter
-import org.apache.commons.io.IOUtils
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, MustMatchers}
+import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.matchers.must.Matchers
 
 import scala.util.{Failure, Success, Try}
 
 class S3MockAwsClientSpec
   extends TestKit(ActorSystem("it-system", ConfigFactory.load("it")))
-    with FlatSpecLike
+    with AnyFlatSpecLike
     with BeforeAndAfterAll
     with ScalaFutures
-    with MustMatchers {
+    with Matchers {
 
   import ErrorCodes._
   import com.loyalty.testing.s3._
 
   private val log = system.log
-  private implicit val mat: ActorMaterializer = ActorMaterializer()
   private val root: Path = Paths.get(System.getProperty("user.dir"), "tmp", "s3mock")
   private val fileStore: FileStore = FileStore(root)
   private implicit val repository: FileRepository = FileRepository(fileStore, log)
@@ -115,7 +114,7 @@ class S3MockAwsClientSpec
     val s3Object = s3Client.getObject(defaultBucketName, key)
     val s3ObjectInputStream = s3Object.getObjectContent
 
-    Try(IOUtils.toString(s3ObjectInputStream, StandardCharsets.UTF_8)) match {
+    Try(IOUtils.toString(s3ObjectInputStream)) match {
       case Success(s) =>
         s.length mustEqual 5365959
         s3Object.getObjectMetadata.getContentLength mustEqual 5365959

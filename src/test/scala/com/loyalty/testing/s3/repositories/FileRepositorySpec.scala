@@ -4,21 +4,20 @@ import java.nio.file.{Files, Path, Paths}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.headers.ByteRange
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{FileIO, Keep, Sink}
 import akka.testkit.TestKit
-import akka.util.{ByteString, Timeout}
+import akka.util.ByteString
 import com.loyalty.testing.s3.request.{BucketVersioning, CreateBucketConfiguration, VersioningConfiguration}
 import com.loyalty.testing.s3.response.{BucketAlreadyExistsException, NoSuchKeyException}
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, MustMatchers}
-
-import scala.concurrent.duration._
+import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.matchers.must.Matchers
 
 class FileRepositorySpec
   extends TestKit(ActorSystem("test"))
-    with FlatSpecLike
-    with MustMatchers
+    with AnyFlatSpecLike
+    with Matchers
     with BeforeAndAfterAll
     with ScalaFutures {
 
@@ -28,8 +27,6 @@ class FileRepositorySpec
   private val defaultBucketName = "actor-non-version"
   private val versionedBucketName = "actor-with-version"
 
-  private implicit val mat: ActorMaterializer = ActorMaterializer()
-  private implicit val timeout: Timeout = Timeout(5.seconds)
   private val fileStore = FileStore(dataPath)
   private val repository = FileRepository(fileStore, system.log)
 
@@ -235,7 +232,7 @@ class FileRepositorySpec
       ex => ex mustBe a[NoSuchKeyException]
     }
   }
-  
+
   it should "copy object from one path to another path within same bucket" in {
     val fileName = "sample1.txt"
     val sourceKey = s"$fileName"

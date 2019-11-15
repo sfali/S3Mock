@@ -13,10 +13,12 @@ import scala.util.{Failure, Success}
 class InitiateMultipartUploadRoute private(log: LoggingAdapter, repository: Repository) extends CustomMarshallers {
 
   def route(bucketName: String, key: String): Route =
-    (post & parameter('uploads)) { uploads =>
+    (post & parameter(Symbol("uploads"))) { _ =>
       onComplete(repository.initiateMultipartUpload(bucketName, key)) {
         case Success(result) => complete(result)
-        case Failure(ex) => complete(HttpResponse(InternalServerError))
+        case Failure(ex) =>
+          log.error(ex, "Exception occurred while initiating multi part upload")
+          complete(HttpResponse(InternalServerError))
       }
     }
 }

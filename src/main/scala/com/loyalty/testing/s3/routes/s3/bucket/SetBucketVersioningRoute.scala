@@ -14,7 +14,7 @@ import scala.util.{Failure, Success}
 class SetBucketVersioningRoute private(log: LoggingAdapter, repository: Repository) {
 
   def route(bucketName: String): Route =
-    (put & extractRequest & parameter('versioning)) {
+    (put & extractRequest & parameter(Symbol("versioning"))) {
       (request, _) =>
         onComplete(repository.setBucketVersioning(bucketName, request.entity.dataBytes)) {
           case Success(response) =>

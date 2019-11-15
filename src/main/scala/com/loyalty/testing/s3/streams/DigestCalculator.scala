@@ -1,12 +1,10 @@
 package com.loyalty.testing.s3.streams
 
-
 import java.security.MessageDigest
 
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.util.ByteString
-import com.amazonaws.util.BinaryUtils
 import javax.xml.bind.DatatypeConverter
 
 class DigestCalculator(algorithm: String) extends GraphStage[FlowShape[ByteString, (String, String)]] {
