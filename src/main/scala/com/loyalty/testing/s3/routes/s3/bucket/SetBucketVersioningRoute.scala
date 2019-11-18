@@ -6,8 +6,8 @@ import akka.http.scaladsl.model.StatusCodes.{InternalServerError, NotFound, OK}
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.response.NoSuchBucketException
+import com.loyalty.testing.s3.repositories._
 
 import scala.util.{Failure, Success}
 

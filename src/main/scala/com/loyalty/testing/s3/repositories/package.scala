@@ -2,6 +2,7 @@ package com.loyalty.testing.s3
 
 import java.nio.file.{Files, Path, Paths}
 import java.time.{Instant, OffsetDateTime, ZoneId}
+import java.util.UUID
 import java.{lang, util}
 
 import akka.stream.Materializer
@@ -13,16 +14,15 @@ import com.loyalty.testing.s3.response.{NoSuchKeyException, ObjectMeta, PutObjec
 import com.loyalty.testing.s3.streams.FileStream
 import org.dizitart.no2.{Cursor, Document}
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
 package object repositories {
 
   val BucketNameField = "bucket-name"
-  val ObjectIdField = "object-id"
+  val IdField = "id"
   val RegionField = "region"
-  val BucketPathField = "bucket-path"
   val VersionField = "version"
   val NotificationNameField = "notification-name"
   val NotificationTypeField = "notification-type"
@@ -34,8 +34,9 @@ package object repositories {
   val ObjectPathField = "object-path"
   val KeyField = "key"
   val ETagField = "etag"
-  val ContentMd5Field = "contentMd5"
-  val ContentLengthField = "contentLength"
+  val ContentMd5Field = "content-md5"
+  val ContentLengthField = "content-length"
+  val VersionIndexField = "version-index"
   val VersionIdField = "version-id"
   val DeleteMarkerField = "deleted"
   val NonVersionId = "NO_VERSION"
@@ -51,6 +52,8 @@ package object repositories {
 
   implicit class DocumentOps(src: Document) {
     def getString(key: String): String = src.get(key, classOf[String])
+
+    def getUUID(key: String): UUID = UUID.fromString(getString(key))
 
     def getLong(key: String): Long = src.get(key, classOf[lang.Long]).toLong
 

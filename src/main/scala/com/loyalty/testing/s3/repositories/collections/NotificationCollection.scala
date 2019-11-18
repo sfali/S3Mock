@@ -38,6 +38,8 @@ class NotificationCollection(db: Nitrite) {
     }
   }
 
+  def findNotifications(bucketName: String): List[Notification] = findByBucketName(bucketName).map(_.toNotification)
+
   def findNotification(bucketName: String, notificationName: String): Option[Notification] = {
     findByBucketNameAndNotificationName(bucketName, notificationName) match {
       case Nil => None
@@ -45,6 +47,9 @@ class NotificationCollection(db: Nitrite) {
       case _ => throw new IllegalStateException(s"multiple bucket-notification pair found: $bucketName/$notificationName")
     }
   }
+
+  private def findByBucketName(bucketName: String) =
+    collection.find(feq(BucketNameField, bucketName)).toScalaList
 
   private def findByBucketNameAndNotificationName(bucketName: String,
                                                   notificationName: String) =
