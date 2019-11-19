@@ -9,13 +9,15 @@ import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.collections.{BucketCollection, CreateResponse, NotificationCollection, ObjectCollection}
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.VersioningConfiguration
-import com.loyalty.testing.s3.response.PutObjectResult
+import com.loyalty.testing.s3.response.{ObjectMeta, PutObjectResult}
+import com.loyalty.testing.s3.utils.DateTimeProvider
 import org.dizitart.no2.Nitrite
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
-class NitriteDatabase(dbSettings: DBSettings)(implicit system: ActorSystem[Nothing]) {
+class NitriteDatabase(dbSettings: DBSettings)(implicit system: ActorSystem[Nothing],
+                                              dateTimeProvider: DateTimeProvider) {
 
   import system.executionContext
 
@@ -63,18 +65,21 @@ class NitriteDatabase(dbSettings: DBSettings)(implicit system: ActorSystem[Nothi
   def getBucketNotifications(bucketName: String): Future[List[Notification]] =
     Future.successful(notificationCollection.findNotifications(bucketName))
 
+  def getAllObjects(objectId: UUID): Future[List[ObjectMeta]] =
+    Future.successful(objectCollection.findAll(objectId))
+
   def createObject(bucket: Bucket,
                    key: String,
                    putObjectResult: PutObjectResult,
-                   versionIndex: Int = 0,
-                   maybeVersionId: Option[String] = None): Future[CreateResponse] =
-    Future.successful(objectCollection.createObject(bucket, key, putObjectResult, versionIndex, maybeVersionId))
+                   versionIndex: Int = 0): Future[CreateResponse] =
+    Future.successful(objectCollection.createObject(bucket, key, putObjectResult, versionIndex))
 
   def close(): Unit = db.close()
 
 }
 
 object NitriteDatabase {
-  def apply(dbSettings: DBSettings)(implicit system: ActorSystem[Nothing]): NitriteDatabase =
+  def apply(dbSettings: DBSettings)(implicit system: ActorSystem[Nothing],
+                                    dateTimeProvider: DateTimeProvider): NitriteDatabase =
     new NitriteDatabase(dbSettings)
 }

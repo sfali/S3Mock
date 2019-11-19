@@ -57,6 +57,8 @@ package object repositories {
 
     def getLong(key: String): Long = src.get(key, classOf[lang.Long]).toLong
 
+    def getInt(key: String): Int = src.get(key, classOf[lang.Integer]).toInt
+
     def getBoolean(key: String): Boolean = src.get(key, classOf[Boolean])
 
     def getOptionalString(key: String): Option[String] = Option(getString(key))
@@ -84,7 +86,8 @@ package object repositories {
         etag = src.getString(ETagField),
         contentMd5 = src.getString(ContentMd5Field),
         contentLength = src.getLong(ContentLengthField),
-        maybeVersionId = if (NonVersionId == version) None else Some(version)
+        maybeVersionId = if (NonVersionId == version) None else Some(version),
+        index = src.getInt(VersionIndexField)
       )
       ObjectMeta(
         path = src.getString(ObjectPathField).toPath,

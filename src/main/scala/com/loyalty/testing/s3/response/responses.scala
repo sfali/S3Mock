@@ -2,6 +2,7 @@ package com.loyalty.testing.s3.response
 
 import java.nio.file.{Path, Paths}
 import java.time.{Instant, LocalDateTime}
+import java.util.UUID
 
 import akka.stream.IOResult
 import akka.stream.scaladsl.Source
@@ -12,7 +13,8 @@ import com.loyalty.testing.s3.request.BucketVersioning
 import scala.concurrent.Future
 import scala.xml.Elem
 
-case class BucketResponse(bucketName: String, locationConstraint: String = defaultRegion,
+case class BucketResponse(bucketName: String,
+                          locationConstraint: String = defaultRegion,
                           maybeBucketVersioning: Option[BucketVersioning] = None)
 
 case class PutObjectResult(key: String,
@@ -20,9 +22,13 @@ case class PutObjectResult(key: String,
                            contentMd5: String,
                            contentLength: Long,
                            maybeVersionId: Option[String],
+                           index: Int = 0,
                            prefix: String = "") // TODO: remove this
 
-case class ObjectMeta(path: Path, result: PutObjectResult, lastModifiedDate: LocalDateTime = LocalDateTime.now())
+case class ObjectMeta(path: Path,
+                      result: PutObjectResult,
+                      lastModifiedDate: LocalDateTime = LocalDateTime.now(),
+                      id: UUID = UUID.randomUUID())
 
 case class GetObjectResponse(bucketName: String,
                              key: String,

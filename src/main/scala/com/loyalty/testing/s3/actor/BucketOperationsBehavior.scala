@@ -1,10 +1,15 @@
 package com.loyalty.testing.s3.actor
 
+import java.nio.file.Path
 import java.util.UUID
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
 import akka.actor.typed.{ActorRef, Behavior}
+import akka.stream.scaladsl.Source
+import akka.util.ByteString
+import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.BucketOperationsBehavior.BucketProtocol
+import com.loyalty.testing.s3.actor.ObjectOperationsBehavior._
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.NitriteDatabase
 import com.loyalty.testing.s3.repositories.model.Bucket
@@ -16,6 +21,7 @@ import scala.util.{Failure, Success}
 
 class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
                                        buffer: StashBuffer[BucketProtocol],
+                                       dataPath: Path,
                                        database: NitriteDatabase)
   extends AbstractBehavior[BucketProtocol](context) {
 
@@ -32,14 +38,16 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
           case Failure(ex: NoSuchBucketException) =>
             context.log.error(s"No such bucket: $bucketId", ex)
             NoSuchBucket
-          case Failure(ex: Throwable) => DatabaseError(ex.getMessage)
+          case Failure(ex: Throwable) =>
+            context.log.error("database error", ex)
+            DatabaseError
           case Success(bucket) => BucketResult(bucket)
         }
         Behaviors.same
 
       case NoSuchBucket => buffer.unstashAll(noSuchBucket)
 
-      case DatabaseError(message) => //TODO: handle properly
+      case DatabaseError => //TODO: handle properly
         Behaviors.same
 
       case BucketResult(bucket) => buffer.unstashAll(bucketOperation(bucket))
@@ -124,6 +132,14 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
         }
         Behaviors.same
 
+      case PutObjectWrapper(key, contentSource, replyTo) =>
+        objectActor(createObjectId(bucket.bucketName, key).toString) ! PutObject(bucket, key, contentSource, replyTo)
+        Behaviors.same
+
+      case GetObjectMetaWrapper(key, replyTo) =>
+        objectActor(createObjectId(bucket.bucketName, key).toString) ! GetObjectMeta(replyTo)
+        Behaviors.same
+
       case ReplyToSender(reply, replyTo) =>
         replyTo ! reply
         Behaviors.same
@@ -135,13 +151,19 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
         Behaviors.unhandled
     }
 
+  private def objectActor(id: String): ActorRef[ObjectProtocol] =
+    context.child(id) match {
+      case Some(behavior) => behavior.unsafeUpcast[ObjectProtocol]
+      case None => context.spawn(ObjectOperationsBehavior(dataPath, database), id)
+    }
+
 }
 
 object BucketOperationsBehavior {
 
-  def apply(database: NitriteDatabase): Behavior[BucketProtocol] =
+  def apply(dataPath: Path, database: NitriteDatabase): Behavior[BucketProtocol] =
     Behaviors.setup { context =>
-      Behaviors.withStash(1000)(buffer => new BucketOperationsBehavior(context, buffer, database))
+      Behaviors.withStash(1000)(buffer => new BucketOperationsBehavior(context, buffer, dataPath, database))
     }
 
   sealed trait BucketProtocol
@@ -156,13 +178,15 @@ object BucketOperationsBehavior {
 
   private final case object NoSuchBucket extends BucketProtocol
 
-  private final case class DatabaseError(message: String) extends BucketProtocol
+  private final case object DatabaseError extends BucketProtocol
 
   private final case class ReplyToSender(reply: Event, replyTo: ActorRef[Event]) extends BucketProtocol
 
-  final case class CreateBucket(bucket: Bucket, replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
   private case class NewBucketCreated(bucket: Bucket, replyTo: ActorRef[Event]) extends BucketProtocolWithReply
+
+  private final case class BucketResult(bucket: Bucket) extends BucketProtocol
+
+  final case class CreateBucket(bucket: Bucket, replyTo: ActorRef[Event]) extends BucketProtocolWithReply
 
   final case class GetBucket(replyTo: ActorRef[Event]) extends BucketProtocolWithReply
 
@@ -174,6 +198,10 @@ object BucketOperationsBehavior {
   final case class CreateBucketNotifications(notifications: List[Notification],
                                              replyTo: ActorRef[Event]) extends BucketProtocolWithReply
 
-  private final case class BucketResult(bucket: Bucket) extends BucketProtocol
+  final case class PutObjectWrapper(key: String,
+                                    contentSource: Source[ByteString, _],
+                                    replyTo: ActorRef[Event]) extends BucketProtocolWithReply
+
+  final case class GetObjectMetaWrapper(key: String, replyTo: ActorRef[Event]) extends BucketProtocolWithReply
 
 }

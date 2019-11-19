@@ -1,20 +1,21 @@
 package com.loyalty.testing.s3.repositories.collections
 
-import java.time.OffsetDateTime
+import java.util.UUID
 
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.repositories._
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.BucketVersioning
-import com.loyalty.testing.s3.response.{NoSuchKeyException, ObjectMeta, PutObjectResult}
+import com.loyalty.testing.s3.response.{ObjectMeta, PutObjectResult}
+import com.loyalty.testing.s3.utils.DateTimeProvider
 import org.dizitart.no2._
-import org.dizitart.no2.filters.Filters.{eq => feq}
+import org.dizitart.no2.filters.Filters.{eq => feq, _}
 import org.slf4j.LoggerFactory
 
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-class ObjectCollection(db: Nitrite) {
+class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider) {
 
   import Document._
   import IndexOptions._
@@ -32,8 +33,8 @@ class ObjectCollection(db: Nitrite) {
   private[repositories] def createObject(bucket: Bucket,
                                          key: String,
                                          putObjectResult: PutObjectResult,
-                                         versionIndex: Int,
-                                         maybeVersionId: Option[String]): CreateResponse = {
+                                         versionIndex: Int): CreateResponse = {
+    val maybeVersionId = putObjectResult.maybeVersionId
     val bucketName = bucket.bucketName
     log.info("Request to create object, key={}, bucket={}", Array(key, bucketName): _*)
     val versionEnabled = bucket.version.filter(_ == BucketVersioning.Enabled).getOrElse(BucketVersioning.Suspended) ==
@@ -42,17 +43,18 @@ class ObjectCollection(db: Nitrite) {
       throw InvalidInputException(s"Bucket has versioning enabled but no version id provided")
     }
 
+    val objectId = createObjectId(bucketName, key)
     val doc =
       if (versionEnabled) {
-        createDocument(IdField, createObjectId(bucketName, key))
+        createDocument(IdField, objectId)
           .put(BucketNameField, bucketName)
           .put(KeyField, key)
           .put(VersionIndexField, versionIndex)
           .put(VersionIdField, maybeVersionId.get)
       } else {
-        findById(bucketName, key) match {
+        findAllById(objectId) match {
           case Nil =>
-            createDocument(IdField, createObjectId(bucketName, key))
+            createDocument(IdField, objectId)
               .put(BucketNameField, bucketName)
               .put(KeyField, key)
               .put(VersionIndexField, 0)
@@ -75,75 +77,32 @@ class ObjectCollection(db: Nitrite) {
         if (docId.isEmpty) throw DatabaseAccessException(s"unable to get document id for $bucketName/$key")
         else {
           log.info("Object created/updated, key={}, bucket={}, doc_id={}", key, bucketName, docId.get.getIdValue)
-          CreateResponse(docId.get.getIdValue, OffsetDateTime.now())
+          CreateResponse(objectId, dateTimeProvider.currentOffsetDateTime)
         }
     }
   }
 
-  @deprecated
-  def createObject(bucket: Bucket, objectMeta: ObjectMeta): ObjectMeta = {
-    val bucketName = bucket.bucketName
-    val result = objectMeta.result
-    val key = result.key
-    log.info("Request to create object, key={}, bucket={}", Array(key, bucketName): _*)
-    val doc =
-      findById(bucketName, key) match {
-        case Nil =>
-          createDocument(IdField, createObjectId(bucketName, key))
-            .put(BucketNameField, bucketName)
-            .put(KeyField, key)
-        case document :: Nil => document
-        case _ => throw new IllegalStateException(s"Multiple documents found for $bucketName/$key")
-      }
+  def findAll(objectId: UUID): List[ObjectMeta] = findAllById(objectId).map(_.toObjectMeta)
 
-    val updatedDocument = doc
-      .put(ObjectPathField, objectMeta.path.toString)
-      .put(ETagField, result.etag)
-      .put(ContentMd5Field, result.contentMd5)
-      .put(ContentLengthField, result.contentLength)
-      .put(VersionIdField, result.maybeVersionId.getOrElse(NonVersionId))
-    val docId = collection
-      .update(updatedDocument, true)
-      .iterator()
-      .asScala
-      .toList
-      .headOption
-
-    if (docId.isEmpty)
-      throw new IllegalStateException(s"unable to get document id for $bucketName/$key")
-    else
-      log.info("Object created/updated, key={}, bucket={}, object_path={}, doc_id={}", key, bucketName,
-        objectMeta.path.toString, docId.get.getIdValue)
-
-    val lastModifiedTime = collection.getById(docId.get).getLastModifiedTime.toOffsetDateTime.toLocalDateTime
-    objectMeta.copy(lastModifiedDate = lastModifiedTime)
-  }
-
-  def findAll(bucketName: String, key: String): List[Document] = findById(bucketName, key)
-
-  def findObject(bucketName: String,
-                 key: String,
-                 maybeVersionId: Option[String] = None): ObjectMeta = {
-    log.info("Finding object, key={}, bucket={}", Array(key, bucketName): _*)
-    findById(bucketName, key, maybeVersionId) match {
-      case Nil =>
-        log.warn("No object found, key={}, bucket={}", Array(key, bucketName): _*)
-        throw NoSuchKeyException(bucketName, s"$key")
+  def findObject(objectId: UUID, maybeVersionId: Option[String] = None): ObjectMeta = {
+    //log.info("Finding object, key={}, bucket={}", Array(key, bucketName): _*)
+    findById(objectId, maybeVersionId.getOrElse(NonVersionId)) match {
+      case Nil => throw NoSuchId(objectId)
       case document :: Nil => document.toObjectMeta
-      case _ => throw new IllegalStateException(s"Multiple documents found for $bucketName/$key")
+      case _ => throw new IllegalStateException(s"Multiple documents found for $objectId")
     }
   }
 
-  private def findById(bucketName: String,
-                       key: String,
-                       maybeVersionId: Option[String] = None): List[Document] = {
-    collection.find(feq(IdField, createObjectId(bucketName, key)),
-      FindOptions.sort(VersionIndexField, SortOrder.Ascending)).toScalaList
+  private def findAllById(objectId: UUID): List[Document] =
+    collection.find(feq(IdField, objectId.toString), FindOptions.sort(VersionIndexField, SortOrder.Ascending)).toScalaList
+
+  private def findById(objectId: UUID, versionId: String): List[Document] = {
+    val filter = and(feq(IdField, objectId.toString), text(versionId, s"*$versionId*"))
+    collection.find(filter, FindOptions.sort(VersionIndexField, SortOrder.Ascending)).toScalaList
   }
 
-  private def createObjectId(bucketName: String, key: String) = s"$bucketName-$key".toUUID.toString
 }
 
 object ObjectCollection {
-  def apply(db: Nitrite): ObjectCollection = new ObjectCollection(db)
+  def apply(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider): ObjectCollection = new ObjectCollection(db)
 }
