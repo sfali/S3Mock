@@ -11,7 +11,7 @@ import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.BucketOperationsBehavior.BucketProtocol
 import com.loyalty.testing.s3.actor.ObjectOperationsBehavior._
 import com.loyalty.testing.s3.notification.Notification
-import com.loyalty.testing.s3.repositories.NitriteDatabase
+import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.VersioningConfiguration
 import com.loyalty.testing.s3.response.NoSuchBucketException
@@ -21,7 +21,7 @@ import scala.util.{Failure, Success}
 
 class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
                                        buffer: StashBuffer[BucketProtocol],
-                                       dataPath: Path,
+                                       objectIO: ObjectIO,
                                        database: NitriteDatabase)
   extends AbstractBehavior[BucketProtocol](context) {
 
@@ -154,16 +154,16 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
   private def objectActor(id: String): ActorRef[ObjectProtocol] =
     context.child(id) match {
       case Some(behavior) => behavior.unsafeUpcast[ObjectProtocol]
-      case None => context.spawn(ObjectOperationsBehavior(dataPath, database), id)
+      case None => context.spawn(ObjectOperationsBehavior(objectIO, database), id)
     }
 
 }
 
 object BucketOperationsBehavior {
 
-  def apply(dataPath: Path, database: NitriteDatabase): Behavior[BucketProtocol] =
+  def apply(objectIO: ObjectIO, database: NitriteDatabase): Behavior[BucketProtocol] =
     Behaviors.setup { context =>
-      Behaviors.withStash(1000)(buffer => new BucketOperationsBehavior(context, buffer, dataPath, database))
+      Behaviors.withStash(1000)(buffer => new BucketOperationsBehavior(context, buffer, objectIO, database))
     }
 
   sealed trait BucketProtocol

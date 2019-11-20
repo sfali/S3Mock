@@ -8,14 +8,14 @@ import java.time.OffsetDateTime
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.FileIO
-import com.loyalty.testing.s3.test._
+import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.BucketOperationsBehavior._
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.repositories._
-import com.loyalty.testing.s3.repositories.model.Bucket
+import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
 import com.loyalty.testing.s3.request.{BucketVersioning, VersioningConfiguration}
-import com.loyalty.testing.s3.response.{ObjectMeta, PutObjectResult}
-import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.streams.FileStream
+import com.loyalty.testing.s3.test._
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
@@ -25,13 +25,14 @@ class BucketOperationsBehaviorSpec
     with Matchers
     with BeforeAndAfterAll {
 
-  import BucketVersioning._
   import BucketOperationsBehaviorSpec._
+  import BucketVersioning._
 
   private val testKit = ActorTestKit("test")
 
   private implicit val system: ActorSystem[Nothing] = testKit.system
 
+  private val objectIO = ObjectIO(rootPath, FileStream())
   private val database = NitriteDatabase(dBSettings)
 
   override protected def beforeAll(): Unit = {
@@ -48,7 +49,7 @@ class BucketOperationsBehaviorSpec
 
   it should "create a bucket" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(dataPath, database), defaultBucketNameUUID)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
 
     actorRef ! CreateBucket(Bucket(defaultBucketName, defaultRegion, NotExists), probe.ref)
     probe.expectMessage(BucketInfo(Bucket(defaultBucketName, defaultRegion, NotExists)))
@@ -58,7 +59,7 @@ class BucketOperationsBehaviorSpec
 
   it should "raise BucketAlreadyExistsException when attempt to create bucket which is already exists" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(dataPath, database), defaultBucketNameUUID)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
 
     actorRef ! CreateBucket(Bucket(defaultBucketName, defaultRegion, NotExists), probe.ref)
     probe.expectMessage(BucketAlreadyExists(Bucket(defaultBucketName, defaultRegion, NotExists)))
@@ -68,7 +69,7 @@ class BucketOperationsBehaviorSpec
 
   it should "create a bucket in region other than default region" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(dataPath, database), versionedBucketNameUUID)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), versionedBucketNameUUID)
 
     actorRef ! CreateBucket(Bucket(versionedBucketName, "us-west-1", NotExists), probe.ref)
     probe.expectMessage(BucketInfo(Bucket(versionedBucketName, "us-west-1", NotExists)))
@@ -78,7 +79,7 @@ class BucketOperationsBehaviorSpec
 
   it should "set versioning on a bucket" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(dataPath, database), versionedBucketNameUUID)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), versionedBucketNameUUID)
 
     val configuration = VersioningConfiguration(Enabled)
     actorRef ! SetBucketVersioning(configuration, probe.ref)
@@ -90,7 +91,7 @@ class BucketOperationsBehaviorSpec
   it should "set bucket notifications" in {
     val probe = testKit.createTestProbe[Event]()
     val bucketName = defaultBucketName
-    val actorRef = testKit.spawn(BucketOperationsBehavior(dataPath, database), defaultBucketNameUUID)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
 
     val notification1 = Notification(
       name = "queue-notification",
@@ -121,7 +122,7 @@ class BucketOperationsBehaviorSpec
 
   it should "fail set bucket notification for non-existing bucket" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(dataPath, database), nonExistentBucketUUID)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), nonExistentBucketUUID)
 
     val notification = Notification(
       name = "queue-notification",
@@ -140,7 +141,7 @@ class BucketOperationsBehaviorSpec
 
   it should "put an object in the specified non-version bucket" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(dataPath, database), defaultBucketNameUUID)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
 
     val key = "sample.txt"
     val path = resourcePath -> key
@@ -148,35 +149,54 @@ class BucketOperationsBehaviorSpec
 
     actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
 
-    val expectedPath = dataPath -> (defaultBucketName, key, NonVersionId, ContentFileName)
-    val result = PutObjectResult(key, etagDigest, md5Digest, Files.size(path), None)
-    val objectMeta = ObjectMeta(expectedPath, result, dateTimeProvider.currentOffsetDateTime.toLocalDateTime,
-      createObjectId(defaultBucketName, key))
-    probe.expectMessage(ObjectInfo(objectMeta))
+    val objectKey = ObjectKey(
+      id = createObjectId(defaultBucketName, key),
+      bucketName = defaultBucketName,
+      key = key,
+      index = 0,
+      version = NotExists,
+      versionId = NonVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = Files.size(path),
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+    probe.expectMessage(ObjectInfo(objectKey))
 
     testKit.stop(actorRef)
   }
 
-  it should "get" in {
+  it should "get object meta for previously saved object" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(dataPath, database), defaultBucketNameUUID)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
 
     val key = "sample.txt"
     val path = resourcePath -> key
 
     actorRef ! GetObjectMetaWrapper(key, probe.ref)
-    val expectedPath = dataPath -> (defaultBucketName, key, NonVersionId, ContentFileName)
-    val result = PutObjectResult(key, etagDigest, md5Digest, Files.size(path), None)
-    val objectMeta = ObjectMeta(expectedPath, result, dateTimeProvider.currentOffsetDateTime.toLocalDateTime,
-      createObjectId(defaultBucketName, key))
-    probe.expectMessage(ObjectInfo(objectMeta))
+
+    val expectedObjectKey = ObjectKey(
+      id = createObjectId(defaultBucketName, key),
+      bucketName = defaultBucketName,
+      key = key,
+      index = 0,
+      version = NotExists,
+      versionId = NonVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = Files.size(path),
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+    val event: ObjectInfo = probe.receiveMessage().asInstanceOf[ObjectInfo]
+    val actualObjectKey = event.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    expectedObjectKey mustEqual actualObjectKey
 
     testKit.stop(actorRef)
   }
 
   it should "put a multi-path object in the specified non-version bucket" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(dataPath, database), defaultBucketNameUUID)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
 
     val fileName = "sample.txt"
     val key = s"input/$fileName"
@@ -185,14 +205,19 @@ class BucketOperationsBehaviorSpec
 
     actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
 
-    val expectedPath = dataPath -> (defaultBucketName, "input", fileName, NonVersionId, ContentFileName)
-    val result = PutObjectResult(key, etagDigest, md5Digest, Files.size(path), None)
-    val objectMeta = ObjectMeta(expectedPath, result, dateTimeProvider.currentOffsetDateTime.toLocalDateTime,
-      createObjectId(defaultBucketName, key))
-    probe.expectMessage(ObjectInfo(objectMeta))
-
-    actorRef ! GetObjectMetaWrapper(key, probe.ref)
-    probe.expectMessage(ObjectInfo(objectMeta))
+    val objectKey = ObjectKey(
+      id = createObjectId(defaultBucketName, key),
+      bucketName = defaultBucketName,
+      key = key,
+      index = 0,
+      version = NotExists,
+      versionId = NonVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = Files.size(path),
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+    probe.expectMessage(ObjectInfo(objectKey))
 
     testKit.stop(actorRef)
   }
@@ -201,8 +226,6 @@ class BucketOperationsBehaviorSpec
 object BucketOperationsBehaviorSpec {
   private val userDir: String = System.getProperty("user.dir")
   private val rootPath: Path = Paths.get(userDir, "target", ".s3mock")
-  private val dataPath: Path = rootPath -> "data"
-  if (!Files.exists(dataPath)) Files.createDirectories(dataPath)
   private val resourcePath = Paths.get("src", "test", "resources")
   private val defaultBucketName = "actor-non-version"
   private val defaultBucketNameUUID = defaultBucketName.toUUID.toString

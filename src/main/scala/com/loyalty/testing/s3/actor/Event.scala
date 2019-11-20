@@ -1,8 +1,7 @@
 package com.loyalty.testing.s3.actor
 
 import com.loyalty.testing.s3.notification.Notification
-import com.loyalty.testing.s3.repositories.model.Bucket
-import com.loyalty.testing.s3.response.ObjectMeta
+import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
 
 sealed trait Event
 
@@ -18,6 +17,6 @@ final case class BucketInfo(bucket: Bucket) extends Event
 
 final case class NotificationsInfo(notifications: List[Notification]) extends Event
 
-final case class ObjectInfo(objectMeta: ObjectMeta) extends Event
+final case class ObjectInfo(objectKey: ObjectKey) extends Event
 
 final case class BucketAlreadyExists(bucket: Bucket) extends Event

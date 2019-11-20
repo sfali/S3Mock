@@ -2,11 +2,9 @@ package com.loyalty.testing.s3.repositories.collections
 
 import java.util.UUID
 
-import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.repositories._
-import com.loyalty.testing.s3.repositories.model.Bucket
+import com.loyalty.testing.s3.repositories.model.ObjectKey
 import com.loyalty.testing.s3.request.BucketVersioning
-import com.loyalty.testing.s3.response.{ObjectMeta, PutObjectResult}
 import com.loyalty.testing.s3.utils.DateTimeProvider
 import org.dizitart.no2._
 import org.dizitart.no2.filters.Filters.{eq => feq, _}
@@ -30,43 +28,38 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
     collection.createIndex(VersionIdField, indexOptions(Fulltext))
   }
 
-  private[repositories] def createObject(bucket: Bucket,
-                                         key: String,
-                                         putObjectResult: PutObjectResult,
-                                         versionIndex: Int): CreateResponse = {
-    val maybeVersionId = putObjectResult.maybeVersionId
-    val bucketName = bucket.bucketName
-    log.info("Request to create object, key={}, bucket={}", Array(key, bucketName): _*)
-    val versionEnabled = bucket.version.filter(_ == BucketVersioning.Enabled).getOrElse(BucketVersioning.Suspended) ==
-      BucketVersioning.Enabled
-    if (versionEnabled && maybeVersionId.isEmpty) {
-      throw InvalidInputException(s"Bucket has versioning enabled but no version id provided")
-    }
-
-    val objectId = createObjectId(bucketName, key)
+  private[repositories] def createObject(objectKey: ObjectKey, versionIndex: Int): ObjectKey = {
+    val bucketName = objectKey.bucketName
+    val key = objectKey.key
+    log.info("Request to create object, key={}, bucket={}", key, bucketName)
+    val version = objectKey.version
+    val versionEnabled = version == BucketVersioning.Enabled
+    val objectId = objectKey.id
     val doc =
       if (versionEnabled) {
-        createDocument(IdField, objectId)
+        createDocument(IdField, objectId.toString)
           .put(BucketNameField, bucketName)
           .put(KeyField, key)
           .put(VersionIndexField, versionIndex)
-          .put(VersionIdField, maybeVersionId.get)
+          .put(VersionField, version.entryName)
+          .put(VersionIdField, objectKey.versionId)
       } else {
         findAllById(objectId) match {
           case Nil =>
-            createDocument(IdField, objectId)
+            createDocument(IdField, objectId.toString)
               .put(BucketNameField, bucketName)
               .put(KeyField, key)
-              .put(VersionIndexField, 0)
-              .put(VersionIdField, NonVersionId)
+              .put(VersionIndexField, versionIndex)
+              .put(VersionField, version.entryName)
+              .put(VersionIdField, objectKey.versionId)
           case document :: _ => document
         }
       }
 
     val updatedDocument = doc
-      .put(ETagField, putObjectResult.etag)
-      .put(ContentMd5Field, putObjectResult.contentMd5)
-      .put(ContentLengthField, putObjectResult.contentLength)
+      .put(ETagField, objectKey.eTag)
+      .put(ContentMd5Field, objectKey.contentMd5)
+      .put(ContentLengthField, objectKey.contentLength)
 
     Try(collection.update(updatedDocument, true)) match {
       case Failure(ex) =>
@@ -77,18 +70,18 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
         if (docId.isEmpty) throw DatabaseAccessException(s"unable to get document id for $bucketName/$key")
         else {
           log.info("Object created/updated, key={}, bucket={}, doc_id={}", key, bucketName, docId.get.getIdValue)
-          CreateResponse(objectId, dateTimeProvider.currentOffsetDateTime)
+          objectKey.copy(index = versionIndex, lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
         }
     }
   }
 
-  def findAll(objectId: UUID): List[ObjectMeta] = findAllById(objectId).map(_.toObjectMeta)
+  def findAll(objectId: UUID): List[ObjectKey] = findAllById(objectId).map(ObjectKey(_))
 
-  def findObject(objectId: UUID, maybeVersionId: Option[String] = None): ObjectMeta = {
+  def findObject(objectId: UUID, maybeVersionId: Option[String] = None): ObjectKey = {
     //log.info("Finding object, key={}, bucket={}", Array(key, bucketName): _*)
     findById(objectId, maybeVersionId.getOrElse(NonVersionId)) match {
       case Nil => throw NoSuchId(objectId)
-      case document :: Nil => document.toObjectMeta
+      case document :: Nil => ObjectKey(document)
       case _ => throw new IllegalStateException(s"Multiple documents found for $objectId")
     }
   }

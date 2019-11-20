@@ -27,7 +27,7 @@ class BucketCollection(db: Nitrite) {
           createDocument(IdField, bucket.id.toString)
             .put(BucketNameField, bucket.bucketName)
             .put(RegionField, bucket.region)
-            .put(VersionField, bucket.version)
+            .put(VersionField, bucket.version.entryName)
         collection.insert(document)
         bucket
       case _ => throw BucketAlreadyExistsException(bucket.bucketName)

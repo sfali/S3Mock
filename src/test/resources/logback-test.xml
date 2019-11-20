@@ -17,6 +17,10 @@
         <appender-ref ref="STDOUT"/>
     </logger>
 
+    <logger name="com.loyalty.testing.s3.actor" level="info" additivity="false">
+        <appender-ref ref="STDOUT"/>
+    </logger>
+
     <root level="error">
         <appender-ref ref="STDOUT"/>
     </root>
