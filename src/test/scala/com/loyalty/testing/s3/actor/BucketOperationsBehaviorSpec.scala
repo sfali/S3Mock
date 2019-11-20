@@ -192,6 +192,32 @@ class BucketOperationsBehaviorSpec
     testKit.stop(actorRef)
   }
 
+  it should "update object in non-version bucket" in {
+    val key = "sample.txt"
+    val path = resourcePath -> key
+    val contentSource = FileIO.fromPath(path)
+
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
+
+    val objectKey = ObjectKey(
+      id = createObjectId(defaultBucketName, key),
+      bucketName = defaultBucketName,
+      key = key,
+      index = 0,
+      version = NotExists,
+      versionId = NonVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = Files.size(path),
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+    probe.expectMessage(ObjectInfo(objectKey))
+
+    testKit.stop(actorRef)
+  }
+
   it should "put a multi-path object in the specified non-version bucket" in {
     val fileName = "sample.txt"
     val key = s"input/$fileName"
@@ -245,15 +271,42 @@ class BucketOperationsBehaviorSpec
 
     testKit.stop(actorRef)
   }
+
+  it should "update object in the specified bucket with bucket versioning on" in {
+    val key = "sample.txt"
+    val path = resourcePath -> key
+    val contentSource = FileIO.fromPath(path)
+
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), versionedBucketNameUUID)
+    actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
+
+    val index = 2
+    val objectKey = ObjectKey(
+      id = createObjectId(versionedBucketName, key),
+      bucketName = versionedBucketName,
+      key = key,
+      index = index,
+      version = Enabled,
+      versionId = index.toVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = Files.size(path),
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+    probe.expectMessage(ObjectInfo(objectKey))
+
+    testKit.stop(actorRef)
+  }
 }
 
 object BucketOperationsBehaviorSpec {
   private val userDir: String = System.getProperty("user.dir")
   private val rootPath: Path = Paths.get(userDir, "target", ".s3mock")
   private val resourcePath = Paths.get("src", "test", "resources")
-  private val defaultBucketName = "actor-non-version"
+  private val defaultBucketName = "non-versioned-bucket"
   private val defaultBucketNameUUID = defaultBucketName.toUUID.toString
-  private val versionedBucketName = "actor-with-version"
+  private val versionedBucketName = "versioned-bucket"
   private val versionedBucketNameUUID = versionedBucketName.toUUID.toString
   private val nonExistentBucketName = "dummy"
   private val nonExistentBucketUUID = nonExistentBucketName.toUUID.toString
@@ -264,6 +317,8 @@ object BucketOperationsBehaviorSpec {
 
   private val etagDigest = "6b4bb2a848f1fac797e320d7b9030f3e"
   private val md5Digest = "a0uyqEjx+seX4yDXuQMPPg=="
+  /*private val etagDigest1 = "84043a46fafcdc5451db399625915436"
+  private val md5Digest1 = "hAQ6Rvr83FRR2zmWJZFUNg=="*/
 
   private def clean() =
     Files.walkFileTree(rootPath, new SimpleFileVisitor[Path] {

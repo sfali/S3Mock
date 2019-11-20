@@ -1,6 +1,5 @@
 package com.loyalty.testing.s3.actor
 
-import java.nio.file.Path
 import java.util.UUID
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
@@ -11,8 +10,8 @@ import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.BucketOperationsBehavior.BucketProtocol
 import com.loyalty.testing.s3.actor.ObjectOperationsBehavior._
 import com.loyalty.testing.s3.notification.Notification
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.repositories.model.Bucket
+import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.VersioningConfiguration
 import com.loyalty.testing.s3.response.NoSuchBucketException
 
