@@ -12,7 +12,6 @@ import akka.http.scaladsl.model.headers.{ByteRange, RawHeader}
 import com.amazonaws.services.sns.AmazonSNSAsync
 import com.amazonaws.services.sqs.AmazonSQSAsync
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
-import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.UploadPart
 import com.loyalty.testing.s3.response.{CompleteMultipartUploadResult, InvalidNotificationConfigurationException, PutObjectResult}
 import javax.xml.bind.DatatypeConverter
@@ -267,8 +266,8 @@ package object s3 {
 
   def createObjectId(bucketName: String, key: String): UUID = s"$bucketName-$key".toUUID
 
-  implicit class BucketOps(src: Bucket) {
-    def bucketPath(dataPath: Path): Path = dataPath -> src.bucketName
+  implicit class IntOps(src: Int) {
+    def toVersionId: String = toBase16(src.toString.toUUID.toString)
   }
 
 }

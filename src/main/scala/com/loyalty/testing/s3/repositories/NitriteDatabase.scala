@@ -67,8 +67,7 @@ class NitriteDatabase(dbSettings: DBSettings)(implicit system: ActorSystem[Nothi
   def getAllObjects(objectId: UUID): Future[List[ObjectKey]] =
     Future.successful(objectCollection.findAll(objectId))
 
-  def createObject(objectKey: ObjectKey, versionIndex: Int): Future[ObjectKey] =
-    Future.successful(objectCollection.createObject(objectKey, versionIndex))
+  def createObject(objectKey: ObjectKey): Future[ObjectKey] = Future.successful(objectCollection.createObject(objectKey))
 
   def close(): Unit = db.close()
 

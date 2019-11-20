@@ -140,13 +140,12 @@ class BucketOperationsBehaviorSpec
   }
 
   it should "put an object in the specified non-version bucket" in {
-    val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
-
     val key = "sample.txt"
     val path = resourcePath -> key
     val contentSource = FileIO.fromPath(path)
 
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
     actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
 
     val objectKey = ObjectKey(
@@ -167,12 +166,11 @@ class BucketOperationsBehaviorSpec
   }
 
   it should "get object meta for previously saved object" in {
-    val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
-
     val key = "sample.txt"
     val path = resourcePath -> key
 
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
     actorRef ! GetObjectMetaWrapper(key, probe.ref)
 
     val expectedObjectKey = ObjectKey(
@@ -195,14 +193,13 @@ class BucketOperationsBehaviorSpec
   }
 
   it should "put a multi-path object in the specified non-version bucket" in {
-    val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
-
     val fileName = "sample.txt"
     val key = s"input/$fileName"
     val path = resourcePath -> fileName
     val contentSource = FileIO.fromPath(path)
 
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
     actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
 
     val objectKey = ObjectKey(
@@ -212,6 +209,33 @@ class BucketOperationsBehaviorSpec
       index = 0,
       version = NotExists,
       versionId = NonVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = Files.size(path),
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+    probe.expectMessage(ObjectInfo(objectKey))
+
+    testKit.stop(actorRef)
+  }
+
+  it should "put an object in the specified bucket with bucket versioning on" in {
+    val key = "sample.txt"
+    val path = resourcePath -> key
+    val contentSource = FileIO.fromPath(path)
+
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), versionedBucketNameUUID)
+    actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
+
+    val index = 1
+    val objectKey = ObjectKey(
+      id = createObjectId(versionedBucketName, key),
+      bucketName = versionedBucketName,
+      key = key,
+      index = index,
+      version = Enabled,
+      versionId = index.toVersionId,
       eTag = etagDigest,
       contentMd5 = md5Digest,
       contentLength = Files.size(path),

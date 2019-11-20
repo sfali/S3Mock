@@ -65,7 +65,8 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
         Behaviors.same
 
       case PutObject(bucket, key, contentSource, replyTo) =>
-        context.pipeToSelf(objectIO.saveObject(bucket, key, objectId, contentSource)) {
+        versionIndex = if (BucketVersioning.Enabled == bucket.version) versionIndex + 1 else versionIndex
+        context.pipeToSelf(objectIO.saveObject(bucket, key, objectId, versionIndex, contentSource)) {
           case Failure(ex) =>
             context.log.error(s"unable to save object: ${bucket.bucketName}/$key", ex)
             DatabaseError
@@ -77,8 +78,7 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
         Behaviors.same
 
       case ObjectSaved(objectKey, replyTo) =>
-        versionIndex = if (BucketVersioning.Enabled == objectKey.version) versionIndex + 1 else versionIndex
-        context.pipeToSelf(database.createObject(objectKey, versionIndex)) {
+        context.pipeToSelf(database.createObject(objectKey)) {
           case Failure(ex) =>
             context.log.error(s"unable to save object: ${objectKey.bucketName}/${objectKey.key}", ex)
             DatabaseError // TODO: retry

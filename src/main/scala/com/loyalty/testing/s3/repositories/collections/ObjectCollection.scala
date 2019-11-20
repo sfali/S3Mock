@@ -28,7 +28,7 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
     collection.createIndex(VersionIdField, indexOptions(Fulltext))
   }
 
-  private[repositories] def createObject(objectKey: ObjectKey, versionIndex: Int): ObjectKey = {
+  private[repositories] def createObject(objectKey: ObjectKey): ObjectKey = {
     val bucketName = objectKey.bucketName
     val key = objectKey.key
     log.info("Request to create object, key={}, bucket={}", key, bucketName)
@@ -40,7 +40,7 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
         createDocument(IdField, objectId.toString)
           .put(BucketNameField, bucketName)
           .put(KeyField, key)
-          .put(VersionIndexField, versionIndex)
+          .put(VersionIndexField, objectKey.index)
           .put(VersionField, version.entryName)
           .put(VersionIdField, objectKey.versionId)
       } else {
@@ -49,7 +49,7 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
             createDocument(IdField, objectId.toString)
               .put(BucketNameField, bucketName)
               .put(KeyField, key)
-              .put(VersionIndexField, versionIndex)
+              .put(VersionIndexField, objectKey.index)
               .put(VersionField, version.entryName)
               .put(VersionIdField, objectKey.versionId)
           case document :: _ => document
@@ -70,7 +70,7 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
         if (docId.isEmpty) throw DatabaseAccessException(s"unable to get document id for $bucketName/$key")
         else {
           log.info("Object created/updated, key={}, bucket={}, doc_id={}", key, bucketName, docId.get.getIdValue)
-          objectKey.copy(index = versionIndex, lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+          objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
         }
     }
   }

@@ -39,7 +39,7 @@ package object repositories {
   val VersionIndexField = "version-index"
   val VersionIdField = "version-id"
   val DeleteMarkerField = "deleted"
-  val NonVersionId: String = toBase16("NO_VERSION")
+  val NonVersionId: String = 0.toVersionId
   val ContentFileName: String = "content"
 
   implicit class LongOps(src: Long) {

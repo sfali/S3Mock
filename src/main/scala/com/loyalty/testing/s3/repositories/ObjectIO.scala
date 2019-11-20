@@ -26,8 +26,9 @@ class ObjectIO(root: Path, fileStream: FileStream)
   def saveObject(bucket: Bucket,
                  key: String,
                  keyId: UUID,
+                 versionIndex: Int,
                  contentSource: Source[ByteString, _]): Future[ObjectKey] = {
-    val versionId = if (BucketVersioning.Enabled == bucket.version) toBase16FromRandomUUID else NonVersionId
+    val versionId = versionIndex.toVersionId
     val objectPath = geObjectPath(bucket.bucketName, key, bucket.version, versionId)
     fileStream.saveContent(contentSource, objectPath)
       .flatMap {
@@ -38,7 +39,7 @@ class ObjectIO(root: Path, fileStream: FileStream)
               id = keyId,
               bucketName = bucket.bucketName,
               key = key,
-              index = 0,
+              index = versionIndex,
               version = bucket.version,
               versionId = versionId,
               eTag = etag,
