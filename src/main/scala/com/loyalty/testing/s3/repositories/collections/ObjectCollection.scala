@@ -35,26 +35,15 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
     val version = objectKey.version
     val versionEnabled = version == BucketVersioning.Enabled
     val objectId = objectKey.id
-    val doc =
-      if (versionEnabled) {
-        createDocument(IdField, objectId.toString)
-          .put(BucketNameField, bucketName)
-          .put(KeyField, key)
-          .put(VersionIndexField, objectKey.index)
-          .put(VersionField, version.entryName)
-          .put(VersionIdField, objectKey.versionId)
-      } else {
-        findAllById(objectId) match {
-          case Nil =>
-            createDocument(IdField, objectId.toString)
-              .put(BucketNameField, bucketName)
-              .put(KeyField, key)
-              .put(VersionIndexField, objectKey.index)
-              .put(VersionField, version.entryName)
-              .put(VersionIdField, objectKey.versionId)
-          case document :: _ => document
-        }
-      }
+
+    val maybeDoc = if (versionEnabled) None else findAllById(objectId).headOption
+    val doc = maybeDoc.getOrElse(
+      createDocument(IdField, objectId.toString)
+        .put(BucketNameField, bucketName)
+        .put(KeyField, key)
+        .put(VersionIndexField, objectKey.index)
+        .put(VersionField, version.entryName)
+        .put(VersionIdField, objectKey.versionId))
 
     val updatedDocument = doc
       .put(ETagField, objectKey.eTag)
