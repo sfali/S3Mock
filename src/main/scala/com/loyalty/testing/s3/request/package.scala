@@ -66,6 +66,8 @@ package object request {
 
     case object Suspended extends BucketVersioning
 
+    case object NotExists extends BucketVersioning
+
   }
 
   case class ListBucketParams(maxKeys: Int,
