@@ -5,6 +5,8 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 import akka.actor.typed.ActorSystem
+import akka.http.scaladsl.model.headers.ByteRange
+import akka.stream.IOResult
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3._
@@ -29,7 +31,7 @@ class ObjectIO(root: Path, fileStream: FileStream)
                  versionIndex: Int,
                  contentSource: Source[ByteString, _]): Future[ObjectKey] = {
     val versionId = versionIndex.toVersionId
-    val objectPath = geObjectPath(bucket.bucketName, key, bucket.version, versionId)
+    val objectPath = getObjectPath(bucket.bucketName, key, bucket.version, versionId)
     fileStream.saveContent(contentSource, objectPath)
       .flatMap {
         case (etag, contentMD5) =>
@@ -52,10 +54,17 @@ class ObjectIO(root: Path, fileStream: FileStream)
       }
   }
 
-  private def geObjectPath(bucketName: String,
-                           key: String,
-                           bucketVersioning: BucketVersioning,
-                           versionId: String) = {
+  def getObject(objectKey: ObjectKey,
+                maybeRange: Option[ByteRange] = None): (ObjectKey, Source[ByteString, Future[IOResult]]) = {
+    val objectPath = getObjectPath(objectKey.bucketName, objectKey.key, objectKey.version, objectKey.versionId)
+    val (downloadRange, source) = fileStream.downloadFile(objectPath, maybeRange = maybeRange)
+    (objectKey.copy(contentLength = downloadRange.capacity), source)
+  }
+
+  private def getObjectPath(bucketName: String,
+                            key: String,
+                            bucketVersioning: BucketVersioning,
+                            versionId: String) = {
     val objectParentPath = dataDir -> (bucketName, key, toBase16(bucketVersioning.entryName), versionId)
     Files.createDirectories(objectParentPath)
     objectParentPath -> ContentFileName

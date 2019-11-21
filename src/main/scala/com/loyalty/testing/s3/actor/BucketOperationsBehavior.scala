@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
 import akka.actor.typed.{ActorRef, Behavior}
+import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3._
@@ -139,6 +140,10 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
         objectActor(createObjectId(bucket.bucketName, key).toString) ! GetObjectMeta(replyTo)
         Behaviors.same
 
+      case GetObjectWrapper(key, maybeVersionId, maybeRange, replyTo) =>
+        objectActor(createObjectId(bucket.bucketName, key).toString) ! GetObject(bucket, key, maybeVersionId, maybeRange, replyTo)
+        Behaviors.same
+
       case ReplyToSender(reply, replyTo) =>
         replyTo ! reply
         Behaviors.same
@@ -202,5 +207,10 @@ object BucketOperationsBehavior {
                                     replyTo: ActorRef[Event]) extends BucketProtocolWithReply
 
   final case class GetObjectMetaWrapper(key: String, replyTo: ActorRef[Event]) extends BucketProtocolWithReply
+
+  final case class GetObjectWrapper(key: String,
+                                    maybeVersionId: Option[String] = None,
+                                    maybeRange: Option[ByteRange] = None,
+                                    replyTo: ActorRef[Event]) extends BucketProtocolWithReply
 
 }

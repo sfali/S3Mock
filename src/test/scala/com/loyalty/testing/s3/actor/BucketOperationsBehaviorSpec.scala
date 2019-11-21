@@ -4,10 +4,12 @@ import java.io.IOException
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 import java.time.OffsetDateTime
+import java.util.UUID
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.ActorSystem
-import akka.stream.scaladsl.FileIO
+import akka.http.scaladsl.model.headers.ByteRange
+import akka.stream.scaladsl.{FileIO, Sink}
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.BucketOperationsBehavior._
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
@@ -17,13 +19,18 @@ import com.loyalty.testing.s3.request.{BucketVersioning, VersioningConfiguration
 import com.loyalty.testing.s3.streams.FileStream
 import com.loyalty.testing.s3.test._
 import org.scalatest.BeforeAndAfterAll
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
+import org.scalatest.time.{Millis, Seconds, Span}
+
+import scala.concurrent.ExecutionContextExecutor
 
 class BucketOperationsBehaviorSpec
   extends AnyFlatSpec
     with Matchers
-    with BeforeAndAfterAll {
+    with BeforeAndAfterAll
+    with ScalaFutures {
 
   import BucketOperationsBehaviorSpec._
   import BucketVersioning._
@@ -31,6 +38,9 @@ class BucketOperationsBehaviorSpec
   private val testKit = ActorTestKit("test")
 
   private implicit val system: ActorSystem[Nothing] = testKit.system
+  private implicit val ec: ExecutionContextExecutor = system.executionContext
+  private implicit val defaultPatience: PatienceConfig = PatienceConfig(timeout = Span(15, Seconds),
+    interval = Span(500, Millis))
 
   private val objectIO = ObjectIO(rootPath, FileStream())
   private val database = NitriteDatabase(dBSettings)
@@ -295,6 +305,229 @@ class BucketOperationsBehaviorSpec
       lastModifiedTime = dateTimeProvider.currentOffsetDateTime
     )
     probe.expectMessage(ObjectInfo(objectKey))
+
+    testKit.stop(actorRef)
+  }
+
+  it should "get entire object when range is not specified" in {
+    val key = "sample.txt"
+    val path = resourcePath -> key
+    val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+    val expectedObjectKey = ObjectKey(
+      id = createObjectId(defaultBucketName, key),
+      bucketName = defaultBucketName,
+      key = key,
+      index = 0,
+      version = NotExists,
+      versionId = NonVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = Files.size(path),
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    actorRef ! GetObjectWrapper(key, replyTo = probe.ref)
+
+    val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
+    val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    val actualContent = objectContent.content.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+    expectedObjectKey mustEqual actualObjectKey
+    expectedContent mustEqual actualContent
+
+    testKit.stop(actorRef)
+  }
+
+  it should "get object with range between two positions from the start of file" in {
+    val key = "sample.txt"
+    val expectedContent = "1. A quick brown fox jumps over the silly lazy dog.\r\n"
+    val expectedObjectKey = ObjectKey(
+      id = createObjectId(defaultBucketName, key),
+      bucketName = defaultBucketName,
+      key = key,
+      index = 0,
+      version = NotExists,
+      versionId = NonVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = expectedContent.length,
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange(0, 53)), replyTo = probe.ref)
+
+    val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
+    val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    val actualContent = objectContent.content.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+    expectedObjectKey mustEqual actualObjectKey
+    expectedContent mustEqual actualContent
+
+    testKit.stop(actorRef)
+  }
+
+  it should "get object with range between two positions from the middle of file" in {
+    val key = "sample.txt"
+    val expectedContent = "6. A quick brown fox jumps over the silly lazy dog.\r\n"
+    val expectedObjectKey = ObjectKey(
+      id = createObjectId(defaultBucketName, key),
+      bucketName = defaultBucketName,
+      key = key,
+      index = 0,
+      version = NotExists,
+      versionId = NonVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = expectedContent.length,
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange(265, 318)), replyTo = probe.ref)
+
+    val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
+    val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    val actualContent = objectContent.content.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+    expectedObjectKey mustEqual actualObjectKey
+    expectedContent mustEqual actualContent
+
+    testKit.stop(actorRef)
+  }
+
+  it should "get object with suffix range" in {
+    val key = "sample.txt"
+    val expectedContent = "7. A quick brown fox jumps over the silly lazy dog.\r\n"
+    val expectedObjectKey = ObjectKey(
+      id = createObjectId(defaultBucketName, key),
+      bucketName = defaultBucketName,
+      key = key,
+      index = 0,
+      version = NotExists,
+      versionId = NonVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = expectedContent.length,
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange.suffix(53)), replyTo = probe.ref)
+
+    val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
+    val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    val actualContent = objectContent.content.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+    expectedObjectKey mustEqual actualObjectKey
+    expectedContent mustEqual actualContent
+
+    testKit.stop(actorRef)
+  }
+
+  it should "get object with range with offset" in {
+    val key = "sample.txt"
+    val expectedContent = "7. A quick brown fox jumps over the silly lazy dog.\r\n"
+    val expectedObjectKey = ObjectKey(
+      id = createObjectId(defaultBucketName, key),
+      bucketName = defaultBucketName,
+      key = key,
+      index = 0,
+      version = NotExists,
+      versionId = NonVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = expectedContent.length,
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange.fromOffset(318)), replyTo = probe.ref)
+
+    val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
+    val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    val actualContent = objectContent.content.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+    expectedObjectKey mustEqual actualObjectKey
+    expectedContent mustEqual actualContent
+
+    testKit.stop(actorRef)
+  }
+
+  it should "get latest object from versioned bucket without providing version" in {
+    val key = "sample.txt"
+    val path = resourcePath -> key
+    val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+    val index = 2
+    val expectedObjectKey = ObjectKey(
+      id = createObjectId(versionedBucketName, key),
+      bucketName = versionedBucketName,
+      key = key,
+      index = index,
+      version = Enabled,
+      versionId = index.toVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = Files.size(path),
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), versionedBucketNameUUID)
+    actorRef ! GetObjectWrapper(key, replyTo = probe.ref)
+
+    val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
+    val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    val actualContent = objectContent.content.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+    expectedObjectKey mustEqual actualObjectKey
+    expectedContent mustEqual actualContent
+
+    testKit.stop(actorRef)
+  }
+
+  it should "get object from versioned repository with version provided" in {
+    val key = "sample.txt"
+    val path = resourcePath -> key
+    val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+    val index = 1
+    val expectedObjectKey = ObjectKey(
+      id = createObjectId(versionedBucketName, key),
+      bucketName = versionedBucketName,
+      key = key,
+      index = index,
+      version = Enabled,
+      versionId = index.toVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = Files.size(path),
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), versionedBucketNameUUID)
+    actorRef ! GetObjectWrapper(key, maybeVersionId = Some(index.toVersionId.toString), replyTo = probe.ref)
+
+    val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
+    val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    val actualContent = objectContent.content.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+    expectedObjectKey mustEqual actualObjectKey
+    expectedContent mustEqual actualContent
+
+    testKit.stop(actorRef)
+  }
+
+  it should
+    """
+      |return NoSuchKeyException when getObject is called on a bucket which does not have
+      | versioning on but version id provided
+    """.stripMargin.replaceAll(System.lineSeparator(), "") in {
+    val key = "sample.txt"
+
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    actorRef ! GetObjectWrapper(key, maybeVersionId = Some(UUID.randomUUID().toString), replyTo = probe.ref)
+    probe.expectMessage(NoSuchKeyExists)
 
     testKit.stop(actorRef)
   }

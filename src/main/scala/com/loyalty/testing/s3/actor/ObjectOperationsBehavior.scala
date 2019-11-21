@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
+import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3._
@@ -14,7 +15,7 @@ import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
 import com.loyalty.testing.s3.request.BucketVersioning
 
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
                                buffer: StashBuffer[ObjectProtocol],
@@ -86,6 +87,27 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
         }
         Behaviors.same
 
+      case GetObject(_, _, maybeVersionId, maybeRange, replyTo) =>
+        val maybeObjectKey =
+          if (maybeVersionId.isDefined) objects.filter(_.versionId == maybeVersionId.get).lastOption
+          else objects.lastOption
+        val command =
+          if (maybeObjectKey.isEmpty) ReplyToSender(NoSuchKeyExists, replyTo)
+          else GetObjectData(maybeObjectKey.get, maybeRange, replyTo)
+        context.self ! command
+        Behaviors.same
+
+      case GetObjectData(objectKey, maybeRange, replyTo) =>
+        val command =
+          Try(objectIO.getObject(objectKey, maybeRange)) match {
+            case Success((updatedObjectKey, source)) => ReplyToSender(ObjectContent(updatedObjectKey, source), replyTo)
+            case Failure(ex) =>
+              context.log.error("unable to download object", ex)
+              DatabaseError // TODO: retry
+          }
+        context.self ! command
+        Behaviors.same
+
       case GetObjectMeta(replyTo) =>
         val maybeObjectKey = objects.find(om => om.id == objectId)
         val event = maybeObjectKey.map(ObjectInfo.apply).getOrElse(NoSuchKeyExists)
@@ -147,5 +169,15 @@ object ObjectOperationsBehavior {
                              replyTo: ActorRef[Event]) extends ObjectInput
 
   final case class GetObjectMeta(replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
+
+  final case class GetObject(bucket: Bucket,
+                             key: String,
+                             maybeVersionId: Option[String],
+                             maybeRange: Option[ByteRange],
+                             replyTo: ActorRef[Event]) extends ObjectInput
+
+  private final case class GetObjectData(objectKey: ObjectKey,
+                                         maybeRange: Option[ByteRange],
+                                         replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
 
 }
