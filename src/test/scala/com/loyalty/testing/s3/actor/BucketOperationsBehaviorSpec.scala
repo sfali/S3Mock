@@ -43,7 +43,7 @@ class BucketOperationsBehaviorSpec
     interval = Span(500, Millis))
 
   private val objectIO = ObjectIO(rootPath, FileStream())
-  private val database = NitriteDatabase(dBSettings)
+  private val database = NitriteDatabase(rootPath, dBSettings)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -545,7 +545,7 @@ object BucketOperationsBehaviorSpec {
   private val nonExistentBucketUUID = nonExistentBucketName.toUUID.toString
 
   private val dBSettings: DBSettings = new DBSettings {
-    override val filePath: String = (rootPath -> "s3mock.db").toString
+    override val fileName: String = "s3mock.db"
   }
 
   private val etagDigest = "6b4bb2a848f1fac797e320d7b9030f3e"

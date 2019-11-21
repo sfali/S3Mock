@@ -1,7 +1,9 @@
 package com.loyalty.testing.s3.repositories
 
+import java.nio.file.Path
 import java.util.UUID
 
+import com.loyalty.testing.s3._
 import akka.Done
 import akka.actor.typed.ActorSystem
 import com.loyalty.testing.s3.DBSettings
@@ -15,7 +17,8 @@ import org.dizitart.no2.Nitrite
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
-class NitriteDatabase(dbSettings: DBSettings)(implicit system: ActorSystem[Nothing],
+class NitriteDatabase(rootPath: Path,
+                      dbSettings: DBSettings)(implicit system: ActorSystem[Nothing],
                                               dateTimeProvider: DateTimeProvider) {
 
   import system.executionContext
@@ -24,7 +27,7 @@ class NitriteDatabase(dbSettings: DBSettings)(implicit system: ActorSystem[Nothi
     val _db = Nitrite
       .builder()
       .compressed()
-      .filePath(dbSettings.filePath)
+      .filePath((rootPath -> dbSettings.fileName).toString)
 
     dbSettings.userName match {
       case Some(userName) => _db.openOrCreate(userName, dbSettings.password.getOrElse(userName))
@@ -74,7 +77,8 @@ class NitriteDatabase(dbSettings: DBSettings)(implicit system: ActorSystem[Nothi
 }
 
 object NitriteDatabase {
-  def apply(dbSettings: DBSettings)(implicit system: ActorSystem[Nothing],
-                                    dateTimeProvider: DateTimeProvider): NitriteDatabase =
-    new NitriteDatabase(dbSettings)
+  def apply(rootPath: Path, dbSettings: DBSettings)
+           (implicit system: ActorSystem[Nothing],
+            dateTimeProvider: DateTimeProvider): NitriteDatabase =
+    new NitriteDatabase(rootPath, dbSettings)
 }

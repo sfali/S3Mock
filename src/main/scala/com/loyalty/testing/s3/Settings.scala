@@ -16,7 +16,7 @@ class Settings(config: Config) {
   }
 
   val dbSettings: DBSettings = new DBSettings {
-    override val filePath: String = config.getString("app.db.file-path")
+    override val fileName: String = config.getString("app.db.file-name")
     override val userName: Option[String] = getOptionalString("app.db-user-name")
     override val password: Option[String] = getOptionalString("app.db-password")
   }
