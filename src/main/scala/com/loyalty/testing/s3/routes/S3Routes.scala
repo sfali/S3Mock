@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.routes.s3.`object`._
-import com.loyalty.testing.s3.routes.s3.bucket._
+import com.loyalty.testing.s3.routes.s3.bucket.old._
 
 trait S3Routes {
 
@@ -19,20 +19,16 @@ trait S3Routes {
   lazy val s3Routes: Route =
     pathPrefix(Segment) {
       bucketName =>
+        val bucketRoutes = concat(
+          SetBucketVersioningRoute().route(bucketName),
+          SetBucketNotificationRoute().route(bucketName),
+          CreateBucketRoute().route(bucketName),
+          ListBucketRoute().route(bucketName)
+        )
         pathSingleSlash {
-          concat(
-            SetBucketVersioningRoute().route(bucketName),
-            SetBucketNotificationRoute().route(bucketName),
-            CreateBucketRoute().route(bucketName),
-            ListBucketRoute().route(bucketName)
-          )
+          bucketRoutes
         } ~ pathEnd {
-          concat(
-            SetBucketVersioningRoute().route(bucketName),
-            SetBucketNotificationRoute().route(bucketName),
-            CreateBucketRoute().route(bucketName),
-            ListBucketRoute().route(bucketName)
-          )
+          bucketRoutes
         } ~ path(RemainingPath) {
           key =>
             val objectName = key.toString().decode

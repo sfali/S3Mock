@@ -1,4 +1,4 @@
-package com.loyalty.testing.s3.routes.s3.bucket
+package com.loyalty.testing.s3.routes.s3.bucket.old
 
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.HttpResponse
