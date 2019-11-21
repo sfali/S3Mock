@@ -87,9 +87,15 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
         }
         Behaviors.same
 
-      case GetObject(_, _, maybeVersionId, maybeRange, replyTo) =>
+      case GetObject(bucket, _, maybeVersionId, maybeRange, replyTo) =>
+        val versionIdToUse =
+          if (BucketVersioning.NotExists == bucket.version && maybeVersionId.isDefined) {
+            // if version id provided and versioning doesn't exists then set some dummy value
+            // so that it results in NoSuckKey
+            Some(UUID.randomUUID().toString)
+          } else maybeVersionId
         val maybeObjectKey =
-          if (maybeVersionId.isDefined) objects.filter(_.versionId == maybeVersionId.get).lastOption
+          if (versionIdToUse.isDefined) objects.filter(_.versionId == versionIdToUse.get).lastOption
           else objects.lastOption
         val command =
           if (maybeObjectKey.isEmpty) ReplyToSender(NoSuchKeyExists, replyTo)
