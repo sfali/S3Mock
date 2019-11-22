@@ -15,7 +15,7 @@ import scala.util.{Failure, Success}
 class UploadMultipartRoute private(log: LoggingAdapter, repository: Repository) {
 
   def route(bucketName: String, key: String): Route =
-    (put & extractRequest & parameters("partNumber".as[Int], "uploadId")) { (request, partNumber, uploadId) =>
+    (put & extractRequest & parameter("partNumber".as[Int]) & parameter("uploadId")) { (request, partNumber, uploadId) =>
       val eventualResult = repository.uploadMultipart(bucketName, key, partNumber, uploadId, request.entity.dataBytes)
       onComplete(eventualResult) {
         case Success(objectMeta) =>

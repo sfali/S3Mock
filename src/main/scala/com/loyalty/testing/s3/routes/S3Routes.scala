@@ -5,7 +5,7 @@ import akka.event.LoggingAdapter
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import com.loyalty.testing.s3.repositories.Repository
-import com.loyalty.testing.s3.routes.s3.`object`._
+import com.loyalty.testing.s3.routes.s3.`object`.old._
 import com.loyalty.testing.s3.routes.s3.bucket.old._
 
 trait S3Routes {

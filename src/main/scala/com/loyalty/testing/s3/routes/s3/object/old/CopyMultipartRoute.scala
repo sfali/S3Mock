@@ -17,9 +17,9 @@ class CopyMultipartRoute private(log: LoggingAdapter, repository: Repository) ex
   import directives._
 
   def route(bucketName: String, key: String): Route = {
-    (put & extractRequest & parameters("partNumber".as[Int], "uploadId") &
+    (put & extractRequest & parameter("partNumber".as[Int]) & parameter("uploadId") &
       headerValueByType[`x-amz-copy-source`]() & optionalHeaderValueByType[`x-amz-copy-source-range`]()) {
-      (request, partNumber, uploadId, source, sourceRange) =>
+      (_, partNumber, uploadId, source, sourceRange) =>
         val eventualResult = repository.copyMultipart(bucketName, key, partNumber, uploadId, source.bucketName,
           source.key, source.maybeVersionId, sourceRange.map(_.range))
         onComplete(eventualResult) {
