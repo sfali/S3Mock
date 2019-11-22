@@ -1,0 +1,52 @@
+package com.loyalty.testing.s3.routes.s3.bucket
+
+import akka.actor.typed.ActorSystem
+import akka.http.scaladsl.model.HttpResponse
+import akka.http.scaladsl.model.StatusCodes.OK
+import akka.http.scaladsl.model.headers.Location
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import akka.util.Timeout
+import com.loyalty.testing.s3.actor.BucketOperationsBehavior._
+import com.loyalty.testing.s3.actor.SpawnBehavior.Command
+import com.loyalty.testing.s3.actor.{BucketAlreadyExists, BucketInfo, Event}
+import com.loyalty.testing.s3.repositories.model.Bucket
+import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
+import com.loyalty.testing.s3.request.{BucketVersioning, CreateBucketConfiguration}
+import com.loyalty.testing.s3.response.{BucketAlreadyExistsException, InternalServiceException}
+import com.loyalty.testing.s3.routes.CustomMarshallers
+import com.loyalty.testing.s3.routes.s3._
+
+import scala.util.{Failure, Success}
+
+object CreateBucketRoute extends CustomMarshallers {
+  def apply(bucketName: String,
+            objectIO: ObjectIO,
+            database: NitriteDatabase)
+           (implicit system: ActorSystem[Command],
+            timeout: Timeout): Route =
+    (put & entity(as[Option[String]])) { maybeXml =>
+      import system.executionContext
+      val bucketConfiguration: CreateBucketConfiguration = CreateBucketConfiguration(maybeXml)
+      system.log.info("Got request to create bucket {} with bucket configuration {}", bucketName, bucketConfiguration)
+
+      val bucket = Bucket(bucketName, bucketConfiguration, BucketVersioning.NotExists)
+      val eventualEvent =
+        for {
+          actorRef <- spawnBucketBehavior(bucketName, objectIO, database)
+          event <- askBucketBehavior(actorRef, replyTo => CreateBucket(bucket, replyTo))
+        } yield event
+
+      onComplete(eventualEvent) {
+        case Success(BucketInfo(bucket)) =>
+          complete(HttpResponse(OK).withHeaders(Location(s"/${bucket.bucketName}")))
+        case Success(BucketAlreadyExists(bucket)) => complete(BucketAlreadyExistsException(bucket.bucketName))
+        case Success(event: Event) =>
+          system.log.warn("CreateBucketRoute: invalid event received. event={}, bucket_name={}", event, bucketName)
+          complete(InternalServiceException(bucketName))
+        case Failure(ex: Throwable) =>
+          system.log.error("CreateBucketRoute: Internal service error occurred", ex)
+          complete(InternalServiceException(bucketName))
+      }
+    }
+}

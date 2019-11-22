@@ -1,5 +1,6 @@
 package com.loyalty.testing.s3.response
 
+import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.{Path, Paths}
 import java.time.{Instant, LocalDateTime}
 import java.util.UUID
@@ -42,6 +43,7 @@ case object DeleteObjectResponse
 
 trait XmlResponse {
   def toXml: Elem
+  def toByteString: ByteString = ByteString(toXml.toString().getBytes(UTF_8))
 }
 
 case class ListBucketResult(bucketName: String,
@@ -163,6 +165,7 @@ object ErrorCodes {
   val InvalidPartOrder = "InvalidPartOrder"
   val InvalidArgument = "InvalidArgument"
   val InvalidRequest = "InvalidRequest"
+  val InternalError = "InternalError"
 }
 
 sealed trait ErrorResponse extends Throwable with XmlResponse {
@@ -173,15 +176,7 @@ sealed trait ErrorResponse extends Throwable with XmlResponse {
   override def getMessage: String = message
 
   override def toXml: Elem =
-    <Error xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-      <Code>
-        {code}
-      </Code> <Message>
-      {message}
-    </Message> <Resource>
-      {resource}
-    </Resource>
-    </Error>
+    <Error xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Code>{code}</Code><Message>{message}</Message><Resource>{resource}</Resource></Error>
 }
 
 import com.loyalty.testing.s3.response.ErrorCodes._
@@ -240,4 +235,9 @@ case class InvalidNotificationConfigurationException(bucketName: String, overrid
 case class InvalidRequestException(bucketName: String, override val message: String) extends ErrorResponse {
   override val code: String = InvalidRequest
   override val resource: String = bucketName
+}
+
+case class InternalServiceException(override val resource: String) extends ErrorResponse {
+  override val code: String = InternalError
+  override val message: String = "We encountered an internal error. Please try again."
 }

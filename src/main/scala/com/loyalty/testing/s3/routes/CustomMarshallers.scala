@@ -1,22 +1,37 @@
 package com.loyalty.testing.s3.routes
 
-import java.nio.charset.StandardCharsets
+import java.nio.charset.StandardCharsets.UTF_8
 
 import akka.http.scaladsl.marshalling.Marshaller.fromToEntityMarshaller
 import akka.http.scaladsl.marshalling.{Marshaller, ToEntityMarshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity}
+import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTypes}
+import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, Unmarshaller}
 import akka.util.ByteString
 import com.loyalty.testing.s3.response._
 import de.heikoseeberger.akkahttpcirce.ErrorAccumulatingCirceSupport
 
 import scala.language.implicitConversions
+import scala.xml.NodeSeq
 
 trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
 
-  import StandardCharsets.UTF_8
-
   import ContentTypes._
+  import akka.http.scaladsl.marshallers.xml.ScalaXmlSupport._
+
+  implicit val BucketAlreadyExistsExceptionUnmarshaller: FromEntityUnmarshaller[BucketAlreadyExistsException] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x => BucketAlreadyExistsException((x \ "Resource").text)
+    }
+
+  /*implicit val v: ToEntityMarshaller[CreateBucketConfiguration] =
+    nodeSeqMarshaller(MediaTypes.`application/xml`) map {
+      me =>
+        Marshaller.strict {
+          v => HttpEntity(`text/plain(UTF-8)`, "")
+        }
+    }*/
 
   implicit val InitiateMultipartUploadResultMarshallers: ToEntityMarshaller[InitiateMultipartUploadResult] =
     xmlResponseMarshallers(`application/octet-stream`)
@@ -37,6 +52,9 @@ trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
     xmlResponseMarshallers(`application/octet-stream`)
 
   implicit val InvalidNotificationConfigurationExceptionMarshallers: ToEntityMarshaller[InvalidNotificationConfigurationException] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
+  implicit val InternalServiceExceptionMarshallers: ToEntityMarshaller[InternalServiceException] =
     xmlResponseMarshallers(`application/octet-stream`)
 
   private def xmlResponseMarshallers(contentType: ContentType): ToEntityMarshaller[XmlResponse] =
@@ -73,6 +91,9 @@ trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
 
   implicit val InvalidNotificationConfigurationExceptionResponse: ToResponseMarshaller[InvalidNotificationConfigurationException] =
     fromToEntityMarshaller[InvalidNotificationConfigurationException](BadRequest)
+
+  implicit val InternalServiceExceptionResponse: ToResponseMarshaller[InternalServiceException] =
+    fromToEntityMarshaller[InternalServiceException](InternalServerError)
 
   /*implicit val CompleteMultipartUploadResultResponse: ToResponseMarshaller[CompleteMultipartUploadResult] =
     fromStatusCodeAndHeadersAndValue[CompleteMultipartUploadResult]

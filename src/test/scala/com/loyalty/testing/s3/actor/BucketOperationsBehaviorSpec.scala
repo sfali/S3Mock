@@ -1,8 +1,6 @@
 package com.loyalty.testing.s3.actor
 
-import java.io.IOException
 import java.nio.file._
-import java.nio.file.attribute.BasicFileAttributes
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -53,7 +51,7 @@ class BucketOperationsBehaviorSpec
   override protected def afterAll(): Unit = {
     super.afterAll()
     database.close()
-    clean()
+    clean(rootPath)
     testKit.shutdownTestKit()
   }
 
@@ -553,16 +551,4 @@ object BucketOperationsBehaviorSpec {
   /*private val etagDigest1 = "84043a46fafcdc5451db399625915436"
   private val md5Digest1 = "hAQ6Rvr83FRR2zmWJZFUNg=="*/
 
-  private def clean() =
-    Files.walkFileTree(rootPath, new SimpleFileVisitor[Path] {
-      override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
-        Files.delete(file)
-        FileVisitResult.CONTINUE
-      }
-
-      override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
-        Files.delete(dir)
-        FileVisitResult.CONTINUE
-      }
-    })
 }

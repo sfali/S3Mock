@@ -36,7 +36,7 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
       case InitializeSnapshot =>
         context.pipeToSelf(database.getBucket(bucketId)) {
           case Failure(ex: NoSuchBucketException) =>
-            context.log.error(s"No such bucket: $bucketId", ex)
+            // context.log.error(s"No such bucket: $bucketId", ex)
             NoSuchBucket
           case Failure(ex: Throwable) =>
             context.log.error("database error", ex)

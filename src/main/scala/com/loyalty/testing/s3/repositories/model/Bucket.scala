@@ -4,7 +4,7 @@ import java.util.UUID
 
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.repositories._
-import com.loyalty.testing.s3.request.BucketVersioning
+import com.loyalty.testing.s3.request.{BucketVersioning, CreateBucketConfiguration}
 import org.dizitart.no2.Document
 
 case class Bucket(id: UUID,
@@ -23,6 +23,11 @@ object Bucket {
             region: String,
             version: BucketVersioning): Bucket =
     Bucket(bucketName.toUUID, bucketName, region, version)
+
+  def apply(bucketName: String,
+            bucketConfiguration: CreateBucketConfiguration,
+            version: BucketVersioning): Bucket =
+    Bucket(bucketName, bucketConfiguration.locationConstraint, version)
 
   def apply(document: Document): Bucket =
     Bucket(
