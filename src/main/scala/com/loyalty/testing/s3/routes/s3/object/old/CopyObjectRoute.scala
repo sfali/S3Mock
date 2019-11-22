@@ -1,4 +1,4 @@
-package com.loyalty.testing.s3.routes.s3.`object`
+package com.loyalty.testing.s3.routes.s3.`object`.old
 
 import akka.actor.ActorRef
 import akka.event.LoggingAdapter
@@ -12,6 +12,7 @@ import com.loyalty.testing.s3.notification.actor.NotificationRouter
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.response.{CopyObjectResult, NoSuchBucketException, ObjectMeta}
 import com.loyalty.testing.s3.routes.CustomMarshallers
+import com.loyalty.testing.s3.routes.s3.`object`.directives
 
 import scala.util.Failure
 

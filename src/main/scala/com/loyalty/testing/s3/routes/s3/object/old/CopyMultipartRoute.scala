@@ -1,16 +1,16 @@
-package com.loyalty.testing.s3.routes.s3.`object`
+package com.loyalty.testing.s3.routes.s3.`object`.old
 
 import akka.event.LoggingAdapter
-import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.response.{NoSuchBucketException, NoSuchKeyException, NoSuchUploadException}
 import com.loyalty.testing.s3.routes.CustomMarshallers
+import com.loyalty.testing.s3.routes.s3.`object`.directives
 
-import scala.util.Failure
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 class CopyMultipartRoute private(log: LoggingAdapter, repository: Repository) extends CustomMarshallers {
 

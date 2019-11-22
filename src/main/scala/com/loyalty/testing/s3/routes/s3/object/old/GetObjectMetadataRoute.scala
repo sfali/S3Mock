@@ -1,9 +1,9 @@
-package com.loyalty.testing.s3.routes.s3.`object`
+package com.loyalty.testing.s3.routes.s3.`object`.old
 
 import akka.event.LoggingAdapter
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
-import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source

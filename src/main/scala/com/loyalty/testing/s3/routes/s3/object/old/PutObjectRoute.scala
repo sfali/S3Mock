@@ -1,4 +1,4 @@
-package com.loyalty.testing.s3.routes.s3.`object`
+package com.loyalty.testing.s3.routes.s3.`object`.old
 
 import akka.actor.ActorRef
 import akka.event.LoggingAdapter

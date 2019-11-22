@@ -1,4 +1,4 @@
-package com.loyalty.testing.s3.routes.s3.`object`
+package com.loyalty.testing.s3.routes.s3.`object`.old
 
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.HttpResponse
@@ -8,8 +8,7 @@ import akka.http.scaladsl.server.Route
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.response.{NoSuchBucketException, NoSuchKeyException}
 
-import scala.util.Failure
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 class DeleteObjectRoute private(log: LoggingAdapter, repository: Repository) {
 
