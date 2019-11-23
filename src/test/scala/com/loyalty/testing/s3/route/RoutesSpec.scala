@@ -4,10 +4,12 @@ import java.nio.file.{Path, Paths}
 import java.time.OffsetDateTime
 
 import akka.actor.typed.ActorSystem
-import akka.http.scaladsl.model.HttpHeader
+import akka.http.scaladsl.model.ContentTypes._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.model.{HttpEntity, HttpHeader}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
+import akka.stream.scaladsl.FileIO
 import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.SpawnBehavior
@@ -57,32 +59,32 @@ class RoutesSpec
   }
 
   it should "create bucket in default region" in {
-    Put("/test-bucket") ~> routes ~> check {
+    Put(s"/$defaultBucketName") ~> routes ~> check {
       status mustBe OK
-      headers.head mustBe Location("/test-bucket")
+      headers.head mustBe Location(s"/$defaultBucketName")
     }
   }
 
-  "Attempt to create bucket, which is already exists " should " result in 404(BadRequest)" in {
-    Put("/test-bucket") ~> routes ~> check {
+  it should "send 404(BadRequest) if attempt to create bucket, which is already exists" in {
+    Put(s"/$defaultBucketName") ~> routes ~> check {
       status mustBe BadRequest
-      responseAs[BucketAlreadyExistsException] mustEqual BucketAlreadyExistsException("test-bucket")
+      responseAs[BucketAlreadyExistsException] mustEqual BucketAlreadyExistsException(defaultBucketName)
     }
   }
 
- /* it should "create bucket with region provided" in {
-    val xml =
-      """
-        |<CreateBucketConfiguration xmlns="http:/.amazonaws.com/doc/2006-03-01/">
-        | <LocationConstraint>us-west-1</LocationConstraint>
-        |</CreateBucketConfiguration>
-      """.stripMargin
-    val entity = HttpEntity(`text/xml(UTF-8)`, xml)
-    Put(s"/test-bucket-2", CreateBucketConfiguration("us-west-1")) ~> routes ~> check {
-      headers.head mustBe Location("/test-bucket-2")
-      status mustBe OK
-    }
-  }*/
+  /* it should "create bucket with region provided" in {
+     val xml =
+       """
+         |<CreateBucketConfiguration xmlns="http:/.amazonaws.com/doc/2006-03-01/">
+         | <LocationConstraint>us-west-1</LocationConstraint>
+         |</CreateBucketConfiguration>
+       """.stripMargin
+     val entity = HttpEntity(`text/xml(UTF-8)`, xml)
+     Put(s"/test-bucket-2", CreateBucketConfiguration("us-west-1")) ~> routes ~> check {
+       headers.head mustBe Location("/test-bucket-2")
+       status mustBe OK
+     }
+   }*/
 
   /*it should "set versioning on the bucket" in {
     val xml =
@@ -98,41 +100,64 @@ class RoutesSpec
     }
   }*/
 
-  /*ignore should "put object in a bucket where versioning is not enabled" in {
-    val content =
-      s"""
-         |Hello,
-         |A quick brown fox jumps over the silly lazy dog.
-         |Bye.
-      """.stripMargin
-    val entity = HttpEntity(`text/plain(UTF-8)`, content)
-    val request = Put("/test-bucket/dummy.txt", entity)
-      .addHeader(RawHeader(CONTENT_LENGTH, content.length.toString))
-    request ~> s3Routes ~> check {
-      status mustBe OK
-      val maybeContentLength = getHeader(headers, CONTENT_LENGTH)
-      maybeContentLength.fold(fail(s"Unable to find $CONTENT_LENGTH header.")) {
-        contentLength => contentLength.value().toInt must equal(content.length)
-      }
+  it should "put an object in the specified non-version bucket" in {
+    val key = "sample.txt"
+    val path = resourcePath -> key
+    val contentSource = FileIO.fromPath(path)
+    val entity = HttpEntity(`application/octet-stream`, contentSource)
+    Put(s"/$defaultBucketName/$key", entity) ~> routes ~> check {
+      status mustEqual OK
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest""""))
+      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest"))
     }
-  }*/
+  }
 
-  /*it should "put object in a bucket where versioning is enabled" in {
-    val content =
-      s"""
-         |Hello,
-         |A quick brown fox jumps over the silly lazy dog.
-         |Bye.
-      """.stripMargin
-    val entity = HttpEntity(`text/plain(UTF-8)`, content)
-    val request = Put("/test-bucket-2/dummy.txt", entity)
-      .addHeader(RawHeader("Content-Length", content.length.toString))
-    request ~> s3Routes ~> {
-      check {
-        val maybeVersionId = getHeader(headers, S3_VERSION_ID)
-        maybeVersionId must not be empty
-        status mustBe OK
-      }
+  it should "update object in non-version bucket" in {
+    val key = "sample.txt"
+    val path = resourcePath -> "sample1.txt"
+    val contentSource = FileIO.fromPath(path)
+    val entity = HttpEntity(`application/octet-stream`, contentSource)
+    Put(s"/$defaultBucketName/$key", entity) ~> routes ~> check {
+      status mustEqual OK
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest1""""))
+      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest1"))
+    }
+  }
+
+  it should "put a multi-path object in the specified non-version bucket" in {
+    val fileName = "sample.txt"
+    val key = s"input/$fileName"
+    val path = resourcePath -> fileName
+    val contentSource = FileIO.fromPath(path)
+    val entity = HttpEntity(`application/octet-stream`, contentSource)
+    Put(s"/$defaultBucketName/$key", entity) ~> routes ~> check {
+      status mustEqual OK
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest""""))
+      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest"))
+    }
+  }
+
+  it should "result in 404(BadRequest) if attempt to put object in non-existing bucket" in {
+    val fileName = "sample.txt"
+    val key = s"input/$fileName"
+    val path = resourcePath -> fileName
+    val contentSource = FileIO.fromPath(path)
+    val entity = HttpEntity(`application/octet-stream`, contentSource)
+    Put(s"/$nonExistentBucketName/$key", entity) ~> routes ~> check {
+      status mustEqual NotFound
+      responseAs[NoSuchBucketException] mustEqual NoSuchBucketException(nonExistentBucketName)
+    }
+  }
+
+  /*it should "put an object in the specified bucket with bucket versioning on" in {
+    val key = "sample.txt"
+    val path = resourcePath -> key
+    val contentSource = FileIO.fromPath(path)
+    val entity = HttpEntity(`application/octet-stream`, contentSource)
+    Put(s"/$versionedBucketName/$key", entity) ~> routes ~> check {
+      status mustEqual OK
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest""""))
+      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest"))
     }
   }*/
 
@@ -200,9 +225,10 @@ object RoutesSpec {
   private val rootPath: Path = Paths.get(userDir, "target", ".s3mock")
   private val resourcePath = Paths.get("src", "test", "resources")
   private val defaultBucketName = "non-versioned-bucket"
-  // private val defaultBucketNameUUID = defaultBucketName.toUUID.toString
-  private val versionedBucketName = "versioned-bucket"
-  // private val versionedBucketNameUUID = versionedBucketName.toUUID.toString
+  //private val versionedBucketName = "versioned-bucket"
   private val nonExistentBucketName = "dummy"
-  // private val nonExistentBucketUUID = nonExistentBucketName.toUUID.toString
+  private val etagDigest = "6b4bb2a848f1fac797e320d7b9030f3e"
+  private val md5Digest = "a0uyqEjx+seX4yDXuQMPPg=="
+  private val etagDigest1 = "84043a46fafcdc5451db399625915436"
+  private val md5Digest1 = "hAQ6Rvr83FRR2zmWJZFUNg=="
 }

@@ -11,7 +11,6 @@ import akka.util.ByteString
 import com.loyalty.testing.s3.response._
 import de.heikoseeberger.akkahttpcirce.ErrorAccumulatingCirceSupport
 
-import scala.language.implicitConversions
 import scala.xml.NodeSeq
 
 trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
@@ -23,6 +22,23 @@ trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
     nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
       case NodeSeq.Empty => throw Unmarshaller.NoContentException
       case x => BucketAlreadyExistsException((x \ "Resource").text)
+    }
+
+  implicit val NoSuchBucketExceptionUnmarshaller: FromEntityUnmarshaller[NoSuchBucketException] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x => NoSuchBucketException((x \ "Resource").text)
+    }
+
+  implicit val NoSuchKeyExceptionUnmarshaller: FromEntityUnmarshaller[NoSuchKeyException] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x =>
+        val resource = (x \ "Resource").text.drop(1) // drop starting '/'
+        val indexOfSeparator = resource.indexOf('/')
+        val bucketName = resource.substring(0, indexOfSeparator)
+        val key = resource.substring(indexOfSeparator + 1)
+        NoSuchKeyException(bucketName, key)
     }
 
   /*implicit val v: ToEntityMarshaller[CreateBucketConfiguration] =
@@ -51,6 +67,9 @@ trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
   implicit val NoSuchBucketExceptionMarshallers: ToEntityMarshaller[NoSuchBucketException] =
     xmlResponseMarshallers(`application/octet-stream`)
 
+  implicit val NoSuchKeyExceptionMarshallers: ToEntityMarshaller[NoSuchKeyException] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
   implicit val InvalidNotificationConfigurationExceptionMarshallers: ToEntityMarshaller[InvalidNotificationConfigurationException] =
     xmlResponseMarshallers(`application/octet-stream`)
 
@@ -73,6 +92,9 @@ trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
 
   implicit val NoSuchBucketExceptionResponse: ToResponseMarshaller[NoSuchBucketException] =
     fromToEntityMarshaller[NoSuchBucketException](NotFound)
+
+  implicit val NoSuchKeyExceptionResponse: ToResponseMarshaller[NoSuchKeyException] =
+    fromToEntityMarshaller[NoSuchKeyException](NotFound)
 
   implicit val NoSuchUploadExceptionResponse: ToResponseMarshaller[NoSuchUploadException] =
     fromToEntityMarshaller[NoSuchUploadException](NotFound)

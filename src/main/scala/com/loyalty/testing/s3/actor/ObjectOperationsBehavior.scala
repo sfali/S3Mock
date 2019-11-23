@@ -83,7 +83,9 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
           case Failure(ex) =>
             context.log.error(s"unable to save object: ${objectKey.bucketName}/${objectKey.key}", ex)
             DatabaseError // TODO: retry
-          case Success(objectKey) => ReplyToSender(ObjectInfo(objectKey), replyTo, Some(objectKey))
+          case Success(objectKey) =>
+            // TODO: notify notification router
+            ReplyToSender(ObjectInfo(objectKey), replyTo, Some(objectKey))
         }
         Behaviors.same
 

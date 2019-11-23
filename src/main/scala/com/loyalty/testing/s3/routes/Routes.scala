@@ -4,8 +4,10 @@ import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.util.Timeout
+import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
+import com.loyalty.testing.s3.routes.s3.`object`.PutObjectRoute
 import com.loyalty.testing.s3.routes.s3.bucket.CreateBucketRoute
 
 trait Routes {
@@ -25,6 +27,12 @@ trait Routes {
           bucketRoutes
         } ~ pathEnd {
           bucketRoutes
+        } ~ path(RemainingPath) {
+          key =>
+            val objectName = key.toString().decode
+            concat(
+              PutObjectRoute(bucketName, objectName, objectIO, database)
+            )
         }
     } /* end of bucket segment*/
 }
