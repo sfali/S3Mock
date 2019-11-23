@@ -2,6 +2,7 @@ package com.loyalty.testing.s3.routes
 
 import java.nio.charset.StandardCharsets.UTF_8
 
+import akka.http.scaladsl.marshallers.xml.ScalaXmlSupport
 import akka.http.scaladsl.marshalling.Marshaller.fromToEntityMarshaller
 import akka.http.scaladsl.marshalling.{Marshaller, ToEntityMarshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes._
@@ -13,10 +14,11 @@ import de.heikoseeberger.akkahttpcirce.ErrorAccumulatingCirceSupport
 
 import scala.xml.NodeSeq
 
-trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
+trait CustomMarshallers
+  extends ErrorAccumulatingCirceSupport
+    with ScalaXmlSupport {
 
   import ContentTypes._
-  import akka.http.scaladsl.marshallers.xml.ScalaXmlSupport._
 
   implicit val BucketAlreadyExistsExceptionUnmarshaller: FromEntityUnmarshaller[BucketAlreadyExistsException] =
     nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
@@ -40,14 +42,18 @@ trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
         val key = resource.substring(indexOfSeparator + 1)
         NoSuchKeyException(bucketName, key)
     }
-
-  /*implicit val v: ToEntityMarshaller[CreateBucketConfiguration] =
-    nodeSeqMarshaller(MediaTypes.`application/xml`) map {
-      me =>
-        Marshaller.strict {
-          v => HttpEntity(`text/plain(UTF-8)`, "")
-        }
-    }*/
+  /*
+    implicit def v(implicit system: ActorSystem[_]): Marshaller[NodeSeq, Future[CreateBucketConfiguration]] =
+      nodeSeqMarshaller(MediaTypes.`application/xml`) map {
+        case NodeSeq.Empty => Future.successful(CreateBucketConfiguration())
+        case x =>
+          import system.executionContext
+          x.dataBytes.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).map {
+            s =>
+              println(s">>>>>>>>>>>>>>>>>>>>>>>> $s")
+              CreateBucketConfiguration()
+          }
+      }*/
 
   implicit val InitiateMultipartUploadResultMarshallers: ToEntityMarshaller[InitiateMultipartUploadResult] =
     xmlResponseMarshallers(`application/octet-stream`)

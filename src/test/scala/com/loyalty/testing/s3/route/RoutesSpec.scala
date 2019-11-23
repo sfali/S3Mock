@@ -1,6 +1,6 @@
 package com.loyalty.testing.s3.route
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 import java.time.OffsetDateTime
 
 import akka.actor.typed.ActorSystem
@@ -9,7 +9,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.{HttpEntity, HttpHeader}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
-import akka.stream.scaladsl.FileIO
+import akka.stream.scaladsl.{FileIO, Sink}
 import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.SpawnBehavior
@@ -146,6 +146,34 @@ class RoutesSpec
     Put(s"/$nonExistentBucketName/$key", entity) ~> routes ~> check {
       status mustEqual NotFound
       responseAs[NoSuchBucketException] mustEqual NoSuchBucketException(nonExistentBucketName)
+    }
+  }
+
+  it should "get entire object when range is not specified" in {
+    val key = "sample.txt"
+    val path = resourcePath -> "sample1.txt"
+    val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+    Get(s"/$defaultBucketName/$key") ~> routes ~> check {
+      status mustEqual OK
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest1""""))
+      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest1"))
+      response.entity.contentLengthOption mustBe Some(Files.size(path))
+      val actualContent = response.entity.dataBytes.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+      expectedContent mustEqual actualContent
+    }
+  }
+
+  it should "get object with range between two positions from the start of file" in {
+    val key = "sample.txt"
+    val expectedContent = "1. A quick brown fox jumps over the silly lazy dog.\r\n"
+    val rangeHeader = Range(ByteRange(0, 53))
+    Get(s"/$defaultBucketName/$key").withHeaders(rangeHeader :: Nil) ~> routes ~> check {
+      status mustEqual OK
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest1""""))
+      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest1"))
+      response.entity.contentLengthOption mustBe Some(53)
+      val actualContent = response.entity.dataBytes.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+      expectedContent mustEqual actualContent
     }
   }
 

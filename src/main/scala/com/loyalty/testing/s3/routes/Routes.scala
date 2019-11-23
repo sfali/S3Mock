@@ -7,7 +7,7 @@ import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
-import com.loyalty.testing.s3.routes.s3.`object`.PutObjectRoute
+import com.loyalty.testing.s3.routes.s3.`object`.{GetObjectRoute, PutObjectRoute}
 import com.loyalty.testing.s3.routes.s3.bucket.CreateBucketRoute
 
 trait Routes {
@@ -30,9 +30,11 @@ trait Routes {
         } ~ path(RemainingPath) {
           key =>
             val objectName = key.toString().decode
-            concat(
+            put {
               PutObjectRoute(bucketName, objectName, objectIO, database)
-            )
+            } ~ get {
+              GetObjectRoute(bucketName, objectName, objectIO, database)
+            }
         }
     } /* end of bucket segment*/
 }

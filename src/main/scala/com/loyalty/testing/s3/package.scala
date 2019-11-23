@@ -29,6 +29,7 @@ package object s3 {
 
   val ETAG = "ETag"
   val CONTENT_MD5 = "Content-MD5"
+  val Content_Length = "Content-Length"
 
   private val md = MessageDigest.getInstance("MD5")
 
