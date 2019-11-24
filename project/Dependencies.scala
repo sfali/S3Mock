@@ -40,8 +40,10 @@ object Dependencies {
     val Scalacheck = "scalacheck"
     val ScalaMock = "scalamock"
     val AlpakkaSqs = "akka-stream-alpakka-sqs"
+    val AlpakkaS3 = "akka-stream-alpakka-s3"
     val Sts = "sts"
     val Sqs = "sqs"
+    val S3 = "s3"
     val AkkaStreamsTestKit = "akka-stream-testkit"
     val ActorTestKit = "akka-actor-testkit-typed"
     val ActorTypedTestKit = "akka-actor-testkit-typed"
@@ -54,8 +56,8 @@ object Dependencies {
     val Scala213 = "2.13.1"
     val AkkaVersion = "2.6.0"
     val AkkaHttpVersion = "10.1.10"
-    val LightbendVersion = "1.1.1"
-    val AwsSdk2Version = "2.9.14"
+    val LightbendVersion = "1.1.2"
+    val AwsSdk2Version = "2.10.21"
     val LogbackVersion = "1.2.3"
     val CirceVersion = "0.12.1"
     val EnumeratumVersion = "1.5.13"
@@ -106,11 +108,17 @@ object Dependencies {
     "com.amazonaws"  % "aws-java-sdk-sts"  % "1.11.502"   % IntegrationTest
   )
 
+  val S3IntegrationTesting: Seq[ModuleID] = Seq(
+    Aws             %  Sts                          % AwsSdk2Version,
+    Aws             %  S3                           % AwsSdk2Version   % IntegrationTest,
+    LightbendAkka   %% AlpakkaS3                    % LightbendVersion % IntegrationTest
+      excludeAll (ExclusionRule(organization = Akka), ExclusionRule(organization = Aws))
+  )
+
   val AwsCommon: Seq[ModuleID] = Seq(
     LightbendAkka   %% AlpakkaSqs                   % LightbendVersion
       excludeAll (ExclusionRule(organization = Akka),
       ExclusionRule(organization = Aws)),
-    Aws             %  Sts                          % AwsSdk2Version,
     Aws             %  Sqs                          % AwsSdk2Version
       excludeAll(
       ExclusionRule(organization = Aws, name = "netty-nio-client"),
@@ -133,9 +141,9 @@ object Dependencies {
   )
 
   val CommonTest: Seq[ModuleID] = Seq(
-    OrgScalaTest    %% ScalaTest                    % ScalaTestVersion            % Test,
-    OrgSalacheck    %% Scalacheck                   % ScalacheckVersion           % Test,
-    OrgScalamock    %% ScalaMock                    % ScalamockVersion            % Test
+    OrgScalaTest    %% ScalaTest                    % ScalaTestVersion            % "test, it",
+    OrgSalacheck    %% Scalacheck                   % ScalacheckVersion           % "test, it",
+    OrgScalamock    %% ScalaMock                    % ScalamockVersion            % "test, it"
   )
 
 }

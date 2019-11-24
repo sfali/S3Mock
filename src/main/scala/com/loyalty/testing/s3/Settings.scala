@@ -10,9 +10,9 @@ import com.typesafe.config.Config
 class Settings(config: Config) {
   def this(system: ActorSystem) = this(system.settings.config)
 
-  object http {
-    val host: String = config.getString("app.http.host")
-    val port: Int = config.getInt("app.http.port")
+  val http: HttpSettings = new HttpSettings {
+    override val host: String = config.getString("app.http.host")
+    override val port: Int = config.getInt("app.http.port")
   }
 
   val dbSettings: DBSettings = new DBSettings {

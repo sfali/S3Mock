@@ -42,6 +42,7 @@ trait CustomMarshallers
         val key = resource.substring(indexOfSeparator + 1)
         NoSuchKeyException(bucketName, key)
     }
+
   /*
     implicit def v(implicit system: ActorSystem[_]): Marshaller[NodeSeq, Future[CreateBucketConfiguration]] =
       nodeSeqMarshaller(MediaTypes.`application/xml`) map {

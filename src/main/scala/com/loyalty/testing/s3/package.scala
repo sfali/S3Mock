@@ -259,6 +259,12 @@ package object s3 {
     else throw InvalidNotificationConfigurationException(bucketName,
       s""""$s", must be one of: TopicConfiguration, QueueConfiguration, CloudFunctionConfiguration""")
 
+
+  trait HttpSettings {
+    val host: String
+    val port: Int
+  }
+
   trait DBSettings {
     val fileName: String
     val userName: Option[String] = None
