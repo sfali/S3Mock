@@ -22,7 +22,7 @@ object Main extends HttpApp with App with S3Routes {
 
   private val config = ConfigFactory.load()
   private implicit val system: ActorSystem = ActorSystem(config.getString("app.name"), config)
-  private implicit val settings: Settings = Settings()
+  private implicit val settings: AppSettings = AppSettings()
 
   import system.dispatcher
 

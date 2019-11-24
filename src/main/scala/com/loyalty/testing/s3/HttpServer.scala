@@ -36,6 +36,6 @@ object HttpServer {
   def apply(objectIO: ObjectIO,
             database: NitriteDatabase)
            (implicit spawnSystem: ActorSystem[Command],
-            settings: Settings): HttpServer =
+            settings: AppSettings): HttpServer =
     new HttpServer(settings.http, objectIO, database)
 }

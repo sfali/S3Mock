@@ -15,7 +15,7 @@ class S3Mock(fileStore: FileStore)
   extends S3Routes {
 
   override protected implicit val log: LoggingAdapter = system.log
-  private implicit val settings: Settings = Settings()
+  private implicit val settings: AppSettings = AppSettings()
   override protected val notificationRouter: ActorRef = system.actorOf(NotificationRouter.props(fileStore))
 
   private val http = Http()

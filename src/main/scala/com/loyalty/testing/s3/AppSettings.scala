@@ -7,7 +7,7 @@ import com.amazonaws.services.sns.{AmazonSNSAsync, AmazonSNSAsyncClientBuilder}
 import com.amazonaws.services.sqs.{AmazonSQSAsync, AmazonSQSAsyncClientBuilder}
 import com.typesafe.config.Config
 
-class Settings(config: Config) {
+class AppSettings(config: Config) {
   def this(system: ActorSystem) = this(system.settings.config)
 
   val http: HttpSettings = new HttpSettings {
@@ -88,8 +88,8 @@ class Settings(config: Config) {
 
 }
 
-object Settings {
-  def apply(config: Config): Settings = new Settings(config)
+object AppSettings {
+  def apply(config: Config): AppSettings = new AppSettings(config)
 
-  def apply()(implicit system: ActorSystem): Settings = new Settings(system)
+  def apply()(implicit system: ActorSystem): AppSettings = new AppSettings(system)
 }

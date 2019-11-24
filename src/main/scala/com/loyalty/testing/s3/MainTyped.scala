@@ -19,7 +19,7 @@ object MainTyped extends App {
   private implicit val system: ActorSystem[SpawnBehavior.Command] = ActorSystem(SpawnBehavior(),
     config.getString("app.name"))
   private implicit val dateTimeProvider: DateTimeProvider = DateTimeProvider()
-  private implicit val settings: Settings = Settings(system.settings.config)
+  private implicit val settings: AppSettings = AppSettings(system.settings.config)
   implicit val timeout: Timeout = Timeout(3.seconds)
 
   private val root = Paths.get(System.getProperty("user.dir"), ".s3mock")

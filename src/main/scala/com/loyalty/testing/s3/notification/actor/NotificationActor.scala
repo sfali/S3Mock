@@ -3,7 +3,7 @@ package com.loyalty.testing.s3.notification.actor
 import akka.actor.{Actor, ActorLogging, Props}
 import com.amazonaws.services.sns.AmazonSNSAsync
 import com.amazonaws.services.sqs.AmazonSQSAsync
-import com.loyalty.testing.s3.Settings
+import com.loyalty.testing.s3.AppSettings
 import com.loyalty.testing.s3.notification.{NotificationData, NotificationMeta}
 
 import scala.concurrent.duration._
@@ -43,7 +43,7 @@ class NotificationActor(sqsClient: AmazonSQSAsync, snsClient: AmazonSNSAsync) ex
 
 object NotificationActor {
 
-  def props()(implicit settings: Settings): Props =
+  def props()(implicit settings: AppSettings): Props =
     Props(new NotificationActor(settings.sqs.sqsClient, settings.sns.snsClient))
 
   case class SqsNotification(notificationMeta: NotificationMeta, notificationData: NotificationData)

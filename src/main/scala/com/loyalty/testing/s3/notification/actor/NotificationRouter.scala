@@ -2,14 +2,14 @@ package com.loyalty.testing.s3.notification.actor
 
 import akka.actor.{Actor, ActorContext, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
-import com.loyalty.testing.s3.Settings
+import com.loyalty.testing.s3.AppSettings
 import com.loyalty.testing.s3.notification.{DestinationType, NotificationData, NotificationMeta}
 import com.loyalty.testing.s3.repositories.FileStore
 
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 
-class NotificationRouter(fileStore: FileStore)(implicit settings: Settings)
+class NotificationRouter(fileStore: FileStore)(implicit settings: AppSettings)
   extends Actor
     with ActorLogging {
 
@@ -81,14 +81,14 @@ class NotificationRouter(fileStore: FileStore)(implicit settings: Settings)
 object NotificationRouter {
 
   def props(fileStore: FileStore)
-           (implicit settings: Settings): Props = Props(new NotificationRouter(fileStore))
+           (implicit settings: AppSettings): Props = Props(new NotificationRouter(fileStore))
 
   case class SendNotification(notificationData: NotificationData)
 
   private case class SendNotificationToDestination(notificationMeta: NotificationMeta,
                                                    notificationData: NotificationData)
 
-  private class RouterState(context: ActorContext)(implicit settings: Settings) {
+  private class RouterState(context: ActorContext)(implicit settings: AppSettings) {
     private var _router: Router = {
       val routees = Vector.fill(5) {
         val r = context.actorOf(NotificationActor.props())
