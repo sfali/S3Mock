@@ -11,9 +11,9 @@ import com.loyalty.testing.s3.notification.Notification
 
 import scala.jdk.CollectionConverters._
 
-class AwsClient(awsSettings: AwsSettings) {
+class AwsClientOld(awsSettings: AwsSettings) {
 
-  import AwsClient._
+  import AwsClientOld._
 
   private val ChunkSize = 5 * 1024 * 1024
 
@@ -149,10 +149,10 @@ class AwsClient(awsSettings: AwsSettings) {
 
 }
 
-object AwsClient {
-  def apply(awsSettings: AwsSettings): AwsClient = new AwsClient(awsSettings)
+object AwsClientOld {
+  def apply(awsSettings: AwsSettings): AwsClientOld = new AwsClientOld(awsSettings)
 
-  def apply()(implicit settings: Settings): AwsClient = AwsClient(settings.aws)
+  def apply()(implicit settings: Settings): AwsClientOld = AwsClientOld(settings.aws)
 
   private case class CopyPartition(partNumber: Int, firstByte: Long, lastByte: Long)
 

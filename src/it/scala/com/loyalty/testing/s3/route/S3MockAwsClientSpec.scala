@@ -9,7 +9,7 @@ import com.amazonaws.client.builder.AwsClientBuilder
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.amazonaws.util.IOUtils
-import com.loyalty.testing.s3.it.client.AwsClient
+import com.loyalty.testing.s3.it.client.AwsClientOld
 import com.loyalty.testing.s3.it.{AwsSettings, S3Settings}
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.{FileRepository, FileStore}
@@ -37,7 +37,7 @@ class S3MockAwsClientSpec
   private val root: Path = Paths.get(System.getProperty("user.dir"), "tmp", "s3mock")
   private val fileStore: FileStore = FileStore(root)
   private implicit val repository: FileRepository = FileRepository(fileStore, log)
-  private val s3Client = AwsClient(S3MockAwsClientSpec.AwsSettingsImpl)
+  private val s3Client = AwsClientOld(S3MockAwsClientSpec.AwsSettingsImpl)
 
   private val defaultBucketName = "data-transfer"
   private val s3Mock = S3Mock(fileStore)
