@@ -5,22 +5,13 @@ import com.amazonaws.auth._
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.services.sns.{AmazonSNSAsync, AmazonSNSAsyncClientBuilder}
 import com.amazonaws.services.sqs.{AmazonSQSAsync, AmazonSQSAsyncClientBuilder}
+import com.loyalty.testing.s3.settings.Settings
 import com.typesafe.config.Config
 
-class AppSettings(config: Config) {
+class AppSettings(override protected val config: Config) extends Settings {
   def this(system: ActorSystem) = this(system.settings.config)
 
-  val http: HttpSettings = new HttpSettings {
-    override val host: String = config.getString("app.http.host")
-    override val port: Int = config.getInt("app.http.port")
-  }
-
-  val dbSettings: DBSettings = new DBSettings {
-    override val fileName: String = config.getString("app.db.file-name")
-    override val userName: Option[String] = getOptionalString("app.db-user-name")
-    override val password: Option[String] = getOptionalString("app.db-password")
-  }
-
+  @deprecated
   object aws {
     val region: String = config.getString("app.aws.region")
     val credentialsProvider: AWSCredentialsProvider = {
@@ -43,6 +34,7 @@ class AppSettings(config: Config) {
     }
   }
 
+  @deprecated
   object sqs extends SqsSettings {
     private val builder =
       AmazonSQSAsyncClientBuilder
@@ -56,6 +48,7 @@ class AppSettings(config: Config) {
         .build()
   }
 
+  @deprecated
   object sns extends SnsSettings {
     private val builder =
       AmazonSNSAsyncClientBuilder
@@ -67,17 +60,6 @@ class AppSettings(config: Config) {
         .map(builder.withEndpointConfiguration)
         .getOrElse(builder)
         .build()
-  }
-
-  private def getOptionalString(keyPath: String): Option[String] = {
-    val maybeValue =
-      if (config.hasPath(keyPath)) Some(config.getString(keyPath))
-      else None
-
-    maybeValue match {
-      case Some(value) => if (value.trim.nonEmpty) Some(value.trim) else None
-      case None => None
-    }
   }
 
   private def getOptionalEndpointConfiguration(keyPath: String): Option[EndpointConfiguration] = {

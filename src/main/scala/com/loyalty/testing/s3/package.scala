@@ -1,6 +1,6 @@
 package com.loyalty.testing
 
-import java.net.{URLDecoder, URLEncoder}
+import java.net.{URI, URLDecoder, URLEncoder}
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.{Files, Path, Paths}
 import java.security.MessageDigest
@@ -14,9 +14,13 @@ import com.amazonaws.services.sqs.AmazonSQSAsync
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.request.UploadPart
 import com.loyalty.testing.s3.response.{CompleteMultipartUploadResult, InvalidNotificationConfigurationException, PutObjectResult}
+import com.typesafe.config.Config
 import javax.xml.bind.DatatypeConverter
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
+import software.amazon.awssdk.regions.Region
 
 import scala.concurrent.Future
+import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 import scala.xml.{Node, NodeSeq}
 
 package object s3 {
@@ -265,6 +269,14 @@ package object s3 {
     val port: Int
   }
 
+  trait AwsSettings {
+    val region: Region
+    val credentialsProvider: AwsCredentialsProvider
+    val sqsEndPoint: Option[URI]
+    val s3EndPoint: Option[URI]
+    val snsEndPoint: Option[URI]
+  }
+
   trait DBSettings {
     val fileName: String
     val userName: Option[String] = None
@@ -275,6 +287,28 @@ package object s3 {
 
   implicit class IntOps(src: Int) {
     def toVersionId: String = toBase16(src.toString.toUUID.toString)
+  }
+
+  implicit class ConfigOps(src: Config) {
+    def getOptionalString(keyPath: String): Option[String] = {
+      val maybeValue =
+        if (src.hasPath(keyPath)) Some(src.getString(keyPath))
+        else None
+
+      maybeValue match {
+        case Some(value) => if (value.trim.nonEmpty) Some(value.trim) else None
+        case None => None
+      }
+    }
+
+    def getOptionalUri(path: String): Option[URI] = {
+      if (src.hasPath(path)) {
+        val endPoint = src.getString(path)
+        if (endPoint.isEmpty) None else Some(new URI(endPoint))
+      } else None
+    }
+
+    def getFiniteDuration(path: String): FiniteDuration = FiniteDuration(src.getDuration(path).toMillis, MILLISECONDS)
   }
 
 }
