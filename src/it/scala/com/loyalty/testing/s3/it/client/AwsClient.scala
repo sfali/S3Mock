@@ -5,7 +5,11 @@ import com.loyalty.testing.s3.it.ITSettings
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.BucketVersioning
 import com.loyalty.testing.s3.response.BucketAlreadyExistsException
-import software.amazon.awssdk.services.s3.model.{CreateBucketConfiguration, CreateBucketRequest, BucketAlreadyExistsException => AwsBucketAlreadyExistsException}
+import software.amazon.awssdk.services.s3.model.{
+  CreateBucketConfiguration, //
+  CreateBucketRequest, //
+  BucketAlreadyExistsException => AwsBucketAlreadyExistsException
+}
 import software.amazon.awssdk.services.s3.{S3Configuration, S3Client => AwsS3Client}
 
 import scala.concurrent.Future
@@ -17,6 +21,7 @@ class AwsClient(override protected val awsSettings: AwsSettings) extends S3Clien
     .builder()
     .region(awsSettings.region)
     .credentialsProvider(awsSettings.credentialsProvider)
+    .endpointOverride(awsSettings.s3EndPoint.get)
     .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
     .build()
 
