@@ -20,10 +20,11 @@ trait Routes {
   lazy val routes: Route =
     pathPrefix(Segment) {
       bucketName =>
-        val bucketRoutes = concat(
-          SetBucketVersioningRoute(bucketName, objectIO, database),
-          CreateBucketRoute(bucketName, objectIO, database)
-        )
+        val bucketRoutes =
+          concat(
+            SetBucketVersioningRoute(bucketName, objectIO, database),
+            CreateBucketRoute(bucketName, objectIO, database)
+          )
         pathSingleSlash {
           bucketRoutes
         } ~ pathEnd {
