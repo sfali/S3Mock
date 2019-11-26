@@ -10,12 +10,11 @@ import akka.actor.typed.ActorSystem
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.SpawnBehavior
 import com.loyalty.testing.s3.it.client.S3Client
-import com.loyalty.testing.s3.repositories.model.Bucket
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
+import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
+import com.loyalty.testing.s3.repositories._
 import com.loyalty.testing.s3.request.BucketVersioning
 import com.loyalty.testing.s3.response.BucketAlreadyExistsException
 import com.loyalty.testing.s3.streams.FileStream
-import com.loyalty.testing.s3.utils.StaticDateTimeProvider
 import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
@@ -37,7 +36,6 @@ abstract class S3IntegrationSpec(rootPath: Path,
   private val config = ConfigFactory.load(resourceBasename)
   protected implicit val system: ActorSystem[SpawnBehavior.Command] = ActorSystem(SpawnBehavior(),
     config.getString("app.name"), config)
-  private implicit val dateTimeProvider: StaticDateTimeProvider = StaticDateTimeProvider()
   protected implicit val settings: ITSettings = ITSettings(system.settings.config)
   private implicit val defaultPatience: PatienceConfig = PatienceConfig(timeout = Span(15, Seconds),
     interval = Span(500, Millis))
@@ -79,6 +77,26 @@ abstract class S3IntegrationSpec(rootPath: Path,
     s3Client.setBucketVersioning(versionedBucketName, BucketVersioningStatus.ENABLED).futureValue mustEqual Done
   }
 
+  it should "put an object in the specified non-version bucket" in {
+    val key = "sample.txt"
+    val path = resourcePath -> key
+    val contentLength = Files.size(path)
+    val actualObjectKey = s3Client.putObject(defaultBucketName, key, md5Digest, path).futureValue
+    val expectedObjectKey = ObjectKey(
+      id = defaultBucketName.toUUID,
+      bucketName = defaultBucketName,
+      key = key,
+      index = 0,
+      version = BucketVersioning.NotExists,
+      versionId = NonVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = contentLength,
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+    expectedObjectKey mustEqual actualObjectKey
+  }
+
   private def clean(rootPath: Path): Path =
     Files.walkFileTree(rootPath, new SimpleFileVisitor[Path] {
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
@@ -94,12 +112,12 @@ abstract class S3IntegrationSpec(rootPath: Path,
 }
 
 object S3IntegrationSpec {
-  // private val resourcePath = Paths.get("src", "it", "resources")
+  private val resourcePath = Paths.get("src", "it", "resources")
   private val defaultBucketName = "non-versioned-bucket"
   private val versionedBucketName = "versioned-bucket"
-  /*private val nonExistentBucketName = "dummy"
+  //private val nonExistentBucketName = "dummy"
   private val etagDigest = "6b4bb2a848f1fac797e320d7b9030f3e"
   private val md5Digest = "a0uyqEjx+seX4yDXuQMPPg=="
-  private val etagDigest1 = "84043a46fafcdc5451db399625915436"
+  /*private val etagDigest1 = "84043a46fafcdc5451db399625915436"
   private val md5Digest1 = "hAQ6Rvr83FRR2zmWJZFUNg=="*/
 }

@@ -1,9 +1,11 @@
 package com.loyalty.testing.s3.it.client
 
+import java.nio.file.{Files, Path}
+
 import akka.Done
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.it.ITSettings
-import com.loyalty.testing.s3.repositories.model.Bucket
+import com.loyalty.testing.s3.it._
+import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
 import com.loyalty.testing.s3.request.BucketVersioning
 import com.loyalty.testing.s3.response.{BucketAlreadyExistsException, NoSuchBucketException}
 import software.amazon.awssdk.regions.Region
@@ -49,6 +51,38 @@ class AwsClient(override protected val awsSettings: AwsSettings) extends S3Clien
       case Failure(_: AwsNoSuchBucketException) => Future.failed(NoSuchBucketException(bucketName))
       case Failure(ex) => Future.failed(ex)
       case Success(_) => Future.successful(Done)
+    }
+  }
+
+  override def putObject(bucketName: String,
+                         key: String,
+                         contentMd5: String,
+                         filePath: Path): Future[ObjectKey] = {
+    val contentLength = Files.size(filePath)
+    val request = PutObjectRequest
+      .builder()
+      .bucket(bucketName)
+      .key(key)
+      .contentLength(contentLength)
+      .contentMD5(contentMd5)
+      .build()
+    Try(s3Client.putObject(request, filePath)) match {
+      case Failure(_: AwsNoSuchBucketException) => Future.failed(NoSuchBucketException(bucketName))
+      case Failure(ex) => Future.failed(ex)
+      case Success(response) =>
+        val objectKey = ObjectKey(
+          id = bucketName.toUUID,
+          bucketName = bucketName,
+          key = key,
+          index = 0,
+          version = BucketVersioning.NotExists,
+          versionId = response.versionId(),
+          eTag = response.eTag(),
+          contentMd5 = contentMd5,
+          contentLength = contentLength,
+          lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+        )
+        Future.successful(objectKey)
     }
   }
 }

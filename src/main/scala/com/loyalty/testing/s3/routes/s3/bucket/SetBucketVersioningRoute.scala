@@ -24,7 +24,7 @@ object SetBucketVersioningRoute extends CustomMarshallers {
             database: NitriteDatabase)
            (implicit system: ActorSystem[Command],
             timeout: Timeout): Route =
-    (put & extractRequest & parameter('versioning)) {
+    (put & extractRequest & parameter("versioning")) {
       (request, _) =>
         import system.executionContext
 
