@@ -26,6 +26,6 @@ object MainTyped extends App {
   system.log.info("Root path of S3: {}", root.toAbsolutePath)
 
   private val objectIO = ObjectIO(root, FileStream())
-  private val database = NitriteDatabase(root, settings.dbSettings)
+  private val database = NitriteDatabase(root)
 
 }

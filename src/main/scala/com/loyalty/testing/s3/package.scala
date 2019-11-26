@@ -269,6 +269,13 @@ package object s3 {
     val port: Int
   }
 
+  object HttpSettings {
+    def apply(config: Config): HttpSettings = new HttpSettings {
+      override val host: String = config.getString("app.http.host")
+      override val port: Int = config.getInt("app.http.port")
+    }
+  }
+
   trait AwsSettings {
     val region: Region
     val credentialsProvider: AwsCredentialsProvider
@@ -281,6 +288,14 @@ package object s3 {
     val fileName: String
     val userName: Option[String] = None
     val password: Option[String] = None
+  }
+
+  object DBSettings {
+    def apply(config: Config): DBSettings = new DBSettings {
+      override val fileName: String = config.getString("app.db.file-name")
+      override val userName: Option[String] = config.getOptionalString("app.db-user-name")
+      override val password: Option[String] = config.getOptionalString("app.db-password")
+    }
   }
 
   def createObjectId(bucketName: String, key: String): UUID = s"$bucketName-$key".toUUID

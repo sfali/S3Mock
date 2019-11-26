@@ -11,10 +11,7 @@ trait Settings {
 
   protected val config: Config
 
-  val http: HttpSettings = new HttpSettings {
-    override val host: String = config.getString("app.http.host")
-    override val port: Int = config.getInt("app.http.port")
-  }
+  val http: HttpSettings = HttpSettings(config)
 
   val awsSettings: AwsSettings = new AwsSettings {
     override val region: Region = Region.of(config.getString("app.aws.region"))
@@ -41,10 +38,6 @@ trait Settings {
     override val snsEndPoint: Option[URI] = config.getOptionalUri("app.aws.sns.end-point")
   }
 
-  val dbSettings: DBSettings = new DBSettings {
-    override val fileName: String = config.getString("app.db.file-name")
-    override val userName: Option[String] = config.getOptionalString("app.db-user-name")
-    override val password: Option[String] = config.getOptionalString("app.db-password")
-  }
+  val dbSettings: DBSettings = DBSettings(config)
 
 }

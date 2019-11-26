@@ -11,6 +11,7 @@ import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.collections.{BucketCollection, NotificationCollection, ObjectCollection}
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
 import com.loyalty.testing.s3.request.VersioningConfiguration
+import com.loyalty.testing.s3.settings.Settings
 import com.loyalty.testing.s3.utils.DateTimeProvider
 import org.dizitart.no2.Nitrite
 
@@ -79,6 +80,10 @@ class NitriteDatabase(rootPath: Path,
 object NitriteDatabase {
   def apply(rootPath: Path, dbSettings: DBSettings)
            (implicit system: ActorSystem[Nothing],
-            dateTimeProvider: DateTimeProvider): NitriteDatabase =
-    new NitriteDatabase(rootPath, dbSettings)
+            dateTimeProvider: DateTimeProvider): NitriteDatabase = new NitriteDatabase(rootPath, dbSettings)
+
+  def apply(rootPath: Path)
+           (implicit system: ActorSystem[Nothing],
+            dateTimeProvider: DateTimeProvider,
+            settings: Settings): NitriteDatabase = NitriteDatabase(rootPath, settings.dbSettings)
 }

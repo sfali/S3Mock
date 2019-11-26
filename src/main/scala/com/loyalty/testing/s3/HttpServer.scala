@@ -9,6 +9,7 @@ import akka.util.Timeout
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.routes.Routes
+import com.loyalty.testing.s3.settings.Settings
 
 import scala.concurrent.duration._
 import scala.util.Try
@@ -27,7 +28,7 @@ class HttpServer(settings: HttpSettings,
 
   override protected def postServerShutdown(attempt: Try[Done], system: ClassicActorSystem): Unit = {
     super.postServerShutdown(attempt, system)
-    database.close()
+    Try(database.close()).toOption
     system.terminate()
   }
 }
@@ -36,6 +37,6 @@ object HttpServer {
   def apply(objectIO: ObjectIO,
             database: NitriteDatabase)
            (implicit spawnSystem: ActorSystem[Command],
-            settings: AppSettings): HttpServer =
+            settings: Settings): HttpServer =
     new HttpServer(settings.http, objectIO, database)
 }

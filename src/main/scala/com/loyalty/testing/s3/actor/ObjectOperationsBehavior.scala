@@ -3,7 +3,7 @@ package com.loyalty.testing.s3.actor
 import java.util.UUID
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
+import akka.actor.typed.{ActorRef, Behavior}
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
@@ -25,7 +25,6 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
 
   import ObjectOperationsBehavior._
 
-  private implicit val system: ActorSystem[Nothing] = context.system
   private var versionIndex = 0
   private var objects: List[ObjectKey] = Nil
   private val objectId = UUID.fromString(context.self.path.name)
