@@ -5,11 +5,8 @@ import com.loyalty.testing.s3.it.ITSettings
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.BucketVersioning
 import com.loyalty.testing.s3.response.BucketAlreadyExistsException
-import software.amazon.awssdk.services.s3.model.{
-  CreateBucketConfiguration, //
-  CreateBucketRequest, //
-  BucketAlreadyExistsException => AwsBucketAlreadyExistsException
-}
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.model.{CreateBucketConfiguration, CreateBucketRequest, BucketAlreadyExistsException => AwsBucketAlreadyExistsException}
 import software.amazon.awssdk.services.s3.{S3Configuration, S3Client => AwsS3Client}
 
 import scala.concurrent.Future
@@ -25,20 +22,22 @@ class AwsClient(override protected val awsSettings: AwsSettings) extends S3Clien
     .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
     .build()
 
-  override def createBucket(bucketName: String, region: Option[String]): Future[Bucket] = {
+  override def createBucket(bucketName: String, region: Option[Region]): Future[Bucket] = {
     val requestBuilder = CreateBucketRequest.builder().bucket(bucketName)
     val request =
       region match {
         case Some(value) =>
-          val c = CreateBucketConfiguration.builder().locationConstraint(value).build()
+          val c = CreateBucketConfiguration.builder().locationConstraint(value.id()).build()
           requestBuilder.createBucketConfiguration(c).build()
         case None => requestBuilder.build()
       }
     Try(s3Client.createBucket(request)) match {
       case Failure(_: AwsBucketAlreadyExistsException) => Future.failed(BucketAlreadyExistsException(bucketName))
       case Failure(ex) => Future.failed(ex)
-      case Success(_) => Future.successful(Bucket(bucketName, region.getOrElse(defaultRegion),
-        BucketVersioning.NotExists))
+      case Success(resp) =>
+        val location = resp.location().drop(1)
+        Future.successful(Bucket(location, region.map(_.id()).getOrElse(defaultRegion),
+          BucketVersioning.NotExists))
     }
   }
 }

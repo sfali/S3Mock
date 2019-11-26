@@ -25,17 +25,18 @@ object CreateBucketRoute extends CustomMarshallers {
             database: NitriteDatabase)
            (implicit system: ActorSystem[Command],
             timeout: Timeout): Route =
-    (put & entity(as[Option[String]])) { maybeXml =>
+    (put & extractRequest) { request =>
       import system.executionContext
-      val bucketConfiguration: CreateBucketConfiguration = CreateBucketConfiguration(maybeXml)
-      system.log.info("Got request to create bucket {} with bucket configuration {}", bucketName, bucketConfiguration)
 
-      val bucket = Bucket(bucketName, bucketConfiguration, BucketVersioning.NotExists)
       val eventualEvent =
-        for {
-          actorRef <- spawnBucketBehavior(bucketName, objectIO, database)
-          event <- askBucketBehavior(actorRef, replyTo => CreateBucket(bucket, replyTo))
-        } yield event
+        extractRequestTo(request)
+          .map(CreateBucketConfiguration.apply)
+          .map {
+            bucketConfiguration =>
+              system.log.info("Got request to create bucket {} with bucket configuration {}", bucketName, bucketConfiguration)
+              Bucket(bucketName, bucketConfiguration, BucketVersioning.NotExists)
+          }
+          .flatMap(execute(objectIO, database))
 
       onComplete(eventualEvent) {
         case Success(BucketInfo(bucket)) =>
@@ -49,4 +50,17 @@ object CreateBucketRoute extends CustomMarshallers {
           complete(InternalServiceException(bucketName))
       }
     }
+
+  private def execute(objectIO: ObjectIO,
+                      database: NitriteDatabase)
+                     (bucket: Bucket)
+                     (implicit system: ActorSystem[Command],
+                      timeout: Timeout) = {
+    import system.executionContext
+    for {
+      actorRef <- spawnBucketBehavior(bucket.bucketName, objectIO, database)
+      event <- askBucketBehavior(actorRef, replyTo => CreateBucket(bucket, replyTo))
+    } yield event
+  }
+
 }

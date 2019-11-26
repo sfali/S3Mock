@@ -4,6 +4,7 @@ import akka.actor.typed.ActorSystem
 import com.loyalty.testing.s3.AwsSettings
 import com.loyalty.testing.s3.it.ITSettings
 import com.loyalty.testing.s3.repositories.model.Bucket
+import software.amazon.awssdk.regions.Region
 
 import scala.concurrent.Future
 
@@ -12,8 +13,8 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
 
   private val awsClient = AwsClient(awsSettings)
 
-  override def createBucket(bucketName: String,
-                            region: Option[String]): Future[Bucket] = awsClient.createBucket(bucketName, region)
+  override def createBucket(bucketName: String, region: Option[Region]): Future[Bucket] =
+    awsClient.createBucket(bucketName, region)
 }
 
 object AlpakkaClient {

@@ -2,8 +2,10 @@ package com.loyalty.testing.s3.routes
 
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.{ActorRef, ActorSystem}
-import akka.http.scaladsl.model.HttpHeader
 import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.model.{HttpHeader, HttpRequest}
+import akka.stream.Materializer
+import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.BucketOperationsBehavior.BucketProtocol
@@ -43,4 +45,17 @@ package object s3 {
     case h: Range => h.ranges.headOption
     case _ => None
   }
+
+  def extractRequestTo(request: HttpRequest)
+                      (implicit mat: Materializer): Future[Option[String]] = {
+    import mat.executionContext
+    request
+      .entity
+      .dataBytes
+      .map(_.utf8String)
+      .runWith(Sink.seq)
+      .map(_.mkString(""))
+      .map(s => if (s.isEmpty) None else Some(s))
+  }
+
 }

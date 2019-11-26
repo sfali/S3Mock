@@ -21,6 +21,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Millis, Seconds, Span}
+import software.amazon.awssdk.regions.Region
 
 abstract class S3IntegrationSpec(rootPath: Path,
                                  resourceBasename: String)
@@ -66,6 +67,12 @@ abstract class S3IntegrationSpec(rootPath: Path,
     s3Client.createBucket(defaultBucketName).failed.futureValue mustEqual BucketAlreadyExistsException(defaultBucketName)
   }
 
+  it should "create bucket with region provided" in {
+    val region = Region.US_WEST_1
+    val bucket = s3Client.createBucket(versionedBucketName, Some(region)).futureValue
+    bucket mustEqual Bucket(versionedBucketName, region.id(), BucketVersioning.NotExists)
+  }
+
   private def clean(rootPath: Path): Path =
     Files.walkFileTree(rootPath, new SimpleFileVisitor[Path] {
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
@@ -81,9 +88,9 @@ abstract class S3IntegrationSpec(rootPath: Path,
 }
 
 object S3IntegrationSpec {
-  private val resourcePath = Paths.get("src", "it", "resources")
+  // private val resourcePath = Paths.get("src", "it", "resources")
   private val defaultBucketName = "non-versioned-bucket"
-  //private val versionedBucketName = "versioned-bucket"
+  private val versionedBucketName = "versioned-bucket"
   /*private val nonExistentBucketName = "dummy"
   private val etagDigest = "6b4bb2a848f1fac797e320d7b9030f3e"
   private val md5Digest = "a0uyqEjx+seX4yDXuQMPPg=="
