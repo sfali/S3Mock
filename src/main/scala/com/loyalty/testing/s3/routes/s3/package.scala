@@ -53,8 +53,7 @@ package object s3 {
       .entity
       .dataBytes
       .map(_.utf8String)
-      .runWith(Sink.seq)
-      .map(_.mkString(""))
+      .runWith(Sink.head)
       .map(s => if (s.isEmpty) None else Some(s))
   }
 
