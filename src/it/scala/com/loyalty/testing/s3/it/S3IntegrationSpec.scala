@@ -10,10 +10,9 @@ import akka.actor.typed.ActorSystem
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.SpawnBehavior
 import com.loyalty.testing.s3.it.client.S3Client
-import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
 import com.loyalty.testing.s3.repositories._
+import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
 import com.loyalty.testing.s3.request.BucketVersioning
-import com.loyalty.testing.s3.response.BucketAlreadyExistsException
 import com.loyalty.testing.s3.streams.FileStream
 import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterAll
@@ -22,7 +21,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Millis, Seconds, Span}
 import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.model.BucketVersioningStatus
+import software.amazon.awssdk.services.s3.model.{BucketVersioningStatus, S3Exception}
 
 abstract class S3IntegrationSpec(rootPath: Path,
                                  resourceBasename: String)
@@ -63,8 +62,9 @@ abstract class S3IntegrationSpec(rootPath: Path,
     bucket mustEqual Bucket(defaultBucketName, defaultRegion, BucketVersioning.NotExists)
   }
 
-  it should "send 404(BadRequest) if attempt to create bucket, which is already exists" in {
-    s3Client.createBucket(defaultBucketName).failed.futureValue mustEqual BucketAlreadyExistsException(defaultBucketName)
+  it should "get `BucketAlreadyExists` if attempt to create bucket, which is already exists" in {
+    val ex = s3Client.createBucket(defaultBucketName).failed.futureValue
+    extractErrorResponse(ex) mustEqual AwsError(400, "The specified bucket already exist", "BucketAlreadyExists")
   }
 
   it should "create bucket with region provided" in {
@@ -75,6 +75,11 @@ abstract class S3IntegrationSpec(rootPath: Path,
 
   it should "set versioning on the bucket" in {
     s3Client.setBucketVersioning(versionedBucketName, BucketVersioningStatus.ENABLED).futureValue mustEqual Done
+  }
+
+  it should "get NoSuchBucket if attempt to set bucket versioning, which does not exist" in {
+    val ex = s3Client.setBucketVersioning(nonExistentBucketName, BucketVersioningStatus.ENABLED).failed.futureValue
+    extractErrorResponse(ex) mustEqual AwsError(404, "The specified bucket does not exist", "NoSuchBucket")
   }
 
   it should "put an object in the specified non-version bucket" in {
@@ -109,15 +114,30 @@ abstract class S3IntegrationSpec(rootPath: Path,
         FileVisitResult.CONTINUE
       }
     })
+
+  private def extractErrorResponse(ex: Throwable) = {
+    ex match {
+      case e@(_: S3Exception) =>
+        val details = e.awsErrorDetails()
+        AwsError(e.statusCode(), details.errorMessage(), details.errorCode())
+      case _ =>
+        ex.printStackTrace()
+        AwsError(503, ex.getMessage, "Unknown")
+    }
+  }
 }
 
 object S3IntegrationSpec {
   private val resourcePath = Paths.get("src", "it", "resources")
   private val defaultBucketName = "non-versioned-bucket"
   private val versionedBucketName = "versioned-bucket"
-  //private val nonExistentBucketName = "dummy"
+  private val nonExistentBucketName = "dummy"
   private val etagDigest = "6b4bb2a848f1fac797e320d7b9030f3e"
   private val md5Digest = "a0uyqEjx+seX4yDXuQMPPg=="
+
   /*private val etagDigest1 = "84043a46fafcdc5451db399625915436"
   private val md5Digest1 = "hAQ6Rvr83FRR2zmWJZFUNg=="*/
+
+  case class AwsError(statusCode: Int, message: String, errorCode: String)
+
 }

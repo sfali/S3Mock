@@ -7,9 +7,8 @@ import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.it._
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
 import com.loyalty.testing.s3.request.BucketVersioning
-import com.loyalty.testing.s3.response.{BucketAlreadyExistsException, NoSuchBucketException}
 import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.model.{BucketAlreadyExistsException => AwsBucketAlreadyExistsException, NoSuchBucketException => AwsNoSuchBucketException, _}
+import software.amazon.awssdk.services.s3.model._
 import software.amazon.awssdk.services.s3.{S3Configuration, S3Client => AwsS3Client}
 
 import scala.concurrent.Future
@@ -35,7 +34,6 @@ class AwsClient(override protected val awsSettings: AwsSettings) extends S3Clien
         case None => requestBuilder.build()
       }
     Try(s3Client.createBucket(request)) match {
-      case Failure(_: AwsBucketAlreadyExistsException) => Future.failed(BucketAlreadyExistsException(bucketName))
       case Failure(ex) => Future.failed(ex)
       case Success(resp) =>
         val location = resp.location().drop(1)
@@ -48,7 +46,6 @@ class AwsClient(override protected val awsSettings: AwsSettings) extends S3Clien
     val vc = VersioningConfiguration.builder().status(status).build()
     val request = PutBucketVersioningRequest.builder().bucket(bucketName).versioningConfiguration(vc).build()
     Try(s3Client.putBucketVersioning(request)) match {
-      case Failure(_: AwsNoSuchBucketException) => Future.failed(NoSuchBucketException(bucketName))
       case Failure(ex) => Future.failed(ex)
       case Success(_) => Future.successful(Done)
     }
@@ -67,7 +64,6 @@ class AwsClient(override protected val awsSettings: AwsSettings) extends S3Clien
       .contentMD5(contentMd5)
       .build()
     Try(s3Client.putObject(request, filePath)) match {
-      case Failure(_: AwsNoSuchBucketException) => Future.failed(NoSuchBucketException(bucketName))
       case Failure(ex) => Future.failed(ex)
       case Success(response) =>
         val objectKey = ObjectKey(

@@ -9,10 +9,10 @@ import akka.http.scaladsl.server.Route
 import akka.util.Timeout
 import com.loyalty.testing.s3.actor.BucketOperationsBehavior._
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
-import com.loyalty.testing.s3.actor.{BucketInfo, Event}
+import com.loyalty.testing.s3.actor.{BucketInfo, Event, NoSuchBucketExists}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.VersioningConfiguration
-import com.loyalty.testing.s3.response.InternalServiceException
+import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
 
@@ -35,6 +35,7 @@ object SetBucketVersioningRoute extends CustomMarshallers {
         onComplete(eventualEvent) {
           case Success(BucketInfo(bucket)) =>
             complete(HttpResponse(OK).withHeaders(Location(s"/${bucket.bucketName}")))
+          case Success(NoSuchBucketExists) => complete(NoSuchBucketException(bucketName))
           case Success(event: Event) =>
             system.log.warn("SetBucketVersioningRoute: invalid event received. event={}, bucket_name={}", event, bucketName)
             complete(InternalServiceException(bucketName))
@@ -51,6 +52,8 @@ object SetBucketVersioningRoute extends CustomMarshallers {
                      (implicit system: ActorSystem[Command],
                       timeout: Timeout) = {
     import system.executionContext
+
+    system.log.info("Setting bucket versioning: {} on bucket: {}", maybeVersioningConfiguration, bucketName)
     for {
       actorRef <- spawnBucketBehavior(bucketName, objectIO, database)
       event <- askBucketBehavior(actorRef, replyTo => SetBucketVersioning(maybeVersioningConfiguration.get,
