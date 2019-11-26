@@ -5,6 +5,7 @@ import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 import java.time.OffsetDateTime
 
+import akka.Done
 import akka.actor.typed.ActorSystem
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.SpawnBehavior
@@ -22,6 +23,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Millis, Seconds, Span}
 import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.model.BucketVersioningStatus
 
 abstract class S3IntegrationSpec(rootPath: Path,
                                  resourceBasename: String)
@@ -71,6 +73,10 @@ abstract class S3IntegrationSpec(rootPath: Path,
     val region = Region.US_WEST_1
     val bucket = s3Client.createBucket(versionedBucketName, Some(region)).futureValue
     bucket mustEqual Bucket(versionedBucketName, region.id(), BucketVersioning.NotExists)
+  }
+
+  it should "set versioning on the bucket" in {
+    s3Client.setBucketVersioning(versionedBucketName, BucketVersioningStatus.ENABLED).futureValue mustEqual Done
   }
 
   private def clean(rootPath: Path): Path =

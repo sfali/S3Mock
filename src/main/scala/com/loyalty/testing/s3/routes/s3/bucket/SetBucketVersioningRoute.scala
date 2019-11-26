@@ -24,15 +24,14 @@ object SetBucketVersioningRoute extends CustomMarshallers {
             database: NitriteDatabase)
            (implicit system: ActorSystem[Command],
             timeout: Timeout): Route =
-    (put & entity(as[Option[String]]) & parameter("versioning")) {
-      (maybeXml, _) =>
+    (put & extractRequest & parameter('versioning)) {
+      (request, _) =>
         import system.executionContext
-        val vc = VersioningConfiguration(maybeXml)
+
         val eventualEvent =
-          for {
-            actorRef <- spawnBucketBehavior(bucketName, objectIO, database)
-            event <- askBucketBehavior(actorRef, replyTo => SetBucketVersioning(vc.get, replyTo))
-          } yield event
+          extractRequestTo(request)
+            .map(VersioningConfiguration.apply)
+            .flatMap(execute(bucketName, objectIO, database))
         onComplete(eventualEvent) {
           case Success(BucketInfo(bucket)) =>
             complete(HttpResponse(OK).withHeaders(Location(s"/${bucket.bucketName}")))
@@ -44,5 +43,19 @@ object SetBucketVersioningRoute extends CustomMarshallers {
             complete(InternalServiceException(bucketName))
         }
     }
+
+  private def execute(bucketName: String,
+                      objectIO: ObjectIO,
+                      database: NitriteDatabase)
+                     (maybeVersioningConfiguration: Option[VersioningConfiguration])
+                     (implicit system: ActorSystem[Command],
+                      timeout: Timeout) = {
+    import system.executionContext
+    for {
+      actorRef <- spawnBucketBehavior(bucketName, objectIO, database)
+      event <- askBucketBehavior(actorRef, replyTo => SetBucketVersioning(maybeVersioningConfiguration.get,
+        replyTo))
+    } yield event
+  }
 
 }
