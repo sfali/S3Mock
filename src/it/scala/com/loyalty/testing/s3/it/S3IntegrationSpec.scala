@@ -7,6 +7,7 @@ import java.time.OffsetDateTime
 
 import akka.Done
 import akka.actor.typed.ActorSystem
+import akka.stream.alpakka.s3.{S3Exception => AlpakkaS3Exception}
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.SpawnBehavior
 import com.loyalty.testing.s3.it.client.S3Client
@@ -22,6 +23,8 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Millis, Seconds, Span}
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{BucketVersioningStatus, S3Exception}
+
+import scala.util.Try
 
 abstract class S3IntegrationSpec(rootPath: Path,
                                  resourceBasename: String)
@@ -102,6 +105,77 @@ abstract class S3IntegrationSpec(rootPath: Path,
     expectedObjectKey mustEqual actualObjectKey
   }
 
+  it should "update object in non-version bucket" in {
+    val key = "sample.txt"
+    val path = resourcePath -> "sample1.txt"
+    val contentLength = Files.size(path)
+    val actualObjectKey = s3Client.putObject(defaultBucketName, key, md5Digest1, path).futureValue
+    val expectedObjectKey = ObjectKey(
+      id = defaultBucketName.toUUID,
+      bucketName = defaultBucketName,
+      key = key,
+      index = 0,
+      version = BucketVersioning.NotExists,
+      versionId = NonVersionId,
+      eTag = etagDigest1,
+      contentMd5 = md5Digest1,
+      contentLength = contentLength,
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+    expectedObjectKey mustEqual actualObjectKey
+  }
+
+  it should "put a multi-path object in the specified non-version bucket" in {
+    val fileName = "sample.txt"
+    val key = s"input/$fileName"
+    val path = resourcePath -> fileName
+    val contentLength = Files.size(path)
+    val actualObjectKey = s3Client.putObject(defaultBucketName, key, md5Digest, path).futureValue
+    val expectedObjectKey = ObjectKey(
+      id = defaultBucketName.toUUID,
+      bucketName = defaultBucketName,
+      key = key,
+      index = 0,
+      version = BucketVersioning.NotExists,
+      versionId = NonVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = contentLength,
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+    expectedObjectKey mustEqual actualObjectKey
+  }
+
+  it should "get NoSuchBucket if attempt to put object in non-existing bucket" in {
+    val fileName = "sample.txt"
+    val key = s"input/$fileName"
+    val path = resourcePath -> fileName
+    val ex = s3Client.putObject(nonExistentBucketName, key, md5Digest, path).failed.futureValue
+    extractErrorResponse(ex).copy(statusCode = 404) mustEqual AwsError(404, "The specified bucket does not exist", "NoSuchBucket")
+  }
+
+  it should "put an object in the specified bucket with bucket versioning on" in {
+    val key = "sample.txt"
+    val path = resourcePath -> key
+    val contentLength = Files.size(path)
+    val index = 1
+    val actualObjectKey = s3Client.putObject(versionedBucketName, key, md5Digest, path).futureValue
+      .copy(version = BucketVersioning.Enabled, index = index)
+    val expectedObjectKey = ObjectKey(
+      id = versionedBucketName.toUUID,
+      bucketName = versionedBucketName,
+      key = key,
+      index = index,
+      version = BucketVersioning.Enabled,
+      versionId = index.toVersionId,
+      eTag = etagDigest,
+      contentMd5 = md5Digest,
+      contentLength = contentLength,
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+    actualObjectKey mustEqual expectedObjectKey
+  }
+
   private def clean(rootPath: Path): Path =
     Files.walkFileTree(rootPath, new SimpleFileVisitor[Path] {
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
@@ -120,6 +194,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
       case e@(_: S3Exception) =>
         val details = e.awsErrorDetails()
         AwsError(e.statusCode(), details.errorMessage(), details.errorCode())
+      case e@(_: AlpakkaS3Exception) => AwsError(Try(e.code.toInt).toOption.getOrElse(-1), e.message, e.code)
       case _ =>
         ex.printStackTrace()
         AwsError(503, ex.getMessage, "Unknown")
@@ -134,9 +209,8 @@ object S3IntegrationSpec {
   private val nonExistentBucketName = "dummy"
   private val etagDigest = "6b4bb2a848f1fac797e320d7b9030f3e"
   private val md5Digest = "a0uyqEjx+seX4yDXuQMPPg=="
-
-  /*private val etagDigest1 = "84043a46fafcdc5451db399625915436"
-  private val md5Digest1 = "hAQ6Rvr83FRR2zmWJZFUNg=="*/
+  private val etagDigest1 = "84043a46fafcdc5451db399625915436"
+  private val md5Digest1 = "hAQ6Rvr83FRR2zmWJZFUNg=="
 
   case class AwsError(statusCode: Int, message: String, errorCode: String)
 

@@ -58,7 +58,8 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
         val docId = writeResult.iterator().asScala.toList.headOption
         if (docId.isEmpty) throw DatabaseAccessException(s"unable to get document id for $bucketName/$key")
         else {
-          log.info("Object created/updated, key={}, bucket={}, doc_id={}", key, bucketName, docId.get.getIdValue)
+          log.info("Object created/updated, key={}, bucket={}, version_id={}, doc_id={}", key, bucketName, objectKey.versionId,
+            docId.get.getIdValue)
           objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
         }
     }

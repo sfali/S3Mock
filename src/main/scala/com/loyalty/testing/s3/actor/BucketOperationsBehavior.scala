@@ -104,9 +104,13 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
             context.log.error(s"unable to set bucket versioning: $bucket", ex)
             // TODO: reply properly
             Shutdown
-          case Success(bucket) => ReplyToSender(BucketInfo(bucket), replyTo)
+          case Success(bucket) => VersioningSet(bucket, replyTo)
         }
         Behaviors.same
+
+      case VersioningSet(updatedBucket, replyTo) =>
+        context.self ! ReplyToSender(BucketInfo(updatedBucket), replyTo)
+        bucketOperation(updatedBucket)
 
       case CreateBucketNotifications(notifications, replyTo) =>
         context.pipeToSelf(database.setBucketNotifications(notifications)) {
@@ -189,6 +193,8 @@ object BucketOperationsBehavior {
   private case class NewBucketCreated(bucket: Bucket, replyTo: ActorRef[Event]) extends BucketProtocolWithReply
 
   private final case class BucketResult(bucket: Bucket) extends BucketProtocol
+
+  private final case class VersioningSet(updatedBucket: Bucket, replyTo: ActorRef[Event]) extends BucketProtocolWithReply
 
   final case class CreateBucket(bucket: Bucket, replyTo: ActorRef[Event]) extends BucketProtocolWithReply
 

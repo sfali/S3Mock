@@ -14,6 +14,7 @@ import com.loyalty.testing.s3.request.VersioningConfiguration
 import com.loyalty.testing.s3.settings.Settings
 import com.loyalty.testing.s3.utils.DateTimeProvider
 import org.dizitart.no2.Nitrite
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
@@ -23,6 +24,8 @@ class NitriteDatabase(rootPath: Path,
                                               dateTimeProvider: DateTimeProvider) {
 
   import system.executionContext
+
+  private val log = LoggerFactory.getLogger(classOf[NitriteDatabase])
 
   private val db: Nitrite = {
     val _db = Nitrite
@@ -52,11 +55,14 @@ class NitriteDatabase(rootPath: Path,
       case Success(bucket) => Future.successful(bucket)
     }
 
-  def setBucketVersioning(bucketId: UUID, versioningConfiguration: VersioningConfiguration): Future[Bucket] =
+  def setBucketVersioning(bucketId: UUID, versioningConfiguration: VersioningConfiguration): Future[Bucket] = {
+    log.info("Setting bucket versioning on bucket_id={}, config={}", bucketId, versioningConfiguration)
     Try(bucketCollection.setBucketVersioning(bucketId, versioningConfiguration.bucketVersioning)) match {
       case Failure(ex) => Future.failed(ex)
       case Success(bucket) => Future.successful(bucket)
     }
+  }
+
 
   def setBucketNotifications(notifications: List[Notification]): Future[Done] = {
     def createNotification(notification: Notification) =
