@@ -5,7 +5,8 @@ import java.nio.file.Path
 import akka.Done
 import akka.http.scaladsl.model.headers.ByteRange
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
+import com.loyalty.testing.s3.it.ObjectInfo
+import com.loyalty.testing.s3.repositories.model.Bucket
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.BucketVersioningStatus
 
@@ -19,10 +20,10 @@ trait S3Client {
 
   def setBucketVersioning(bucketName: String, status: BucketVersioningStatus): Future[Done]
 
-  def putObject(bucketName: String, key: String, filePath: Path): Future[ObjectKey]
+  def putObject(bucketName: String, key: String, filePath: Path): Future[ObjectInfo]
 
   def getObject(bucketName: String,
                 key: String,
                 maybeVersionId: Option[String] = None,
-                maybeRange: Option[ByteRange] = None): Future[(String, ObjectKey)]
+                maybeRange: Option[ByteRange] = None): Future[(String, ObjectInfo)]
 }

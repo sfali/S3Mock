@@ -14,9 +14,8 @@ import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.SpawnBehavior
 import com.loyalty.testing.s3.it.client.S3Client
 import com.loyalty.testing.s3.repositories._
-import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
+import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.BucketVersioning
-import com.loyalty.testing.s3.request.BucketVersioning.NotExists
 import com.loyalty.testing.s3.streams.FileStream
 import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterAll
@@ -94,40 +93,30 @@ abstract class S3IntegrationSpec(rootPath: Path,
     val key = "sample.txt"
     val path = resourcePath -> key
     val contentLength = Files.size(path)
-    val actualObjectKey = s3Client.putObject(defaultBucketName, key, path).futureValue
-    val expectedObjectKey = ObjectKey(
-      id = defaultBucketName.toUUID,
+    val actualObjectInfo = s3Client.putObject(defaultBucketName, key, path).futureValue
+    val expectedObjectInfo = ObjectInfo(
       bucketName = defaultBucketName,
       key = key,
-      index = 0,
-      version = BucketVersioning.NotExists,
-      versionId = NonVersionId,
       eTag = etagDigest,
       contentMd5 = md5Digest,
-      contentLength = contentLength,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+      contentLength = contentLength
     )
-    actualObjectKey mustEqual expectedObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
   }
 
   it should "update object in non-version bucket" in {
     val key = "sample.txt"
     val path = resourcePath -> "sample1.txt"
     val contentLength = Files.size(path)
-    val actualObjectKey = s3Client.putObject(defaultBucketName, key, path).futureValue
-    val expectedObjectKey = ObjectKey(
-      id = defaultBucketName.toUUID,
+    val actualObjectInfo = s3Client.putObject(defaultBucketName, key, path).futureValue
+    val expectedObjectInfo = ObjectInfo(
       bucketName = defaultBucketName,
       key = key,
-      index = 0,
-      version = BucketVersioning.NotExists,
-      versionId = NonVersionId,
       eTag = etagDigest1,
       contentMd5 = md5Digest1,
-      contentLength = contentLength,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+      contentLength = contentLength
     )
-    actualObjectKey mustEqual expectedObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
   }
 
   it should "put a multi-path object in the specified non-version bucket" in {
@@ -135,20 +124,15 @@ abstract class S3IntegrationSpec(rootPath: Path,
     val key = s"input/$fileName"
     val path = resourcePath -> fileName
     val contentLength = Files.size(path)
-    val actualObjectKey = s3Client.putObject(defaultBucketName, key, path).futureValue
-    val expectedObjectKey = ObjectKey(
-      id = defaultBucketName.toUUID,
+    val actualObjectInfo = s3Client.putObject(defaultBucketName, key, path).futureValue
+    val expectedObjectInfo = ObjectInfo(
       bucketName = defaultBucketName,
       key = key,
-      index = 0,
-      version = BucketVersioning.NotExists,
-      versionId = NonVersionId,
       eTag = etagDigest,
       contentMd5 = md5Digest,
-      contentLength = contentLength,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+      contentLength = contentLength
     )
-    actualObjectKey mustEqual expectedObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
   }
 
   it should "get NoSuchBucket if attempt to put object in non-existing bucket" in {
@@ -165,20 +149,15 @@ abstract class S3IntegrationSpec(rootPath: Path,
     val contentLength = Files.size(path)
     val index = 1
     val actualObjectKey = s3Client.putObject(versionedBucketName, key, path).futureValue
-      .copy(version = BucketVersioning.Enabled, index = index)
-    val expectedObjectKey = ObjectKey(
-      id = versionedBucketName.toUUID,
+    val expectedObjectInfo = ObjectInfo(
       bucketName = versionedBucketName,
       key = key,
-      index = index,
-      version = BucketVersioning.Enabled,
-      versionId = index.toVersionId,
       eTag = etagDigest,
       contentMd5 = md5Digest,
       contentLength = contentLength,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+      versionId = Some(index.toVersionId)
     )
-    actualObjectKey mustEqual expectedObjectKey
+    actualObjectKey mustEqual expectedObjectInfo
   }
 
   it should "update object in the specified bucket with bucket versioning on" in {
@@ -186,126 +165,96 @@ abstract class S3IntegrationSpec(rootPath: Path,
     val path = resourcePath -> "sample1.txt"
     val contentLength = Files.size(path)
     val index = 2
-    val actualObjectKey = s3Client.putObject(versionedBucketName, key, path).futureValue
-      .copy(version = BucketVersioning.Enabled, index = index)
-    val expectedObjectKey = ObjectKey(
-      id = versionedBucketName.toUUID,
+    val actualObjectInfo = s3Client.putObject(versionedBucketName, key, path).futureValue
+    val expectedObjectKey = ObjectInfo(
       bucketName = versionedBucketName,
       key = key,
-      index = index,
-      version = BucketVersioning.Enabled,
-      versionId = index.toVersionId,
       eTag = etagDigest1,
       contentMd5 = md5Digest1,
       contentLength = contentLength,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+      versionId = Some(index.toVersionId),
     )
-    actualObjectKey mustEqual expectedObjectKey
+    actualObjectInfo mustEqual expectedObjectKey
   }
 
   it should "get entire object when range is not specified" in {
     val key = "sample.txt"
     val path = resourcePath -> "sample1.txt"
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
-    val expectedObjectKey = ObjectKey(
-      id = defaultBucketName.toUUID,
+    val expectedObjectInfo = ObjectInfo(
       bucketName = defaultBucketName,
       key = key,
-      index = 0,
-      version = BucketVersioning.NotExists,
-      versionId = NonVersionId,
       eTag = etagDigest1,
       contentMd5 = md5Digest1,
-      contentLength = Files.size(path),
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+      contentLength = Files.size(path)
     )
-    val (actualContent, actualObjectKey) = s3Client.getObject(defaultBucketName, key).futureValue
+    val (actualContent, actualObjectInfo) = s3Client.getObject(defaultBucketName, key).futureValue
     actualContent mustEqual expectedContent
-    actualObjectKey mustEqual expectedObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
   }
 
   it should "get object with range between two positions from the start of file" in {
     val key = "sample.txt"
     val expectedContent = "1. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectKey = ObjectKey(
-      id = defaultBucketName.toUUID,
+    val expectedObjectInfo = ObjectInfo(
       bucketName = defaultBucketName,
       key = key,
-      index = 0,
-      version = BucketVersioning.NotExists,
-      versionId = NonVersionId,
       eTag = etagDigest1,
       contentMd5 = md5Digest1,
-      contentLength = expectedContent.length,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+      contentLength = expectedContent.length
     )
     val range = ByteRange(0, 53)
     val (actualContent, actualObjectKey) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
     actualContent mustEqual expectedContent
-    actualObjectKey mustEqual expectedObjectKey
+    actualObjectKey mustEqual expectedObjectInfo
   }
 
   it should "get object with range between two positions from the middle of file" in {
     val key = "sample.txt"
     val expectedContent = "6. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectKey = ObjectKey(
-      id = defaultBucketName.toUUID,
+    val expectedObjectInfo = ObjectInfo(
       bucketName = defaultBucketName,
       key = key,
-      index = 0,
-      version = NotExists,
-      versionId = NonVersionId,
       eTag = etagDigest1,
       contentMd5 = md5Digest1,
-      contentLength = expectedContent.length,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+      contentLength = expectedContent.length
     )
     val range = ByteRange(265, 318)
-    val (actualContent, actualObjectKey) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
+    val (actualContent, actualObjectInfo) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
     actualContent mustEqual expectedContent
-    actualObjectKey mustEqual expectedObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
   }
 
   it should "get object with suffix range" in {
     val key = "sample.txt"
     val expectedContent = "8. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectKey = ObjectKey(
-      id = defaultBucketName.toUUID,
+    val expectedObjectInfo = ObjectInfo(
       bucketName = defaultBucketName,
       key = key,
-      index = 0,
-      version = NotExists,
-      versionId = NonVersionId,
       eTag = etagDigest1,
       contentMd5 = md5Digest1,
-      contentLength = expectedContent.length,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+      contentLength = expectedContent.length
     )
     val range = ByteRange.suffix(53)
-    val (actualContent, actualObjectKey) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
+    val (actualContent, actualObjectInfo) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
     actualContent mustEqual expectedContent
-    actualObjectKey mustEqual expectedObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
   }
 
   it should "get object with range with offset" in {
     val key = "sample.txt"
     val expectedContent = "8. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectKey = ObjectKey(
-      id = defaultBucketName.toUUID,
+    val expectedObjectInfo = ObjectInfo(
       bucketName = defaultBucketName,
       key = key,
-      index = 0,
-      version = NotExists,
-      versionId = NonVersionId,
       eTag = etagDigest1,
       contentMd5 = md5Digest1,
-      contentLength = expectedContent.length,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+      contentLength = expectedContent.length
     )
     val range = ByteRange.fromOffset(371)
-    val (actualContent, actualObjectKey) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
+    val (actualContent, actualObjectInfo) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
     actualContent mustEqual expectedContent
-    actualObjectKey mustEqual expectedObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
   }
 
   it should "get latest object from versioned bucket without providing version" in {
@@ -313,21 +262,17 @@ abstract class S3IntegrationSpec(rootPath: Path,
     val path = resourcePath -> "sample1.txt"
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 2
-    val expectedObjectKey = ObjectKey(
-      id = versionedBucketName.toUUID,
+    val expectedObjectInfo = ObjectInfo(
       bucketName = versionedBucketName,
       key = key,
-      index = index,
-      version = NotExists,
-      versionId = index.toVersionId,
       eTag = etagDigest1,
       contentMd5 = md5Digest1,
       contentLength = expectedContent.length,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+      versionId = Some(index.toVersionId),
     )
     val (actualContent, actualObjectKey) = s3Client.getObject(versionedBucketName, key).futureValue
     actualContent mustEqual expectedContent
-    actualObjectKey.copy(index = index) mustEqual expectedObjectKey
+    actualObjectKey mustEqual expectedObjectInfo
   }
 
   it should "get object from versioned repository with version provided" in {
@@ -335,21 +280,17 @@ abstract class S3IntegrationSpec(rootPath: Path,
     val path = resourcePath -> key
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 1
-    val expectedObjectKey = ObjectKey(
-      id = versionedBucketName.toUUID,
+    val expectedObjectInfo = ObjectInfo(
       bucketName = versionedBucketName,
       key = key,
-      index = index,
-      version = NotExists,
-      versionId = index.toVersionId,
       eTag = etagDigest,
       contentMd5 = md5Digest,
       contentLength = expectedContent.length,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+      versionId = Some(index.toVersionId)
     )
-    val (actualContent, actualObjectKey) = s3Client.getObject(versionedBucketName, key, maybeVersionId = Some(index.toVersionId)).futureValue
+    val (actualContent, actualObjectInfo) = s3Client.getObject(versionedBucketName, key, maybeVersionId = Some(index.toVersionId)).futureValue
     actualContent mustEqual expectedContent
-    actualObjectKey.copy(index = index) mustEqual expectedObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
   }
 
   it should "get NoSuchKey for non-existing key" in {

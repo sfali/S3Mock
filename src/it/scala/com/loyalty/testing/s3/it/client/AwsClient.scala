@@ -6,7 +6,7 @@ import akka.Done
 import akka.http.scaladsl.model.headers.ByteRange
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.it._
-import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
+import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.BucketVersioning
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model._
@@ -54,7 +54,7 @@ class AwsClient(override protected val awsSettings: AwsSettings) extends S3Clien
 
   override def putObject(bucketName: String,
                          key: String,
-                         filePath: Path): Future[ObjectKey] = {
+                         filePath: Path): Future[ObjectInfo] = {
     val contentLength = Files.size(filePath)
     val request = PutObjectRequest
       .builder()
@@ -65,25 +65,21 @@ class AwsClient(override protected val awsSettings: AwsSettings) extends S3Clien
     Try(s3Client.putObject(request, filePath)) match {
       case Failure(ex) => Future.failed(ex)
       case Success(response) =>
-        val objectKey = ObjectKey(
-          id = bucketName.toUUID,
+        val objectInfo = ObjectInfo(
           bucketName = bucketName,
           key = key,
-          index = 0,
-          version = BucketVersioning.NotExists,
-          versionId = response.versionId(),
           eTag = response.eTag(),
           contentMd5 = "",
           contentLength = contentLength,
-          lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+          versionId = Option(response.versionId()),
         )
-        Future.successful(objectKey)
+        Future.successful(objectInfo)
     }
   }
 
   override def getObject(bucketName: String,
                          key: String, maybeVersionId: Option[String],
-                         maybeRange: Option[ByteRange]): Future[(String, ObjectKey)] = ???
+                         maybeRange: Option[ByteRange]): Future[(String, ObjectInfo)] = ???
 }
 
 object AwsClient {

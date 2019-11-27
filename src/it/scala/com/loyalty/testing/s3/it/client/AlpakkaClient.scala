@@ -12,9 +12,7 @@ import akka.stream.scaladsl.{FileIO, Framing, Sink}
 import akka.util.ByteString
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.it._
-import com.loyalty.testing.s3.repositories._
-import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
-import com.loyalty.testing.s3.request.BucketVersioning
+import com.loyalty.testing.s3.repositories.model.Bucket
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{BucketVersioningStatus, NoSuchKeyException}
@@ -36,22 +34,18 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
   override def setBucketVersioning(bucketName: String, status: BucketVersioningStatus): Future[Done] =
     awsClient.setBucketVersioning(bucketName, status)
 
-  override def putObject(bucketName: String, key: String, filePath: Path): Future[ObjectKey] = {
+  override def putObject(bucketName: String, key: String, filePath: Path): Future[ObjectInfo] = {
     val contentLength = Files.size(filePath)
     S3.putObject(bucketName, key, FileIO.fromPath(filePath), contentLength, s3Headers = S3Headers())
       .map {
         objectMetadata =>
-          ObjectKey(
-            id = bucketName.toUUID,
+          ObjectInfo(
             bucketName = bucketName,
             key = key,
-            index = 0,
-            version = BucketVersioning.NotExists,
-            versionId = objectMetadata.versionId.getOrElse(NonVersionId),
             eTag = objectMetadata.eTag.getOrElse(""),
             contentMd5 = getHeader(objectMetadata.metadata, CONTENT_MD5).map(_.value()).getOrElse(""),
             contentLength = contentLength,
-            lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+            versionId = objectMetadata.versionId,
           )
       }.runWith(Sink.head)
   }
@@ -59,7 +53,7 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
   def getObject(bucketName: String,
                 key: String,
                 maybeVersionId: Option[String],
-                maybeRange: Option[ByteRange]): Future[(String, ObjectKey)] = {
+                maybeRange: Option[ByteRange]): Future[(String, ObjectInfo)] = {
     import system.executionContext
     S3.download(bucketName, key, maybeRange, maybeVersionId)
       .map {
@@ -76,17 +70,13 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
             .awsErrorDetails(errorDetails)
             .build()
         case Some((source, objectMetadata)) =>
-          val objectKey = ObjectKey(
-            id = bucketName.toUUID,
+          val objectKey = ObjectInfo(
             bucketName = bucketName,
             key = key,
-            index = 0,
-            version = BucketVersioning.NotExists,
-            versionId = objectMetadata.versionId.getOrElse(NonVersionId),
             eTag = objectMetadata.eTag.getOrElse(""),
             contentMd5 = getHeader(objectMetadata.metadata, CONTENT_MD5).map(_.value()).getOrElse(""),
             contentLength = objectMetadata.getContentLength,
-            lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+            versionId = objectMetadata.versionId
           )
           (source, objectKey)
       }.runWith(Sink.head)

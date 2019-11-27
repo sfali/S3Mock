@@ -12,4 +12,11 @@ package object it {
 
   val rootPath: Path = Paths.get(userDir, "target", ".s3mock")
 
+  case class ObjectInfo(bucketName: String,
+                        key: String,
+                        eTag: String,
+                        contentMd5: String,
+                        contentLength: Long,
+                        versionId: Option[String] = None)
+
 }
