@@ -3,6 +3,7 @@ package com.loyalty.testing.s3.it.client
 import java.nio.file.{Files, Path}
 
 import akka.Done
+import akka.http.scaladsl.model.headers.ByteRange
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.it._
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
@@ -53,7 +54,6 @@ class AwsClient(override protected val awsSettings: AwsSettings) extends S3Clien
 
   override def putObject(bucketName: String,
                          key: String,
-                         contentMd5: String,
                          filePath: Path): Future[ObjectKey] = {
     val contentLength = Files.size(filePath)
     val request = PutObjectRequest
@@ -61,7 +61,6 @@ class AwsClient(override protected val awsSettings: AwsSettings) extends S3Clien
       .bucket(bucketName)
       .key(key)
       .contentLength(contentLength)
-      .contentMD5(contentMd5)
       .build()
     Try(s3Client.putObject(request, filePath)) match {
       case Failure(ex) => Future.failed(ex)
@@ -74,13 +73,17 @@ class AwsClient(override protected val awsSettings: AwsSettings) extends S3Clien
           version = BucketVersioning.NotExists,
           versionId = response.versionId(),
           eTag = response.eTag(),
-          contentMd5 = contentMd5,
+          contentMd5 = "",
           contentLength = contentLength,
           lastModifiedTime = dateTimeProvider.currentOffsetDateTime
         )
         Future.successful(objectKey)
     }
   }
+
+  override def getObject(bucketName: String,
+                         key: String, maybeVersionId: Option[String],
+                         maybeRange: Option[ByteRange]): Future[(String, ObjectKey)] = ???
 }
 
 object AwsClient {
