@@ -176,6 +176,28 @@ abstract class S3IntegrationSpec(rootPath: Path,
     actualObjectKey mustEqual expectedObjectKey
   }
 
+  it should "update object in the specified bucket with bucket versioning on" in {
+    val key = "sample.txt"
+    val path = resourcePath -> "sample1.txt"
+    val contentLength = Files.size(path)
+    val index = 2
+    val actualObjectKey = s3Client.putObject(versionedBucketName, key, md5Digest1, path).futureValue
+      .copy(version = BucketVersioning.Enabled, index = index)
+    val expectedObjectKey = ObjectKey(
+      id = versionedBucketName.toUUID,
+      bucketName = versionedBucketName,
+      key = key,
+      index = index,
+      version = BucketVersioning.Enabled,
+      versionId = index.toVersionId,
+      eTag = etagDigest1,
+      contentMd5 = md5Digest1,
+      contentLength = contentLength,
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
+    )
+    actualObjectKey mustEqual expectedObjectKey
+  }
+
   private def clean(rootPath: Path): Path =
     Files.walkFileTree(rootPath, new SimpleFileVisitor[Path] {
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
