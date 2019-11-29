@@ -1,8 +1,6 @@
 package com.loyalty.testing.s3.it
 
-import java.io.IOException
 import java.nio.file._
-import java.nio.file.attribute.BasicFileAttributes
 import java.time.OffsetDateTime
 
 import akka.Done
@@ -304,19 +302,6 @@ abstract class S3IntegrationSpec(rootPath: Path,
     val ex = s3Client.getObject(defaultBucketName, key, Some(NonVersionId)).failed.futureValue
     extractErrorResponse(ex) mustEqual AwsError(404, "The resource you requested does not exist", "NoSuchKey")
   }
-
-  private def clean(rootPath: Path): Path =
-    Files.walkFileTree(rootPath, new SimpleFileVisitor[Path] {
-      override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
-        Files.delete(file)
-        FileVisitResult.CONTINUE
-      }
-
-      override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
-        Files.delete(dir)
-        FileVisitResult.CONTINUE
-      }
-    })
 
   private def extractErrorResponse(ex: Throwable) = {
     ex match {
