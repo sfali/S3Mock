@@ -1,8 +1,10 @@
 package com.loyalty.testing
 
+import java.io.IOException
 import java.net.{URI, URLDecoder, URLEncoder}
 import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file._
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
@@ -326,4 +328,16 @@ package object s3 {
     def getFiniteDuration(path: String): FiniteDuration = FiniteDuration(src.getDuration(path).toMillis, MILLISECONDS)
   }
 
+  def clean(rootPath: Path): Path =
+    Files.walkFileTree(rootPath, new SimpleFileVisitor[Path] {
+      override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+        Files.delete(file)
+        FileVisitResult.CONTINUE
+      }
+
+      override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
+        Files.delete(dir)
+        FileVisitResult.CONTINUE
+      }
+    })
 }
