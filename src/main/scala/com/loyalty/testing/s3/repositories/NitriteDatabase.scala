@@ -3,10 +3,9 @@ package com.loyalty.testing.s3.repositories
 import java.nio.file.Path
 import java.util.UUID
 
-import com.loyalty.testing.s3._
 import akka.Done
 import akka.actor.typed.ActorSystem
-import com.loyalty.testing.s3.DBSettings
+import com.loyalty.testing.s3.{DBSettings, _}
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.collections.{BucketCollection, NotificationCollection, ObjectCollection}
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
@@ -63,7 +62,6 @@ class NitriteDatabase(rootPath: Path,
     }
   }
 
-
   def setBucketNotifications(notifications: List[Notification]): Future[Done] = {
     def createNotification(notification: Notification) =
       Future.successful(notificationCollection.createNotification(notification))
@@ -78,6 +76,12 @@ class NitriteDatabase(rootPath: Path,
     Future.successful(objectCollection.findAll(objectId))
 
   def createObject(objectKey: ObjectKey): Future[ObjectKey] = Future.successful(objectCollection.createObject(objectKey))
+
+  def deleteObject(objectId: UUID, maybeVersionId: Option[String], permanentDelete: Boolean): Future[Done] =
+    Try(objectCollection.deleteObject(objectId, maybeVersionId, permanentDelete)) match {
+      case Failure(ex) => Future.failed(ex)
+      case Success(_) => Future.successful(Done)
+    }
 
   def close(): Unit = db.close()
 

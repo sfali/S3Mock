@@ -37,7 +37,7 @@ package object repositories {
   val ContentLengthField = "content-length"
   val VersionIndexField = "version-index"
   val VersionIdField = "version-id"
-  val DeleteMarkerField = "deleted"
+  val DeleteMarkerField = "delete-marker"
   val NonVersionId: String = 0.toVersionId
   val ContentFileName: String = "content"
 
@@ -52,6 +52,8 @@ package object repositories {
   implicit class DocumentOps(src: Document) {
     def getString(key: String): String = src.get(key, classOf[String])
 
+    def getOptionalString(key: String): Option[String] = Option(getString(key))
+
     def getUUID(key: String): UUID = UUID.fromString(getString(key))
 
     def getLong(key: String): Long = src.get(key, classOf[lang.Long]).toLong
@@ -60,7 +62,7 @@ package object repositories {
 
     def getBoolean(key: String): Boolean = src.get(key, classOf[Boolean])
 
-    def getOptionalString(key: String): Option[String] = Option(getString(key))
+    def getOptionalBoolean(key: String): Option[Boolean] = Option(getBoolean(key))
 
     def getPath(key: String): Path = Paths.get(getString(key))
 

@@ -43,7 +43,9 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
         .put(KeyField, key)
         .put(VersionIndexField, objectKey.index)
         .put(VersionField, version.entryName)
-        .put(VersionIdField, objectKey.versionId))
+        .put(VersionIdField, objectKey.versionId)
+        .put(DeleteMarkerField, null)
+    )
 
     val updatedDocument = doc
       .put(ETagField, objectKey.eTag)
@@ -65,21 +67,31 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
     }
   }
 
+  def deleteObject(objectId: UUID, maybeVersionId: Option[String], permanentDelete: Boolean): Int =
+    findById(objectId, maybeVersionId) match {
+      case Nil => throw NoSuchId(objectId)
+      case document :: Nil =>
+        val result =
+          if (permanentDelete) collection.remove(document)
+          else collection.update(document.put(DeleteMarkerField, true))
+        result.getAffectedCount
+      case _ => throw new IllegalStateException(s"Multiple documents found for $objectId")
+    }
+
   def findAll(objectId: UUID): List[ObjectKey] = findAllById(objectId).map(ObjectKey(_))
 
-  def findObject(objectId: UUID, maybeVersionId: Option[String] = None): ObjectKey = {
-    //log.info("Finding object, key={}, bucket={}", Array(key, bucketName): _*)
-    findById(objectId, maybeVersionId.getOrElse(NonVersionId)) match {
+  def findObject(objectId: UUID, maybeVersionId: Option[String] = None): ObjectKey =
+    findById(objectId, maybeVersionId) match {
       case Nil => throw NoSuchId(objectId)
       case document :: Nil => ObjectKey(document)
       case _ => throw new IllegalStateException(s"Multiple documents found for $objectId")
     }
-  }
 
   private def findAllById(objectId: UUID): List[Document] =
     collection.find(feq(IdField, objectId.toString), FindOptions.sort(VersionIndexField, SortOrder.Ascending)).toScalaList
 
-  private def findById(objectId: UUID, versionId: String): List[Document] = {
+  private def findById(objectId: UUID, maybeVersionId: Option[String]): List[Document] = {
+    val versionId = maybeVersionId.getOrElse(NonVersionId)
     val filter = and(feq(IdField, objectId.toString), text(versionId, s"*$versionId*"))
     collection.find(filter, FindOptions.sort(VersionIndexField, SortOrder.Ascending)).toScalaList
   }
