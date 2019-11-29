@@ -16,7 +16,8 @@ case class ObjectKey(id: UUID,
                      eTag: String,
                      contentMd5: String,
                      contentLength: Long,
-                     lastModifiedTime: OffsetDateTime)
+                     lastModifiedTime: OffsetDateTime,
+                     deleteMarker: Option[Boolean])
 
 object ObjectKey {
   def apply(id: UUID,
@@ -28,8 +29,21 @@ object ObjectKey {
             eTag: String,
             contentMd5: String,
             contentLength: Long,
-            lastModifiedTime: OffsetDateTime): ObjectKey =
-    new ObjectKey(id, bucketName, key, index, version, versionId, eTag, contentMd5, contentLength, lastModifiedTime)
+            lastModifiedTime: OffsetDateTime,
+            deleteMarker: Option[Boolean] = None): ObjectKey =
+    new ObjectKey(
+      id,
+      bucketName,
+      key,
+      index,
+      version,
+      versionId,
+      eTag,
+      contentMd5,
+      contentLength,
+      lastModifiedTime,
+      deleteMarker
+    )
 
   def apply(doc: Document): ObjectKey =
     ObjectKey(
@@ -42,6 +56,7 @@ object ObjectKey {
       eTag = doc.getString(ETagField),
       contentMd5 = doc.getString(ContentMd5Field),
       contentLength = doc.getLong(ContentLengthField),
-      lastModifiedTime = doc.getLastModifiedTime.toOffsetDateTime
+      lastModifiedTime = doc.getLastModifiedTime.toOffsetDateTime,
+      deleteMarker = doc.getOptionalBoolean(DeleteMarkerField)
     )
 }
