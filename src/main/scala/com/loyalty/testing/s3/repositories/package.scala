@@ -10,7 +10,7 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.request.{BucketVersioning, VersioningConfiguration}
-import com.loyalty.testing.s3.response.{NoSuchKeyException, ObjectMeta, PutObjectResult}
+import com.loyalty.testing.s3.response.{NoSuchKeyException, ObjectMeta}
 import com.loyalty.testing.s3.streams.FileStream
 import org.dizitart.no2.{Cursor, Document}
 
@@ -31,7 +31,6 @@ package object repositories {
   val DestinationNameField = "destination-name"
   val PrefixField = "prefix"
   val SuffixField = "suffix"
-  val ObjectPathField = "object-path"
   val KeyField = "key"
   val ETagField = "etag"
   val ContentMd5Field = "content-md5"
@@ -78,23 +77,6 @@ package object repositories {
         bucketName = src.getString(BucketNameField),
         suffix = src.getOptionalString(SuffixField)
       )
-
-    def toObjectMeta: ObjectMeta = {
-      val version = src.getString(VersionIdField)
-      val result = PutObjectResult(
-        key = src.getString(KeyField),
-        etag = src.getString(ETagField),
-        contentMd5 = src.getString(ContentMd5Field),
-        contentLength = src.getLong(ContentLengthField),
-        maybeVersionId = if (NonVersionId == version) None else Some(version),
-        index = src.getInt(VersionIndexField)
-      )
-      ObjectMeta(
-        path = src.getString(ObjectPathField).toPath,
-        result = result,
-        lastModifiedDate = src.getLastModifiedTime.toOffsetDateTime.toLocalDateTime
-      )
-    }
   }
 
   def toVersionConfiguration(contentSource: Source[ByteString, _])
