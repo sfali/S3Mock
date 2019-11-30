@@ -3,6 +3,7 @@ package com.loyalty.testing.s3.repositories
 import java.nio.file.{Files, Path}
 import java.time.OffsetDateTime
 import java.util.UUID
+import java.util.stream.Collectors
 
 import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.headers.ByteRange
@@ -59,6 +60,15 @@ class ObjectIO(root: Path, fileStream: FileStream)
     val objectPath = getObjectPath(objectKey.bucketName, objectKey.key, objectKey.version, objectKey.versionId)
     val (downloadRange, source) = fileStream.downloadFile(objectPath, maybeRange = maybeRange)
     (objectKey.copy(contentLength = downloadRange.capacity), source)
+  }
+
+  def delete(objectKey: ObjectKey): Unit = {
+    val objectPath = getObjectPath(objectKey.bucketName, objectKey.key, objectKey.version, objectKey.versionId)
+    val path = objectPath.getParent.getParent
+    val parent = path.getParent
+    clean(path)
+    val empty = Files.list(parent).collect(Collectors.toList()).isEmpty
+    if (empty) clean(parent)
   }
 
   private def getObjectPath(bucketName: String,

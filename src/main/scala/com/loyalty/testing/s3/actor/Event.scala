@@ -26,4 +26,6 @@ final case class ObjectInfo(objectKey: ObjectKey) extends Event
 
 final case class ObjectContent(objectKey: ObjectKey, content: Source[ByteString, Future[IOResult]]) extends Event
 
+final case class DeleteInfo(deleteMarker: Boolean) extends Event
+
 final case class BucketAlreadyExists(bucket: Bucket) extends Event

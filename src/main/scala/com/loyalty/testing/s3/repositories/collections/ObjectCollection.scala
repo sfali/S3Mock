@@ -73,7 +73,7 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
       case document :: Nil =>
         val result =
           if (permanentDelete) collection.remove(document)
-          else collection.update(document.put(DeleteMarkerField, true))
+          else collection.update(document.put(DeleteMarkerField, "true"))
         result.getAffectedCount
       case _ => throw new IllegalStateException(s"Multiple documents found for $objectId")
     }
@@ -92,7 +92,7 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
 
   private def findById(objectId: UUID, maybeVersionId: Option[String]): List[Document] = {
     val versionId = maybeVersionId.getOrElse(NonVersionId)
-    val filter = and(feq(IdField, objectId.toString), text(versionId, s"*$versionId*"))
+    val filter = and(feq(IdField, objectId.toString), text(VersionIdField, s"*$versionId*"))
     collection.find(filter, FindOptions.sort(VersionIndexField, SortOrder.Ascending)).toScalaList
   }
 

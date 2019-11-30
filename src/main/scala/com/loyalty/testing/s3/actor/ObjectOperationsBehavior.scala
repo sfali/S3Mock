@@ -47,7 +47,7 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
       case ObjectResult(values) =>
         val tuples = values.map(ok => (ok.index, ok.versionId))
         context.log.info("Current values: {} for {}", tuples, objectId)
-        versionIndex = tuples.headOption.map(_._1).getOrElse(0)
+        versionIndex = tuples.lastOption.map(_._1).getOrElse(0)
         objects = values
         buffer.unstashAll(objectOperations)
 
@@ -89,15 +89,7 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
         Behaviors.same
 
       case GetObject(bucket, _, maybeVersionId, maybeRange, replyTo) =>
-        val versionIdToUse =
-          if (BucketVersioning.NotExists == bucket.version && maybeVersionId.isDefined) {
-            // if version id provided and versioning doesn't exists then set some dummy value
-            // so that it results in NoSuckKey
-            Some(UUID.randomUUID().toString)
-          } else maybeVersionId
-        val maybeObjectKey =
-          if (versionIdToUse.isDefined) objects.filter(_.versionId == versionIdToUse.get).lastOption
-          else objects.lastOption
+        val maybeObjectKey = getObject(sanitizeVersionId(bucket, maybeVersionId))
         val command =
           if (maybeObjectKey.isEmpty) ReplyToSender(NoSuchKeyExists, replyTo)
           else GetObjectData(maybeObjectKey.get, maybeRange, replyTo)
@@ -112,6 +104,40 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
               context.log.error("unable to download object", ex)
               DatabaseError // TODO: retry
           }
+        context.self ! command
+        Behaviors.same
+
+      case DeleteObject(bucket, _, maybeVersionId, replyTo) =>
+        val maybeObjectKey = getObject(sanitizeVersionId(bucket, maybeVersionId))
+        if (maybeObjectKey.isEmpty) context.self ! ReplyToSender(NoSuchKeyExists, replyTo)
+        else {
+          val objectKey = maybeObjectKey.get
+          val permanentDelete = objectKey.deleteMarker.getOrElse(false)
+          context.pipeToSelf(database.deleteObject(objectId, maybeVersionId, permanentDelete)) {
+            case Failure(ex) =>
+              context.log.error(s"unable to delete object: ${objectKey.bucketName}/${objectKey.key}", ex)
+              DatabaseError // TODO: retry
+            case Success(_) => ObjectDeleted(objectKey.copy(deleteMarker = Some(permanentDelete)), replyTo)
+          }
+        }
+        Behaviors.same
+
+      case ObjectDeleted(objectKey, replyTo) =>
+        val permanentDelete = objectKey.deleteMarker.getOrElse(false)
+        val deleteInfo = DeleteInfo(permanentDelete)
+        objects = objects.filterNot(_.id == objectKey.id)
+        if (!permanentDelete) {
+          objects = (objects :+ objectKey).sortBy(_.index)
+        }
+        val command =
+          if (permanentDelete) {
+            Try(objectIO.delete(objectKey)) match {
+              case Failure(ex) =>
+                context.log.error(s"unable to delete files: ${objectKey.bucketName}/${objectKey.key}", ex)
+                DatabaseError // TODO: retry
+              case Success(_) => ReplyToSender(deleteInfo, replyTo)
+            }
+          } else ReplyToSender(deleteInfo, replyTo)
         context.self ! command
         Behaviors.same
 
@@ -131,6 +157,12 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
       case other =>
         context.log.warn("unhandled message: {}", other)
         Behaviors.unhandled
+    }
+
+  private def getObject(maybeVersionId: Option[String]) =
+    maybeVersionId match {
+      case Some(versionId) => objects.filter(_.versionId == versionId).lastOption
+      case None => objects.lastOption
     }
 }
 
@@ -187,4 +219,18 @@ object ObjectOperationsBehavior {
                                          maybeRange: Option[ByteRange],
                                          replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
 
+  final case class DeleteObject(bucket: Bucket,
+                                key: String,
+                                maybeVersionId: Option[String],
+                                replyTo: ActorRef[Event]) extends ObjectInput
+
+  private final case class ObjectDeleted(objectKey: ObjectKey,
+                                         replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
+
+  private def sanitizeVersionId(bucket: Bucket, maybeVersionId: Option[String]): Option[String] =
+    if (BucketVersioning.NotExists == bucket.version && maybeVersionId.isDefined) {
+      // if version id provided and versioning doesn't exists then set some dummy value
+      // so that it results in NoSuckKey
+      Some(UUID.randomUUID().toString)
+    } else maybeVersionId
 }

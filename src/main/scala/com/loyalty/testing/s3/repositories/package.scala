@@ -62,7 +62,11 @@ package object repositories {
 
     def getBoolean(key: String): Boolean = src.get(key, classOf[Boolean])
 
-    def getOptionalBoolean(key: String): Option[Boolean] = Option(getBoolean(key))
+    def getOptionalBoolean(key: String): Option[Boolean] =
+      getOptionalString(key) match {
+        case Some(value) => Some(value.toBoolean)
+        case None => None
+      }
 
     def getPath(key: String): Path = Paths.get(getString(key))
 

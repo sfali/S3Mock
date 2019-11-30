@@ -137,15 +137,19 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
         Behaviors.same
 
       case PutObjectWrapper(key, contentSource, replyTo) =>
-        objectActor(createObjectId(bucket.bucketName, key).toString) ! PutObject(bucket, key, contentSource, replyTo)
+        objectActor(bucket, key) ! PutObject(bucket, key, contentSource, replyTo)
         Behaviors.same
 
       case GetObjectMetaWrapper(key, replyTo) =>
-        objectActor(createObjectId(bucket.bucketName, key).toString) ! GetObjectMeta(replyTo)
+        objectActor(bucket, key) ! GetObjectMeta(replyTo)
         Behaviors.same
 
       case GetObjectWrapper(key, maybeVersionId, maybeRange, replyTo) =>
-        objectActor(createObjectId(bucket.bucketName, key).toString) ! GetObject(bucket, key, maybeVersionId, maybeRange, replyTo)
+        objectActor(bucket, key) ! GetObject(bucket, key, maybeVersionId, maybeRange, replyTo)
+        Behaviors.same
+
+      case DeleteObjectWrapper(key, maybeVersionId, replyTo) =>
+        objectActor(bucket, key) ! DeleteObject(bucket, key, maybeVersionId, replyTo)
         Behaviors.same
 
       case ReplyToSender(reply, replyTo) =>
@@ -159,11 +163,13 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
         Behaviors.unhandled
     }
 
-  private def objectActor(id: String): ActorRef[ObjectProtocol] =
+  private def objectActor(bucket: Bucket, key: String): ActorRef[ObjectProtocol] = {
+    val id = createObjectId(bucket.bucketName, key).toString
     context.child(id) match {
       case Some(behavior) => behavior.unsafeUpcast[ObjectProtocol]
       case None => context.spawn(ObjectOperationsBehavior(objectIO, database), id)
     }
+  }
 
 }
 
@@ -218,5 +224,9 @@ object BucketOperationsBehavior {
                                     maybeVersionId: Option[String] = None,
                                     maybeRange: Option[ByteRange] = None,
                                     replyTo: ActorRef[Event]) extends BucketProtocolWithReply
+
+  final case class DeleteObjectWrapper(key: String,
+                                       maybeVersionId: Option[String] = None,
+                                       replyTo: ActorRef[Event]) extends BucketProtocolWithReply
 
 }
