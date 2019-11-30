@@ -1,14 +1,14 @@
 package com.loyalty.testing.s3.routes.s3.`object`
 
 import akka.actor.typed.ActorSystem
-import akka.http.scaladsl.model.StatusCodes.OK
+import akka.http.scaladsl.model.StatusCodes.{NotFound, OK}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.util.Timeout
 import com.loyalty.testing.s3.actor.BucketOperationsBehavior.GetObjectWrapper
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
-import com.loyalty.testing.s3.actor.{InvalidAccess, NoSuchBucketExists, NoSuchKeyExists, ObjectContent}
+import com.loyalty.testing.s3.actor._
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException, NoSuchKeyException}
 import com.loyalty.testing.s3.routes.CustomMarshallers
@@ -37,6 +37,8 @@ object GetObjectRoute extends CustomMarshallers {
             complete(HttpResponse(OK)
               .withEntity(HttpEntity(ContentTypes.`application/octet-stream`, objectKey.contentLength, content))
               .withHeaders(createResponseHeaders(objectKey)))
+          case Success(ObjectInfo(objectKey)) => complete(HttpResponse(NotFound)
+            .withHeaders(createResponseHeaders(objectKey)))
           case Success(NoSuchBucketExists) => complete(NoSuchBucketException(bucketName))
           case Success(NoSuchKeyExists) => complete(NoSuchKeyException(bucketName, key))
           case Success(InvalidAccess) =>

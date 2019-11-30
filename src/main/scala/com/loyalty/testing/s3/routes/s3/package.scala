@@ -33,7 +33,9 @@ package object s3 {
                         timeout: Timeout): Future[Event] = actorRef.ask[Event](toProtocol)
 
   def createResponseHeaders(objectKey: ObjectKey): List[RawHeader] = {
-    val headers = RawHeader(CONTENT_MD5, objectKey.contentMd5) :: RawHeader(ETAG, s""""${objectKey.eTag}"""") :: Nil
+    var headers = List.empty[RawHeader]
+    headers = if (objectKey.contentMd5.nonEmpty) headers :+ RawHeader(CONTENT_MD5, objectKey.contentMd5) else headers
+    headers = if (objectKey.eTag.nonEmpty) headers :+ RawHeader(ETAG, s""""${objectKey.eTag}"""") else headers
     objectKey.version match {
       case BucketVersioning.Enabled =>
         headers :+ RawHeader("x-amz-version-id", objectKey.versionId)

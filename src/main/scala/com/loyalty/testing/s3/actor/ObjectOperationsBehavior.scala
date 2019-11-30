@@ -92,7 +92,11 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
         val maybeObjectKey = getObject(sanitizeVersionId(bucket, maybeVersionId))
         val command =
           if (maybeObjectKey.isEmpty) ReplyToSender(NoSuchKeyExists, replyTo)
-          else GetObjectData(maybeObjectKey.get, maybeRange, replyTo)
+          else {
+            val objectKey = maybeObjectKey.get
+            if (objectKey.deleteMarker.isEmpty) GetObjectData(objectKey, maybeRange, replyTo)
+            else ReplyToSender(ObjectInfo(objectKey.copy(eTag = "", contentMd5 = "", contentLength = 0)), replyTo)
+          }
         context.self ! command
         Behaviors.same
 

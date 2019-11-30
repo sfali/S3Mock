@@ -43,8 +43,8 @@ class RoutesSpec
   private implicit val defaultPatience: PatienceConfig = PatienceConfig(timeout = Span(15, Seconds),
     interval = Span(500, Millis))
   private val settings = AppSettings(spawnSystem.settings.config)
-  protected override val objectIO = ObjectIO(rootPath, FileStream())
-  protected override val database = NitriteDatabase(rootPath, settings.dbSettings)
+  protected override val objectIO: ObjectIO = ObjectIO(rootPath, FileStream())
+  protected override val database: NitriteDatabase = NitriteDatabase(rootPath, settings.dbSettings)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
