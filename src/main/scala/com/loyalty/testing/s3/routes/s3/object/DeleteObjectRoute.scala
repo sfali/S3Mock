@@ -37,7 +37,7 @@ object DeleteObjectRoute extends CustomMarshallers {
             event <- askBucketBehavior(actorRef, replyTo => DeleteObjectWrapper(key, maybeVersionId, replyTo))
           } yield event
         onComplete(eventualEvent) {
-          case Success(DeleteInfo(deleteMarker, version)) =>
+          case Success(DeleteInfo(deleteMarker, version, maybeVersionId)) =>
             val objectKey = ObjectKey(
               id = UUID.randomUUID(),
               bucketName = bucketName,

@@ -17,7 +17,13 @@ case class ObjectKey(id: UUID,
                      contentMd5: String,
                      contentLength: Long,
                      lastModifiedTime: OffsetDateTime,
-                     deleteMarker: Option[Boolean])
+                     deleteMarker: Option[Boolean]) {
+  def actualVersionId: Option[String] =
+    version match {
+      case BucketVersioning.Enabled => Some(versionId)
+      case _ => None
+    }
+}
 
 object ObjectKey {
   def apply(id: UUID,

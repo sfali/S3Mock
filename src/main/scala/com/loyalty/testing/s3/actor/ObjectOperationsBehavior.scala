@@ -118,7 +118,7 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
         else {
           val objectKey = maybeObjectKey.get
           val permanentDelete = objectKey.deleteMarker.isDefined
-          context.pipeToSelf(database.deleteObject(objectId, maybeVersionId, permanentDelete)) {
+          context.pipeToSelf(database.deleteObject(objectId, Some(objectKey.versionId), permanentDelete)) {
             case Failure(ex) =>
               context.log.error(s"unable to delete object: ${objectKey.bucketName}/${objectKey.key}", ex)
               DatabaseError // TODO: retry
@@ -129,7 +129,7 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
 
       case ObjectDeleted(objectKey, replyTo) =>
         val permanentDelete = objectKey.deleteMarker.getOrElse(false)
-        val deleteInfo = DeleteInfo(permanentDelete, objectKey.version)
+        val deleteInfo = DeleteInfo(permanentDelete, objectKey.version, objectKey.actualVersionId)
         val command =
           if (permanentDelete) {
             Try(objectIO.delete(objectKey)) match {
