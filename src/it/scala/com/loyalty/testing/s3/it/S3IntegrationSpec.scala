@@ -58,7 +58,8 @@ abstract class S3IntegrationSpec(rootPath: Path,
   override protected def afterAll(): Unit = {
     super.afterAll()
     database.close()
-    clean(rootPath)
+    // clean(rootPath)
+    Files.delete(rootPath -> settings.dbSettings.fileName)
     system.terminate()
   }
 
@@ -301,6 +302,41 @@ abstract class S3IntegrationSpec(rootPath: Path,
     val key = "sample.txt"
     val ex = s3Client.getObject(defaultBucketName, key, Some(NonVersionId)).failed.futureValue
     extractErrorResponse(ex) mustEqual AwsError(404, "The resource you requested does not exist", "NoSuchKey")
+  }
+
+  it should "set delete marker on an object" in {
+    val key = "sample.txt"
+    val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(defaultBucketName, key).futureValue
+    maybeDeleteMarker mustBe empty
+    maybeVersionId mustBe empty
+  }
+
+  it should "result in 404(NotFound) when attempt to get an item which is flag with delete marker" in {
+    val key = "sample.txt"
+    val ex = s3Client.getObject(defaultBucketName, key).failed.futureValue
+    extractErrorResponse(ex).copy(statusCode = 404) mustEqual AwsError(404, "", "404 Not Found")
+  }
+
+  it should "permanently delete an object" in {
+    val key = "sample.txt"
+    val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(defaultBucketName, key).futureValue
+    maybeDeleteMarker mustBe Some(true)
+    maybeVersionId mustBe empty
+  }
+
+  it should "set delete marker on latest object on a versioned bucket" in {
+    val key = "sample.txt"
+    val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(versionedBucketName, key).futureValue
+    maybeDeleteMarker mustBe empty
+    maybeVersionId mustBe Some(2.toVersionId)
+  }
+
+  it should "set delete marker on by version id" in {
+    val key = "sample.txt"
+    val index = 1
+    val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(versionedBucketName, key, Some(index.toVersionId)).futureValue
+    maybeDeleteMarker mustBe empty
+    maybeVersionId mustBe Some(index.toVersionId)
   }
 
   private def extractErrorResponse(ex: Throwable) = {

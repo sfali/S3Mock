@@ -80,6 +80,15 @@ class AwsClient(override protected val awsSettings: AwsSettings) extends S3Clien
   override def getObject(bucketName: String,
                          key: String, maybeVersionId: Option[String],
                          maybeRange: Option[ByteRange]): Future[(String, ObjectInfo)] = ???
+
+  override def deleteObject(bucketName: String,
+                            key: String,
+                            maybeVersionId: Option[String]): Future[(Option[Boolean], Option[String])] = {
+    val builder = DeleteObjectRequest.builder().bucket(bucketName).key(key)
+    val request = maybeVersionId.map(builder.versionId).map(_.build()).getOrElse(builder.build())
+    val response = s3Client.deleteObject(request)
+    Future.successful((Option(response.deleteMarker()).map(_.booleanValue()), Option(response.versionId())))
+  }
 }
 
 object AwsClient {

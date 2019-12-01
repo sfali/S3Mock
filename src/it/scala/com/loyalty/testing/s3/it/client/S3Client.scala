@@ -26,4 +26,8 @@ trait S3Client {
                 key: String,
                 maybeVersionId: Option[String] = None,
                 maybeRange: Option[ByteRange] = None): Future[(String, ObjectInfo)]
+
+  def deleteObject(bucketName: String,
+                   key: String,
+                   maybeVersionId: Option[String] = None): Future[(Option[Boolean], Option[String])]
 }

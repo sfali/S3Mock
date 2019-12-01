@@ -50,10 +50,10 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
       }.runWith(Sink.head)
   }
 
-  def getObject(bucketName: String,
-                key: String,
-                maybeVersionId: Option[String],
-                maybeRange: Option[ByteRange]): Future[(String, ObjectInfo)] = {
+  override def getObject(bucketName: String,
+                         key: String,
+                         maybeVersionId: Option[String],
+                         maybeRange: Option[ByteRange]): Future[(String, ObjectInfo)] = {
     import system.executionContext
     S3.download(bucketName, key, maybeRange, maybeVersionId)
       .map {
@@ -91,6 +91,11 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
             .map(s => (s, objectKey))
       }
   }
+
+  override def deleteObject(bucketName: String,
+                            key: String,
+                            maybeVersionId: Option[String]): Future[(Option[Boolean], Option[String])] =
+    awsClient.deleteObject(bucketName, key, maybeVersionId)
 
   private def getHeader(headers: Seq[HttpHeader], headerName: String): Option[HttpHeader] =
     headers.find(_.lowercaseName() == headerName.toLowerCase)
