@@ -36,7 +36,7 @@ package object s3 {
   val ETAG = "ETag"
   val CONTENT_MD5 = "Content-MD5"
   val VersionIdHeader = "x-amz-version-id"
-  val DeleteMarkerHeader = "x-amz-deletemarker"
+  val DeleteMarkerHeader = "x-amz-delete-marker"
 
   private val md = MessageDigest.getInstance("MD5")
 

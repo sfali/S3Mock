@@ -152,8 +152,12 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
         objects =
           maybeObjectMeta match {
             case Some(objectKey) =>
-              val _objs = objects.filterNot(_.id == objectKey.id)
-              (_objs :+ objectKey).sortBy(_.index)
+              objectKey.version match {
+                case BucketVersioning.Enabled => objects :+ objectKey
+                case _ =>
+                  val _objs = objects.filterNot(_.id == objectKey.id)
+                  (_objs :+ objectKey).sortBy(_.index)
+              }
             case None => objects
           }
         replyTo ! reply
