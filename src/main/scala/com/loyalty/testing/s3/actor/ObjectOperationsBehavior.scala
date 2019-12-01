@@ -95,7 +95,8 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
           else {
             val objectKey = maybeObjectKey.get
             if (objectKey.deleteMarker.isEmpty) GetObjectData(objectKey, maybeRange, replyTo)
-            else ReplyToSender(ObjectInfo(objectKey.copy(eTag = "", contentMd5 = "", contentLength = 0)), replyTo)
+            else ReplyToSender(ObjectInfo(objectKey.copy(eTag = "", contentMd5 = "", contentLength = 0,
+              deleteMarker = Some(true))), replyTo)
           }
         context.self ! command
         Behaviors.same
@@ -116,7 +117,7 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
         if (maybeObjectKey.isEmpty) context.self ! ReplyToSender(NoSuchKeyExists, replyTo)
         else {
           val objectKey = maybeObjectKey.get
-          val permanentDelete = objectKey.deleteMarker.getOrElse(false)
+          val permanentDelete = objectKey.deleteMarker.isDefined
           context.pipeToSelf(database.deleteObject(objectId, maybeVersionId, permanentDelete)) {
             case Failure(ex) =>
               context.log.error(s"unable to delete object: ${objectKey.bucketName}/${objectKey.key}", ex)
@@ -128,20 +129,16 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
 
       case ObjectDeleted(objectKey, replyTo) =>
         val permanentDelete = objectKey.deleteMarker.getOrElse(false)
-        val deleteInfo = DeleteInfo(permanentDelete)
-        objects = objects.filterNot(_.id == objectKey.id)
-        if (!permanentDelete) {
-          objects = (objects :+ objectKey).sortBy(_.index)
-        }
+        val deleteInfo = DeleteInfo(permanentDelete, objectKey.version)
         val command =
           if (permanentDelete) {
             Try(objectIO.delete(objectKey)) match {
               case Failure(ex) =>
                 context.log.error(s"unable to delete files: ${objectKey.bucketName}/${objectKey.key}", ex)
                 DatabaseError // TODO: retry
-              case Success(_) => ReplyToSender(deleteInfo, replyTo)
+              case Success(_) => ReplyToSender(deleteInfo, replyTo, Some(objectKey))
             }
-          } else ReplyToSender(deleteInfo, replyTo)
+          } else ReplyToSender(deleteInfo, replyTo, Some(objectKey))
         context.self ! command
         Behaviors.same
 
@@ -152,7 +149,13 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
         Behaviors.same
 
       case ReplyToSender(reply, replyTo, maybeObjectMeta) =>
-        objects = maybeObjectMeta.map(objects :+ _).getOrElse(objects)
+        objects =
+          maybeObjectMeta match {
+            case Some(objectKey) =>
+              val _objs = objects.filterNot(_.id == objectKey.id)
+              (_objs :+ objectKey).sortBy(_.index)
+            case None => objects
+          }
         replyTo ! reply
         Behaviors.same
 

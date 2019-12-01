@@ -5,6 +5,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
+import com.loyalty.testing.s3.request.BucketVersioning
 
 import scala.concurrent.Future
 
@@ -26,6 +27,6 @@ final case class ObjectInfo(objectKey: ObjectKey) extends Event
 
 final case class ObjectContent(objectKey: ObjectKey, content: Source[ByteString, Future[IOResult]]) extends Event
 
-final case class DeleteInfo(deleteMarker: Boolean) extends Event
+final case class DeleteInfo(deleteMarker: Boolean, version: BucketVersioning) extends Event
 
 final case class BucketAlreadyExists(bucket: Bucket) extends Event

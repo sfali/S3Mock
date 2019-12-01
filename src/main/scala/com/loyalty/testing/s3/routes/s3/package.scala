@@ -15,6 +15,7 @@ import com.loyalty.testing.s3.repositories.model.ObjectKey
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.BucketVersioning
 
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 
 package object s3 {
@@ -33,14 +34,13 @@ package object s3 {
                         timeout: Timeout): Future[Event] = actorRef.ask[Event](toProtocol)
 
   def createResponseHeaders(objectKey: ObjectKey): List[RawHeader] = {
-    var headers = List.empty[RawHeader]
-    headers = if (objectKey.contentMd5.nonEmpty) headers :+ RawHeader(CONTENT_MD5, objectKey.contentMd5) else headers
-    headers = if (objectKey.eTag.nonEmpty) headers :+ RawHeader(ETAG, s""""${objectKey.eTag}"""") else headers
-    objectKey.version match {
-      case BucketVersioning.Enabled =>
-        headers :+ RawHeader("x-amz-version-id", objectKey.versionId)
-      case _ => headers
-    }
+    val headers = ListBuffer[RawHeader]()
+    if (objectKey.contentMd5.nonEmpty) headers.addOne(RawHeader(CONTENT_MD5, objectKey.contentMd5))
+    if (objectKey.eTag.nonEmpty) headers.addOne(RawHeader(ETAG, s""""${objectKey.eTag}""""))
+    val deleteMarker = objectKey.deleteMarker.getOrElse(false)
+    if (deleteMarker) headers.addOne(RawHeader(DeleteMarkerHeader, deleteMarker.toString))
+    if (objectKey.version == BucketVersioning.Enabled) headers.addOne(RawHeader(VersionIdHeader, objectKey.versionId))
+    headers.toList
   }
 
   def extractRange: HttpHeader => Option[ByteRange] = {

@@ -533,7 +533,7 @@ class BucketOperationsBehaviorSpec
   it should "set delete marker on an object" in {
     val key = "sample.txt"
 
-    val expected = DeleteInfo(false)
+    val expected = DeleteInfo(deleteMarker = false, NotExists)
     val probe = testKit.createTestProbe[Event]()
     val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
     actorRef ! DeleteObjectWrapper(key, replyTo = probe.ref)
@@ -546,7 +546,7 @@ class BucketOperationsBehaviorSpec
   it should "delete an object" in {
     val key = "sample.txt"
 
-    val expected = DeleteInfo(true)
+    val expected = DeleteInfo(deleteMarker = true, NotExists)
     val probe = testKit.createTestProbe[Event]()
     val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
     actorRef ! DeleteObjectWrapper(key, replyTo = probe.ref)

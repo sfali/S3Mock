@@ -54,7 +54,7 @@ class RoutesSpec
   override protected def afterAll(): Unit = {
     super.afterAll()
     database.close()
-    clean(rootPath)
+    Files.delete(rootPath -> settings.dbSettings.fileName)
     system.terminate()
   }
 
@@ -137,7 +137,7 @@ class RoutesSpec
     }
   }
 
-  it should "result in 404(BadRequest) if attempt to put object in non-existing bucket" in {
+  it should "result in 404(NotFound) if attempt to put object in non-existing bucket" in {
     val fileName = "sample.txt"
     val key = s"input/$fileName"
     val path = resourcePath -> fileName
@@ -174,6 +174,30 @@ class RoutesSpec
       response.entity.contentLengthOption mustBe Some(53)
       val actualContent = response.entity.dataBytes.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
       expectedContent mustEqual actualContent
+    }
+  }
+
+  it should "set delete marker on an object" in {
+    val key: String = "sample.txt"
+    Delete(s"/$defaultBucketName/$key") ~> routes ~> check {
+      status mustEqual NoContent
+      getHeader(headers, DeleteMarkerHeader) mustBe empty
+    }
+  }
+
+  it should "result in 404(NotFound) when attempt to get an item which is flag with delete marker" in {
+    val key = "sample.txt"
+    Get(s"/$defaultBucketName/$key") ~> routes ~> check {
+      status mustEqual NotFound
+      getHeader(headers, DeleteMarkerHeader) mustBe Some(RawHeader(DeleteMarkerHeader, "true"))
+    }
+  }
+
+  it should "permanently delete an object" in {
+    val key: String = "sample.txt"
+    Delete(s"/$defaultBucketName/$key") ~> routes ~> check {
+      status mustEqual NoContent
+      getHeader(headers, DeleteMarkerHeader) mustBe Some(RawHeader(DeleteMarkerHeader, "true"))
     }
   }
 
