@@ -31,4 +31,6 @@ final case class DeleteInfo(deleteMarker: Boolean,
                             version: BucketVersioning,
                             maybeVersionId: Option[String] = None) extends Event
 
+final case class MultiPartUploadedInitiated(uploadId: String) extends Event
+
 final case class BucketAlreadyExists(bucket: Bucket) extends Event

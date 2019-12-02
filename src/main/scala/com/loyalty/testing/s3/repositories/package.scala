@@ -38,6 +38,8 @@ package object repositories {
   val VersionIndexField = "version-index"
   val VersionIdField = "version-id"
   val DeleteMarkerField = "delete-marker"
+  val UploadIdField = "upload-id"
+  val PartNumberField = "part-number"
   val NonVersionId: String = 0.toVersionId
   val ContentFileName: String = "content"
 

@@ -11,7 +11,7 @@ import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.ObjectOperationsBehavior.ObjectProtocol
 import com.loyalty.testing.s3.repositories._
 import com.loyalty.testing.s3.repositories.collections.NoSuchId
-import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
+import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
 import com.loyalty.testing.s3.request.BucketVersioning
 
 import scala.concurrent.duration._
@@ -27,6 +27,7 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
 
   private var versionIndex = 0
   private var objects: List[ObjectKey] = Nil
+  private var uploadInfo: Option[UploadInfo] = None
   private val objectId = UUID.fromString(context.self.path.name)
   context.setReceiveTimeout(5.minutes, Shutdown)
   context.self ! InitializeSnapshot
@@ -142,6 +143,34 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
         context.self ! command
         Behaviors.same
 
+      case InitiateMultiPartUpload(bucket, key, replyTo) =>
+        versionIndex = if (BucketVersioning.Enabled == bucket.version) versionIndex + 1 else versionIndex
+        val uploadInfo = UploadInfo(
+          bucketName = bucket.bucketName,
+          key = key,
+          version = bucket.version,
+          versionIndex = versionIndex,
+          uploadId = toBase16FromRandomUUID,
+          partNumber = 0
+        )
+        context.pipeToSelf(database.createUpload(uploadInfo)) {
+          case Failure(ex) =>
+            context.log.error(s"unable to initiated multi part upload: ${bucket.bucketName}/$key", ex)
+            DatabaseError // TODO: retry
+          case Success(_) => UploadInfoCreated(uploadInfo, replyTo)
+        }
+        Behaviors.same
+
+      case UploadInfoCreated(uploadInfo, replyTo) =>
+        this.uploadInfo = Some(uploadInfo)
+        Try(objectIO.initiateMultipartUpload(uploadInfo)) match {
+          case Failure(ex) =>
+            context.log.error(s"unable to initiated multi part upload: ${uploadInfo.bucketName}/${uploadInfo.key}", ex)
+            DatabaseError // TODO: retry
+          case Success(_) => ReplyToSender(MultiPartUploadedInitiated(uploadInfo.uploadId), replyTo)
+        }
+        Behaviors.same
+
       case GetObjectMeta(replyTo) =>
         val maybeObjectKey = objects.find(om => om.id == objectId)
         val event = maybeObjectKey.map(ObjectInfo.apply).getOrElse(NoSuchKeyExists)
@@ -237,6 +266,13 @@ object ObjectOperationsBehavior {
 
   private final case class ObjectDeleted(objectKey: ObjectKey,
                                          replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
+
+  final case class InitiateMultiPartUpload(bucket: Bucket,
+                                           key: String,
+                                           replyTo: ActorRef[Event]) extends ObjectInput
+
+  private final case class UploadInfoCreated(uploadInfo: UploadInfo,
+                                             replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
 
   private def sanitizeVersionId(bucket: Bucket, maybeVersionId: Option[String]): Option[String] =
     if (BucketVersioning.NotExists == bucket.version && maybeVersionId.isDefined) {

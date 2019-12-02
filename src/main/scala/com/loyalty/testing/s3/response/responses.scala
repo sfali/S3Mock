@@ -105,15 +105,7 @@ case class BucketContent(expand: Boolean,
 
 case class InitiateMultipartUploadResult(bucketName: String, key: String, uploadId: String) extends XmlResponse {
   override def toXml: Elem =
-    <InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-      <Bucket>
-        {bucketName}
-      </Bucket> <Key>
-      {key.decode}
-    </Key> <UploadId>
-      {uploadId}
-    </UploadId>
-    </InitiateMultipartUploadResult>
+    <InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>{bucketName}</Bucket><Key>{key.decode}</Key><UploadId>{uploadId}</UploadId></InitiateMultipartUploadResult>
 }
 
 case class CopyObjectResult(eTag: String,

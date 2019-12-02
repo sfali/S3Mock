@@ -11,7 +11,7 @@ import akka.stream.IOResult
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
+import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
 import com.loyalty.testing.s3.request.BucketVersioning
 import com.loyalty.testing.s3.streams.FileStream
 
@@ -24,7 +24,7 @@ class ObjectIO(root: Path, fileStream: FileStream)
 
   private val workDir: Path = root.toAbsolutePath
   private val dataDir: Path = workDir + "data"
-  // private val uploadsDir: Path = workDir + "uploads"
+  private val uploadsDir: Path = workDir + "uploads"
 
   def saveObject(bucket: Bucket,
                  key: String,
@@ -71,14 +71,19 @@ class ObjectIO(root: Path, fileStream: FileStream)
     if (empty) clean(parent)
   }
 
+  def initiateMultipartUpload(uploadInfo: UploadInfo): Path = getUploadPath(uploadInfo)
+
   private def getObjectPath(bucketName: String,
                             key: String,
                             bucketVersioning: BucketVersioning,
                             versionId: String) = {
-    val objectParentPath = dataDir -> (bucketName, key, toBase16(bucketVersioning.entryName), versionId)
-    Files.createDirectories(objectParentPath)
+    val objectParentPath = dataDir + (bucketName, key, toBase16(bucketVersioning.entryName), versionId)
     objectParentPath -> ContentFileName
   }
+
+  private def getUploadPath(uploadInfo: UploadInfo) =
+    uploadsDir + (uploadInfo.bucketName, uploadInfo.key, uploadInfo.uploadId, toBase16(uploadInfo.version.entryName),
+      uploadInfo.versionIndex.toVersionId)
 }
 
 object ObjectIO {

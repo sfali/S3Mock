@@ -152,6 +152,10 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
         objectActor(bucket, key) ! DeleteObject(bucket, key, maybeVersionId, replyTo)
         Behaviors.same
 
+      case InitiateMultiPartUploadWrapper(key, replyTo) =>
+        objectActor(bucket, key) ! InitiateMultiPartUpload(bucket, key, replyTo)
+        Behaviors.same
+
       case ReplyToSender(reply, replyTo) =>
         replyTo ! reply
         Behaviors.same
@@ -228,5 +232,8 @@ object BucketOperationsBehavior {
   final case class DeleteObjectWrapper(key: String,
                                        maybeVersionId: Option[String] = None,
                                        replyTo: ActorRef[Event]) extends BucketProtocolWithReply
+
+  final case class InitiateMultiPartUploadWrapper(key: String,
+                                                  replyTo: ActorRef[Event]) extends BucketProtocolWithReply
 
 }

@@ -51,7 +51,7 @@ class BucketOperationsBehaviorSpec
   override protected def afterAll(): Unit = {
     super.afterAll()
     database.close()
-    clean(rootPath)
+    Files.delete(rootPath -> dBSettings.fileName)
     testKit.shutdownTestKit()
   }
 

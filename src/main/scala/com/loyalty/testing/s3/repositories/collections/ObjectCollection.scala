@@ -67,7 +67,9 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
     }
   }
 
-  def deleteObject(objectId: UUID, maybeVersionId: Option[String], permanentDelete: Boolean): Int =
+  private[repositories] def deleteObject(objectId: UUID,
+                                         maybeVersionId: Option[String],
+                                         permanentDelete: Boolean): Int =
     findById(objectId, maybeVersionId) match {
       case Nil => throw NoSuchId(objectId)
       case document :: Nil =>
