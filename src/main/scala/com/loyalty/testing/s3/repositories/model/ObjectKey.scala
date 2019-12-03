@@ -35,7 +35,7 @@ object ObjectKey {
             eTag: String,
             contentMd5: String,
             contentLength: Long,
-            lastModifiedTime: OffsetDateTime,
+            lastModifiedTime: OffsetDateTime = OffsetDateTime.now,
             deleteMarker: Option[Boolean] = None): ObjectKey =
     new ObjectKey(
       id,

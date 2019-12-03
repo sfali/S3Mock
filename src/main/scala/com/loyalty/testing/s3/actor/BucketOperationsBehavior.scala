@@ -156,6 +156,10 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
         objectActor(bucket, key) ! InitiateMultiPartUpload(bucket, key, replyTo)
         Behaviors.same
 
+      case UploadPartWrapper(key, uploadId, partNumber, contentSource, replyTo) =>
+        objectActor(bucket, key) ! UploadPart(bucket, key, uploadId, partNumber, contentSource, replyTo)
+        Behaviors.same
+
       case ReplyToSender(reply, replyTo) =>
         replyTo ! reply
         Behaviors.same
@@ -235,5 +239,11 @@ object BucketOperationsBehavior {
 
   final case class InitiateMultiPartUploadWrapper(key: String,
                                                   replyTo: ActorRef[Event]) extends BucketProtocolWithReply
+
+  final case class UploadPartWrapper(key: String,
+                                     uploadId: String,
+                                     partNumber: Int,
+                                     contentSource: Source[ByteString, _],
+                                     replyTo: ActorRef[Event]) extends BucketProtocolWithReply
 
 }

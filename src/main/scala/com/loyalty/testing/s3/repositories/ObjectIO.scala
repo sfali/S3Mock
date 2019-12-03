@@ -55,6 +55,23 @@ class ObjectIO(root: Path, fileStream: FileStream)
       }
   }
 
+  def savePart(uploadInfo: UploadInfo, contentSource: Source[ByteString, _]): Future[UploadInfo] = {
+    val objectPath = getUploadPath(uploadInfo)
+    fileStream.saveContent(contentSource, objectPath)
+      .flatMap {
+        case (eTag, contentMd5) =>
+          if (Files.notExists(objectPath)) Future.failed(new RuntimeException("unable to save file"))
+          else {
+            val updateUploadInfo = uploadInfo.copy(
+              eTag = eTag,
+              contentMd5 = contentMd5,
+              contentLength = Files.size(objectPath)
+            )
+            Future.successful(updateUploadInfo)
+          }
+      }
+  }
+
   def getObject(objectKey: ObjectKey,
                 maybeRange: Option[ByteRange] = None): (ObjectKey, Source[ByteString, Future[IOResult]]) = {
     val objectPath = getObjectPath(objectKey.bucketName, objectKey.key, objectKey.version, objectKey.versionId)
@@ -81,9 +98,16 @@ class ObjectIO(root: Path, fileStream: FileStream)
     objectParentPath -> ContentFileName
   }
 
-  private def getUploadPath(uploadInfo: UploadInfo) =
-    uploadsDir + (uploadInfo.bucketName, uploadInfo.key, uploadInfo.uploadId, toBase16(uploadInfo.version.entryName),
-      uploadInfo.versionIndex.toVersionId)
+  private def getUploadPath(uploadInfo: UploadInfo) = {
+    val uploadPath = uploadsDir + (uploadInfo.bucketName, uploadInfo.key, uploadInfo.uploadId,
+      toBase16(uploadInfo.version.entryName), uploadInfo.versionIndex.toVersionId)
+    if (uploadInfo.partNumber > 0) {
+      val partPath = uploadPath + uploadInfo.partNumber.toString
+      partPath -> ContentFileName
+    } else uploadPath
+
+  }
+
 }
 
 object ObjectIO {

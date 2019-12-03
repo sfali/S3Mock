@@ -9,9 +9,9 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.ObjectOperationsBehavior.ObjectProtocol
-import com.loyalty.testing.s3.repositories._
 import com.loyalty.testing.s3.repositories.collections.NoSuchId
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
+import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.BucketVersioning
 
 import scala.concurrent.duration._
@@ -150,8 +150,7 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
           key = key,
           version = bucket.version,
           versionIndex = versionIndex,
-          uploadId = toBase16FromRandomUUID,
-          partNumber = 0
+          uploadId = toBase16FromRandomUUID
         )
         context.pipeToSelf(database.createUpload(uploadInfo)) {
           case Failure(ex) =>
@@ -168,6 +167,29 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
             context.log.error(s"unable to initiated multi part upload: ${uploadInfo.bucketName}/${uploadInfo.key}", ex)
             DatabaseError // TODO: retry
           case Success(_) => ReplyToSender(MultiPartUploadedInitiated(uploadInfo.uploadId), replyTo)
+        }
+        Behaviors.same
+
+      case UploadPart(bucket, key, uploadId, partNumber, contentSource, replyTo) =>
+        val hasUpload = uploadInfo.exists(_.uploadId == uploadId)
+        if (hasUpload) {
+          val partInfo = uploadInfo.get.copy(partNumber = partNumber)
+          context.pipeToSelf(objectIO.savePart(partInfo, contentSource)) {
+            case Failure(ex) =>
+              context.log.error(s"unable to create part upload: ${bucket.bucketName}/$key", ex)
+              DatabaseError // TODO: retry
+            case Success(uploadInfo) => PartSaved(uploadInfo, replyTo)
+          }
+        } else
+          context.self ! ReplyToSender(UploadNotFound, replyTo)
+        Behaviors.same
+
+      case PartSaved(uploadInfo, replyTo) =>
+        context.pipeToSelf(database.createUpload(uploadInfo)) {
+          case Failure(ex) =>
+            context.log.error(s"unable to create part upload: ${uploadInfo.bucketName}/${uploadInfo.key}", ex)
+            DatabaseError // TODO: retry
+          case Success(_) => ReplyToSender(PartUploaded(uploadInfo.copy(contentMd5 = "", contentLength = 0)), replyTo)
         }
         Behaviors.same
 
@@ -204,6 +226,7 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
       case Some(versionId) => objects.filter(_.versionId == versionId).lastOption
       case None => objects.lastOption
     }
+
 }
 
 object ObjectOperationsBehavior {
@@ -273,6 +296,16 @@ object ObjectOperationsBehavior {
 
   private final case class UploadInfoCreated(uploadInfo: UploadInfo,
                                              replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
+
+  final case class UploadPart(bucket: Bucket,
+                              key: String,
+                              uploadId: String,
+                              partNumber: Int,
+                              contentSource: Source[ByteString, _],
+                              replyTo: ActorRef[Event]) extends ObjectInput
+
+  private final case class PartSaved(uploadInfo: UploadInfo,
+                                     replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
 
   private def sanitizeVersionId(bucket: Bucket, maybeVersionId: Option[String]): Option[String] =
     if (BucketVersioning.NotExists == bucket.version && maybeVersionId.isDefined) {

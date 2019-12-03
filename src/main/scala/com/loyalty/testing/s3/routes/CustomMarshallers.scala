@@ -77,6 +77,9 @@ trait CustomMarshallers
   implicit val NoSuchKeyExceptionMarshallers: ToEntityMarshaller[NoSuchKeyException] =
     xmlResponseMarshallers(`application/octet-stream`)
 
+  implicit val NoSuchUploadExceptionMarshallers: ToEntityMarshaller[NoSuchUploadException] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
   implicit val InvalidNotificationConfigurationExceptionMarshallers: ToEntityMarshaller[InvalidNotificationConfigurationException] =
     xmlResponseMarshallers(`application/octet-stream`)
 

@@ -34,6 +34,9 @@ class UploadStagingCollection(db: Nitrite) {
             .put(VersionField, uploadInfo.version.entryName)
             .put(VersionIndexField, uploadInfo.versionIndex)
             .put(PartNumberField, uploadInfo.partNumber)
+            .put(ETagField, uploadInfo.eTag)
+            .put(ContentMd5Field, uploadInfo.contentMd5)
+            .put(ContentLengthField, uploadInfo.contentLength)
         case document :: Nil =>
           val other = UploadInfo(document)
           if (other != uploadInfo) {
