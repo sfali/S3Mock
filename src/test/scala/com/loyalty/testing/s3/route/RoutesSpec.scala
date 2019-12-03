@@ -6,8 +6,8 @@ import java.time.OffsetDateTime
 import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.ContentTypes._
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.model.{HttpEntity, HttpHeader}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.stream.scaladsl.{FileIO, Sink}
 import akka.util.Timeout
@@ -72,33 +72,33 @@ class RoutesSpec
     }
   }
 
-  /* it should "create bucket with region provided" in {
-     val xml =
-       """
-         |<CreateBucketConfiguration xmlns="http:/.amazonaws.com/doc/2006-03-01/">
-         | <LocationConstraint>us-west-1</LocationConstraint>
-         |</CreateBucketConfiguration>
-       """.stripMargin
-     val entity = HttpEntity(`text/xml(UTF-8)`, xml)
-     Put(s"/test-bucket-2", CreateBucketConfiguration("us-west-1")) ~> routes ~> check {
-       headers.head mustBe Location("/test-bucket-2")
-       status mustBe OK
-     }
-   }*/
+  it should "create bucket with region provided" in {
+    val xml =
+      """
+        |<CreateBucketConfiguration xmlns="http:/.amazonaws.com/doc/2006-03-01/">
+        |<LocationConstraint>us-west-1</LocationConstraint>
+        |</CreateBucketConfiguration>
+       """.stripMargin.replaceAll(System.lineSeparator(), "")
+    val entity = HttpEntity(ContentType(MediaTypes.`application/xml`, HttpCharsets.`UTF-8`), xml)
+    Put(s"/$versionedBucketName", entity) ~> routes ~> check {
+      headers.head mustBe Location(s"/$versionedBucketName")
+      status mustBe OK
+    }
+  }
 
-  /*it should "set versioning on the bucket" in {
+  it should "set versioning on the bucket" in {
     val xml =
       """
         |<VersioningConfiguration xmlns="http:/.amazonaws.com/doc/2006-03-01/">
-        |  <Status>Enabled</Status>
+        |<Status>Enabled</Status>
         |</VersioningConfiguration>
-      """.stripMargin
+      """.stripMargin.replaceAll(System.lineSeparator(), "")
     val entity = HttpEntity(`text/xml(UTF-8)`, xml)
-    Put("/test-bucket-2?versioning", entity) ~> s3Routes ~> check {
-      headers.head mustBe Location("/test-bucket-2")
+    Put(s"/$versionedBucketName?versioning", entity) ~> routes ~> check {
+      headers.head mustBe Location(s"/$versionedBucketName")
       status mustBe OK
     }
-  }*/
+  }
 
   it should "put an object in the specified non-version bucket" in {
     val key = "sample.txt"
@@ -201,7 +201,7 @@ class RoutesSpec
     }
   }
 
-  /*it should "put an object in the specified bucket with bucket versioning on" in {
+  it should "put an object in the specified bucket with bucket versioning on" in {
     val key = "sample.txt"
     val path = resourcePath -> key
     val contentSource = FileIO.fromPath(path)
@@ -210,8 +210,9 @@ class RoutesSpec
       status mustEqual OK
       getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest""""))
       getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest"))
+      getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, 1.toVersionId))
     }
-  }*/
+  }
 
   /*it should "initiate multi part upload" in {
     Post("/test-bucket/file.txt?uploads") ~> s3Routes ~> {
@@ -277,7 +278,7 @@ object RoutesSpec {
   private val rootPath: Path = Paths.get(userDir, "target", ".s3mock")
   private val resourcePath = Paths.get("src", "test", "resources")
   private val defaultBucketName = "non-versioned-bucket"
-  //private val versionedBucketName = "versioned-bucket"
+  private val versionedBucketName = "versioned-bucket"
   private val nonExistentBucketName = "dummy"
   private val etagDigest = "6b4bb2a848f1fac797e320d7b9030f3e"
   private val md5Digest = "a0uyqEjx+seX4yDXuQMPPg=="
