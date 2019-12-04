@@ -55,7 +55,7 @@ object Dependencies {
     val Scala212 = "2.12.8"
     val Scala213 = "2.13.1"
     val AkkaVersion = "2.6.0"
-    val AkkaHttpVersion = "10.1.10"
+    val AkkaHttpVersion = "10.1.11"
     val LightbendVersion = "1.1.2"
     val AwsSdk2Version = "2.10.21"
     val LogbackVersion = "1.2.3"
