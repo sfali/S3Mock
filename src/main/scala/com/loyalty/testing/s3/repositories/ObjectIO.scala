@@ -12,7 +12,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
-import com.loyalty.testing.s3.request.BucketVersioning
+import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo}
 import com.loyalty.testing.s3.streams.FileStream
 
 import scala.concurrent.Future
@@ -35,10 +35,10 @@ class ObjectIO(root: Path, fileStream: FileStream)
     val objectPath = getObjectPath(bucket.bucketName, key, bucket.version, versionId)
     fileStream.saveContent(contentSource, objectPath)
       .flatMap {
-        case (etag, contentMD5) =>
+        case (etag, contentMd5) =>
           if (Files.notExists(objectPath)) Future.failed(new RuntimeException("unable to save file"))
-          else {
-            val objectKey = ObjectKey(
+          else
+            Future.successful(ObjectKey(
               id = keyId,
               bucketName = bucket.bucketName,
               key = key,
@@ -46,12 +46,10 @@ class ObjectIO(root: Path, fileStream: FileStream)
               version = bucket.version,
               versionId = versionId,
               eTag = etag,
-              contentMd5 = contentMD5,
+              contentMd5 = contentMd5,
               contentLength = Files.size(objectPath),
               lastModifiedTime = OffsetDateTime.now()
-            )
-            Future.successful(objectKey)
-          }
+            ))
       }
   }
 
@@ -59,16 +57,41 @@ class ObjectIO(root: Path, fileStream: FileStream)
     val objectPath = getUploadPath(uploadInfo)
     fileStream.saveContent(contentSource, objectPath)
       .flatMap {
-        case (eTag, contentMd5) =>
+        case (etag, contentMd5) =>
           if (Files.notExists(objectPath)) Future.failed(new RuntimeException("unable to save file"))
           else {
             val updateUploadInfo = uploadInfo.copy(
-              eTag = eTag,
+              eTag = etag,
               contentMd5 = contentMd5,
               contentLength = Files.size(objectPath)
             )
             Future.successful(updateUploadInfo)
           }
+      }
+  }
+
+  def completeUpload(uploadInfo: UploadInfo, parts: List[PartInfo]): Future[ObjectKey] = {
+    val versionId = uploadInfo.versionIndex.toVersionId
+    val objectPath = getObjectPath(uploadInfo.bucketName, uploadInfo.key, uploadInfo.version, versionId)
+    val partPaths = parts.map(partInfo => uploadInfo.copy(partNumber = partInfo.partNumber)).map(getUploadPath)
+    fileStream.mergeFiles(objectPath, partPaths)
+      .flatMap {
+        case (etag, contentMd5) =>
+          if (Files.notExists(objectPath)) Future.failed(new RuntimeException("unable to save file"))
+          else
+            Future.successful(ObjectKey(
+              id = createObjectId(uploadInfo.bucketName, uploadInfo.key),
+              bucketName = uploadInfo.bucketName,
+              key = uploadInfo.key,
+              index = uploadInfo.versionIndex,
+              version = uploadInfo.version,
+              versionId = versionId,
+              eTag = etag,
+              contentMd5 = contentMd5,
+              contentLength = Files.size(objectPath),
+              lastModifiedTime = OffsetDateTime.now(),
+              uploadId = Some(uploadInfo.uploadId)
+            ))
       }
   }
 

@@ -35,6 +35,12 @@ final case class MultiPartUploadedInitiated(uploadId: String) extends Event
 
 final case class PartUploaded(uploadInfo: UploadInfo) extends Event
 
-case object UploadNotFound extends Event
+case object NoSuchUpload extends Event
+
+case object InvalidPartOrder extends Event
+
+final case class InvalidPart(partNumber: Int) extends Event
 
 final case class BucketAlreadyExists(bucket: Bucket) extends Event
+
+case object InternalError extends Event

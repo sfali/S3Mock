@@ -13,7 +13,7 @@ import com.loyalty.testing.s3.actor.ObjectOperationsBehavior._
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
-import com.loyalty.testing.s3.request.VersioningConfiguration
+import com.loyalty.testing.s3.request.{PartInfo, VersioningConfiguration}
 import com.loyalty.testing.s3.response.NoSuchBucketException
 
 import scala.concurrent.duration._
@@ -160,6 +160,10 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
         objectActor(bucket, key) ! UploadPart(bucket, key, uploadId, partNumber, contentSource, replyTo)
         Behaviors.same
 
+      case CompleteUploadWrapper(key, uploadId, parts, replyTo) =>
+        objectActor(bucket, key) ! CompleteUpload(bucket, key, uploadId, parts, replyTo)
+        Behaviors.same
+
       case ReplyToSender(reply, replyTo) =>
         replyTo ! reply
         Behaviors.same
@@ -245,5 +249,10 @@ object BucketOperationsBehavior {
                                      partNumber: Int,
                                      contentSource: Source[ByteString, _],
                                      replyTo: ActorRef[Event]) extends BucketProtocolWithReply
+
+  final case class CompleteUploadWrapper(key: String,
+                                         uploadId: String,
+                                         parts: List[PartInfo],
+                                         replyTo: ActorRef[Event]) extends BucketProtocolWithReply
 
 }

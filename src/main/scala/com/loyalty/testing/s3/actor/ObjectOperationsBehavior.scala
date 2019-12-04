@@ -12,7 +12,7 @@ import com.loyalty.testing.s3.actor.ObjectOperationsBehavior.ObjectProtocol
 import com.loyalty.testing.s3.repositories.collections.NoSuchId
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
-import com.loyalty.testing.s3.request.BucketVersioning
+import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo}
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
@@ -28,6 +28,7 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
   private var versionIndex = 0
   private var objects: List[ObjectKey] = Nil
   private var uploadInfo: Option[UploadInfo] = None
+  private var uploadParts: Map[String, Set[UploadInfo]] = Map.empty
   private val objectId = UUID.fromString(context.self.path.name)
   context.setReceiveTimeout(5.minutes, Shutdown)
   context.self ! InitializeSnapshot
@@ -63,6 +64,10 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
     Behaviors.receiveMessagePartial {
       case protocol: ObjectInput if protocol.objectId != objectId =>
         context.self ! ReplyToSender(InvalidAccess, protocol.replyTo)
+        Behaviors.same
+
+      case protocol: UploadInput if !uploadInfo.exists(_.uploadId == protocol.uploadId) =>
+        context.self ! ReplyToSender(NoSuchUpload, protocol.replyTo)
         Behaviors.same
 
       case PutObject(bucket, key, contentSource, replyTo) =>
@@ -171,17 +176,13 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
         Behaviors.same
 
       case UploadPart(bucket, key, uploadId, partNumber, contentSource, replyTo) =>
-        val hasUpload = uploadInfo.exists(_.uploadId == uploadId)
-        if (hasUpload) {
-          val partInfo = uploadInfo.get.copy(partNumber = partNumber)
-          context.pipeToSelf(objectIO.savePart(partInfo, contentSource)) {
-            case Failure(ex) =>
-              context.log.error(s"unable to create part upload: ${bucket.bucketName}/$key", ex)
-              DatabaseError // TODO: retry
-            case Success(uploadInfo) => PartSaved(uploadInfo, replyTo)
-          }
-        } else
-          context.self ! ReplyToSender(UploadNotFound, replyTo)
+        val partInfo = uploadInfo.get.copy(partNumber = partNumber)
+        context.pipeToSelf(objectIO.savePart(partInfo, contentSource)) {
+          case Failure(ex) =>
+            context.log.error(s"unable to create part upload: ${bucket.bucketName}/$key/$uploadId", ex)
+            DatabaseError // TODO: retry
+          case Success(uploadInfo) => PartSaved(uploadInfo, replyTo)
+        }
         Behaviors.same
 
       case PartSaved(uploadInfo, replyTo) =>
@@ -189,8 +190,54 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
           case Failure(ex) =>
             context.log.error(s"unable to create part upload: ${uploadInfo.bucketName}/${uploadInfo.key}", ex)
             DatabaseError // TODO: retry
-          case Success(_) => ReplyToSender(PartUploaded(uploadInfo.copy(contentMd5 = "", contentLength = 0)), replyTo)
+          case Success(_) => PartCreated(uploadInfo.copy(contentMd5 = "", contentLength = 0), replyTo)
         }
+        Behaviors.same
+
+      case PartCreated(uploadInfo, replyTo) =>
+        val parts = uploadParts.getOrElse(uploadInfo.uploadId, Set.empty[UploadInfo])
+        uploadParts = uploadParts + (uploadInfo.uploadId -> (parts + uploadInfo))
+        context.self ! ReplyToSender(PartUploaded(uploadInfo), replyTo)
+        Behaviors.same
+
+      case CompleteUpload(bucket, key, uploadId, parts, replyTo) =>
+        val uploadInfo = this.uploadInfo.get
+        if (checkPartOrders(parts.map(_.partNumber))) {
+          val savedParts =
+            uploadParts.get(uploadId) match {
+              case Some(values) => values.map(PartInfo(_)).toList.sortBy(_.partNumber)
+              case None => Nil
+            }
+          if (savedParts.isEmpty)
+            context.self ! ReplyToSender(InternalError, replyTo)
+          else if (savedParts != parts) {
+            val diff = savedParts.diff(parts)
+            context.log.warn("Invalid part order: bucket={}, key={}, upload_id={}, saved_parts={}, request_parts={}",
+              bucket.bucketName, key, uploadId, savedParts, parts)
+            context.self ! ReplyToSender(InvalidPart(diff.head.partNumber), replyTo)
+          } else {
+            context.pipeToSelf(objectIO.completeUpload(uploadInfo, parts)) {
+              case Failure(ex) =>
+                context.log.error(s"unable to complete upload: ${uploadInfo.bucketName}/${uploadInfo.key}", ex)
+                DatabaseError // TODO: retry
+              case Success(objectKey) => PartsMerged(objectKey, replyTo)
+            }
+          }
+        } else context.self ! ReplyToSender(InvalidPartOrder, replyTo)
+        Behaviors.same
+
+      case PartsMerged(objectKey, replyTo) =>
+        context.pipeToSelf(database.createObject(objectKey)) {
+          case Failure(ex) =>
+            context.log.error(s"unable to save object: ${objectKey.bucketName}/${objectKey.key}", ex)
+            DatabaseError // TODO: retry
+          case Success(savedObjectKey) => ResetUploadInfo(savedObjectKey, replyTo)
+        }
+        Behaviors.same
+
+      case ResetUploadInfo(objectKey, replyTo) =>
+        uploadInfo = None
+        context.self ! ReplyToSender(ObjectInfo(objectKey), replyTo)
         Behaviors.same
 
       case GetObjectMeta(replyTo) =>
@@ -251,6 +298,10 @@ object ObjectOperationsBehavior {
     lazy val objectId: UUID = createObjectId(bucket.bucketName, key)
   }
 
+  sealed trait UploadInput extends ObjectInput {
+    val uploadId: String
+  }
+
   private final case object Shutdown extends ObjectProtocol
 
   private final case object DatabaseError extends ObjectProtocol
@@ -302,10 +353,25 @@ object ObjectOperationsBehavior {
                               uploadId: String,
                               partNumber: Int,
                               contentSource: Source[ByteString, _],
-                              replyTo: ActorRef[Event]) extends ObjectInput
+                              replyTo: ActorRef[Event]) extends UploadInput
 
   private final case class PartSaved(uploadInfo: UploadInfo,
                                      replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
+
+  private final case class PartCreated(uploadInfo: UploadInfo,
+                                       replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
+
+  final case class CompleteUpload(bucket: Bucket,
+                                  key: String,
+                                  uploadId: String,
+                                  parts: List[PartInfo],
+                                  replyTo: ActorRef[Event]) extends UploadInput
+
+  private final case class PartsMerged(objectKey: ObjectKey,
+                                       replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
+
+  private final case class ResetUploadInfo(objectKey: ObjectKey,
+                                           replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
 
   private def sanitizeVersionId(bucket: Bucket, maybeVersionId: Option[String]): Option[String] =
     if (BucketVersioning.NotExists == bucket.version && maybeVersionId.isDefined) {

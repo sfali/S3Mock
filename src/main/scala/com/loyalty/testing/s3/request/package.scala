@@ -1,5 +1,6 @@
 package com.loyalty.testing.s3
 
+import com.loyalty.testing.s3.repositories.model.UploadInfo
 import enumeratum.{CirceEnum, Enum, EnumEntry}
 
 import scala.collection.immutable
@@ -37,11 +38,16 @@ package object request {
   case class PartInfo(partNumber: Int, eTag: String)
 
   object PartInfo {
+    def apply(partNumber: Int, eTag: String): PartInfo = new PartInfo(partNumber, eTag)
+
     def apply(node: NodeSeq): PartInfo = {
       val partNumber = (node \ "PartNumber").text.toInt
       val eTag = (node \ "ETag").text.drop(1).dropRight(1) // remove quotations
       PartInfo(partNumber, eTag)
     }
+
+    def apply(uploadInfo: UploadInfo): PartInfo = PartInfo(uploadInfo.partNumber, uploadInfo.eTag)
+
   }
 
   case class CompleteMultipartUpload(parts: List[PartInfo])

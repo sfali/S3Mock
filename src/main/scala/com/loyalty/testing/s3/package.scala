@@ -341,4 +341,15 @@ package object s3 {
         FileVisitResult.CONTINUE
       }
     })
+
+  def checkPartOrders(parts: List[Int]): Boolean =
+    if (parts.isEmpty || (parts.head != 1 || parts.last != parts.length)) false
+    else isSortedInternal(parts)
+
+  @scala.annotation.tailrec
+  private def isSortedInternal(ls: List[Int]): Boolean =
+    ls match {
+      case Nil | _ :: Nil => true
+      case item1 :: item2 :: xs => item1 + 1 == item2 && isSortedInternal(item2 :: xs)
+    }
 }

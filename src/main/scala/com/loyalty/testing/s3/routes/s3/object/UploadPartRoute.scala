@@ -8,7 +8,7 @@ import akka.http.scaladsl.server.Route
 import akka.util.Timeout
 import com.loyalty.testing.s3.actor.BucketOperationsBehavior.UploadPartWrapper
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
-import com.loyalty.testing.s3.actor.{InvalidAccess, NoSuchBucketExists, PartUploaded, UploadNotFound}
+import com.loyalty.testing.s3.actor.{InvalidAccess, NoSuchBucketExists, PartUploaded, NoSuchUpload}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException, NoSuchUploadException}
 import com.loyalty.testing.s3.routes.CustomMarshallers
@@ -37,7 +37,7 @@ object UploadPartRoute extends CustomMarshallers {
           case Success(PartUploaded(uploadInfo)) => complete(HttpResponse(OK)
             .withHeaders(createResponseHeaders(uploadInfo.toObjectKey)))
           case Success(NoSuchBucketExists) => complete(NoSuchBucketException(bucketName))
-          case Success(UploadNotFound) => complete(NoSuchUploadException(bucketName, key))
+          case Success(NoSuchUpload) => complete(NoSuchUploadException(bucketName, key))
           case Success(InvalidAccess) =>
             system.log.warn("UploadPartRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
             complete(InternalServiceException(s"$bucketName/$key"))
