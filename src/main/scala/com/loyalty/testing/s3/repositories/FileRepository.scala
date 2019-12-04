@@ -221,7 +221,7 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
               case (etag, contentMD5) =>
                 if (Files.notExists(filePath)) Future.failed(new RuntimeException("unable to save file"))
                 else {
-                  bucketMetadata.addPart(uploadId, UploadPart(partNumber, etag))
+                  bucketMetadata.addPart(uploadId, PartInfo(partNumber, etag))
                   val response = ObjectMeta(filePath, createPutObjectResult(key, etag, contentMD5, Files.size(filePath)))
                   bucketMetadata.putObject(key, response)
                   Future.successful(response)

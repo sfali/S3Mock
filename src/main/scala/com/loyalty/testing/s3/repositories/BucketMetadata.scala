@@ -4,7 +4,7 @@ import java.nio.file.Path
 import java.time.LocalDateTime
 
 import com.loyalty.testing.s3.notification.Notification
-import com.loyalty.testing.s3.request.{UploadPart, VersioningConfiguration}
+import com.loyalty.testing.s3.request.{PartInfo, VersioningConfiguration}
 import com.loyalty.testing.s3.response.ObjectMeta
 import com.loyalty.testing.s3._
 
@@ -16,7 +16,7 @@ class BucketMetadata(val bucketName: String, val path: Path) {
   private var _maybeBucketVersioning: Option[VersioningConfiguration] = None
   private var _notifications: List[Notification] = Nil
   private val objectMetaMap: mutable.Map[String, ObjectMeta] = mutable.Map.empty
-  private val multiPartUploads = mutable.Map[String, List[UploadPart]]()
+  private val multiPartUploads = mutable.Map[String, List[PartInfo]]()
 
   def location: String = _location
 
@@ -53,12 +53,12 @@ class BucketMetadata(val bucketName: String, val path: Path) {
 
   def removeMetadata(key: String): Unit = objectMetaMap -= convertKey(key)
 
-  def addPart(uploadId: String, part: UploadPart): Unit = {
+  def addPart(uploadId: String, part: PartInfo): Unit = {
     val parts = multiPartUploads.getOrElse(uploadId, List())
     multiPartUploads += (uploadId -> (parts :+ part))
   }
 
-  def getParts(uploadId: String): List[UploadPart] = multiPartUploads.getOrElse(uploadId, List())
+  def getParts(uploadId: String): List[PartInfo] = multiPartUploads.getOrElse(uploadId, List())
 
   def removeUpload(uploadId: String): Unit = multiPartUploads -= uploadId
 

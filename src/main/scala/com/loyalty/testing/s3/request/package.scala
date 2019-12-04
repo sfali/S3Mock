@@ -34,24 +34,24 @@ package object request {
     }
   }
 
-  case class UploadPart(partNumber: Int, eTag: String)
+  case class PartInfo(partNumber: Int, eTag: String)
 
-  object UploadPart {
-    def apply(node: NodeSeq): UploadPart = {
+  object PartInfo {
+    def apply(node: NodeSeq): PartInfo = {
       val partNumber = (node \ "PartNumber").text.toInt
-      val eTag = (node \ "ETag").text
-      UploadPart(partNumber, eTag)
+      val eTag = (node \ "ETag").text.drop(1).dropRight(1) // remove quotations
+      PartInfo(partNumber, eTag)
     }
   }
 
-  case class CompleteMultipartUpload(parts: List[UploadPart])
+  case class CompleteMultipartUpload(parts: List[PartInfo])
 
   object CompleteMultipartUpload {
     def apply(maybeXml: Option[String]): Option[CompleteMultipartUpload] =
       if (maybeXml.getOrElse("").trim.nonEmpty) {
         val node = scala.xml.XML.loadString(maybeXml.get.trim)
         val children = node \ "Part"
-        Some(CompleteMultipartUpload(children.map(UploadPart.apply).toList))
+        Some(CompleteMultipartUpload(children.map(PartInfo.apply).toList))
       } else None
   }
 
