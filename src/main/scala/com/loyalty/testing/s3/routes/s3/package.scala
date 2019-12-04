@@ -39,7 +39,8 @@ package object s3 {
     if (objectKey.eTag.nonEmpty) headers.addOne(RawHeader(ETAG, s""""${objectKey.eTag}""""))
     val deleteMarker = objectKey.deleteMarker.getOrElse(false)
     if (deleteMarker) headers.addOne(RawHeader(DeleteMarkerHeader, deleteMarker.toString))
-    if (objectKey.version == BucketVersioning.Enabled) headers.addOne(RawHeader(VersionIdHeader, objectKey.versionId))
+    val maybeVersionId = objectKey.actualVersionId
+    if (maybeVersionId.isDefined) headers.addOne(RawHeader(VersionIdHeader, maybeVersionId.get))
     headers.toList
   }
 

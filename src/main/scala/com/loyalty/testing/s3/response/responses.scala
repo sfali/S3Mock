@@ -135,17 +135,7 @@ case class CompleteMultipartUploadResult(bucketName: String, key: String, eTag: 
   val location = s"http://s3.amazonaws.com/${Paths.get(bucketName, key.decode).toString}"
 
   override def toXml: Elem =
-    <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-      <Location>
-        {location}
-      </Location> <Bucket>
-      {bucketName}
-    </Bucket> <Key>
-      {key.decode}
-    </Key> <ETag>"
-      {eTag}
-      "</ETag>
-    </CompleteMultipartUploadResult>
+    <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Location>{location}</Location><Bucket>{bucketName}</Bucket><Key>{key.decode}</Key><ETag>"{eTag}"</ETag></CompleteMultipartUploadResult>
 }
 
 object ErrorCodes {

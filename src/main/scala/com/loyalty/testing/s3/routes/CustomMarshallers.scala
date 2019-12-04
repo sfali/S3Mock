@@ -3,12 +3,14 @@ package com.loyalty.testing.s3.routes
 import java.nio.charset.StandardCharsets.UTF_8
 
 import akka.http.scaladsl.marshallers.xml.ScalaXmlSupport
-import akka.http.scaladsl.marshalling.Marshaller.fromToEntityMarshaller
+import akka.http.scaladsl.marshalling.Marshaller.{fromStatusCodeAndHeadersAndValue, fromToEntityMarshaller}
 import akka.http.scaladsl.marshalling.{Marshaller, ToEntityMarshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTypes}
+import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, HttpHeader, MediaTypes}
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, Unmarshaller}
 import akka.util.ByteString
+import com.loyalty.testing.s3.VersionIdHeader
 import com.loyalty.testing.s3.response._
 import de.heikoseeberger.akkahttpcirce.ErrorAccumulatingCirceSupport
 
@@ -80,6 +82,12 @@ trait CustomMarshallers
   implicit val NoSuchUploadExceptionMarshallers: ToEntityMarshaller[NoSuchUploadException] =
     xmlResponseMarshallers(`application/octet-stream`)
 
+  implicit val InvalidPartExceptionMarshallers: ToEntityMarshaller[InvalidPartException] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
+  implicit val InvalidPartOrderExceptionMarshallers: ToEntityMarshaller[InvalidPartOrderException] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
   implicit val InvalidNotificationConfigurationExceptionMarshallers: ToEntityMarshaller[InvalidNotificationConfigurationException] =
     xmlResponseMarshallers(`application/octet-stream`)
 
@@ -115,8 +123,8 @@ trait CustomMarshallers
   implicit val InvalidPartExceptionResponse: ToResponseMarshaller[InvalidPartException] =
     fromToEntityMarshaller[InvalidPartException](BadRequest)
 
-  implicit val CompleteMultipartUploadResultResponse: ToResponseMarshaller[CompleteMultipartUploadResult] =
-    fromToEntityMarshaller[CompleteMultipartUploadResult](OK)
+  /*implicit val CompleteMultipartUploadResultResponse: ToResponseMarshaller[CompleteMultipartUploadResult] =
+    fromToEntityMarshaller[CompleteMultipartUploadResult](OK)*/
 
   implicit val ListBucketResultResponse: ToResponseMarshaller[ListBucketResult] =
     fromToEntityMarshaller[ListBucketResult](OK)
@@ -127,16 +135,16 @@ trait CustomMarshallers
   implicit val InternalServiceExceptionResponse: ToResponseMarshaller[InternalServiceException] =
     fromToEntityMarshaller[InternalServiceException](InternalServerError)
 
-  /*implicit val CompleteMultipartUploadResultResponse: ToResponseMarshaller[CompleteMultipartUploadResult] =
+  implicit val CompleteMultipartUploadResultResponse: ToResponseMarshaller[CompleteMultipartUploadResult] =
     fromStatusCodeAndHeadersAndValue[CompleteMultipartUploadResult]
       .compose {
         result =>
           val headers: List[HttpHeader] =
             result.versionId.fold(List[HttpHeader]()) {
-              vId => RawHeader("x-amz-version-id", vId) :: Nil
+              vId => RawHeader(VersionIdHeader, vId) :: Nil
             }
           (OK, headers, result)
-      }*/
+      }
 
 
   /*implicit def noSuchBucketExceptionResponse(
