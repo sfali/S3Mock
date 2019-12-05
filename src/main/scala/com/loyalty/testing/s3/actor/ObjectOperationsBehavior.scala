@@ -167,12 +167,14 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
 
       case UploadInfoCreated(uploadInfo, replyTo) =>
         this.uploadInfo = Some(uploadInfo)
-        Try(objectIO.initiateMultipartUpload(uploadInfo)) match {
-          case Failure(ex) =>
-            context.log.error(s"unable to initiated multi part upload: ${uploadInfo.bucketName}/${uploadInfo.key}", ex)
-            DatabaseError // TODO: retry
-          case Success(_) => ReplyToSender(MultiPartUploadedInitiated(uploadInfo.uploadId), replyTo)
-        }
+        val command =
+          Try(objectIO.initiateMultipartUpload(uploadInfo)) match {
+            case Failure(ex) =>
+              context.log.error(s"unable to initiated multi part upload: ${uploadInfo.bucketName}/${uploadInfo.key}", ex)
+              DatabaseError // TODO: retry
+            case Success(_) => ReplyToSender(MultiPartUploadedInitiated(uploadInfo.uploadId), replyTo)
+          }
+        context.self ! command
         Behaviors.same
 
       case UploadPart(bucket, key, uploadId, partNumber, contentSource, replyTo) =>
