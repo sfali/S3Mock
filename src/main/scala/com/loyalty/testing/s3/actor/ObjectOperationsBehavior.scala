@@ -236,8 +236,14 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
         Behaviors.same
 
       case ResetUploadInfo(objectKey, replyTo) =>
+        val uploadId = uploadInfo.get.uploadId
         uploadInfo = None
-        context.self ! ReplyToSender(ObjectInfo(objectKey), replyTo)
+        context.pipeToSelf(database.deleteUpload(uploadId, 0)) {
+          case Failure(ex) =>
+            context.log.error(s"unable to delete upload: ${objectKey.bucketName}/${objectKey.key}", ex)
+            DatabaseError // TODO: retry
+          case Success(_) => ReplyToSender(ObjectInfo(objectKey), replyTo, Some(objectKey))
+        }
         Behaviors.same
 
       case GetObjectMeta(replyTo) =>

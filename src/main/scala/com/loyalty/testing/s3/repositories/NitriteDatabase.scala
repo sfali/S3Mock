@@ -90,6 +90,12 @@ class NitriteDatabase(rootPath: Path,
       case Success(_) => Future.successful(Done)
     }
 
+  def deleteUpload(uploadId: String, partNumber: Int): Future[Done] =
+    Try(uploadCollection.deleteUpload(uploadId, partNumber)) match {
+      case Failure(ex) => Future.failed(ex)
+      case Success(_) => Future.successful(Done)
+    }
+
   def close(): Unit = db.close()
 
 }

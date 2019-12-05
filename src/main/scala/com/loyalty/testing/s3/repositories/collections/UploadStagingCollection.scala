@@ -24,16 +24,17 @@ class UploadStagingCollection(db: Nitrite) {
     val uploadId = uploadInfo.uploadId
     val bucketName = uploadInfo.bucketName
     val key = uploadInfo.key
-    log.info("Initiating multi part upload, upload_id={}, bucket_name={}, key={}", uploadId, bucketName, key)
+    val partNumber = uploadInfo.partNumber
+    log.info("upload part, upload_id={}, part_number={},bucket_name={}, key={}", uploadId, partNumber, bucketName, key)
     val document =
-      findById(uploadId, uploadInfo.partNumber) match {
+      findById(uploadId, partNumber) match {
         case Nil =>
           createDocument(UploadIdField, uploadId)
             .put(BucketNameField, bucketName)
             .put(KeyField, key)
             .put(VersionField, uploadInfo.version.entryName)
             .put(VersionIndexField, uploadInfo.versionIndex)
-            .put(PartNumberField, uploadInfo.partNumber)
+            .put(PartNumberField, partNumber)
             .put(ETagField, uploadInfo.eTag)
             .put(ContentMd5Field, uploadInfo.contentMd5)
             .put(ContentLengthField, uploadInfo.contentLength)
@@ -46,11 +47,19 @@ class UploadStagingCollection(db: Nitrite) {
               bucketName, key, other.bucketName, other.key)
           }
           document
-        case _ => throw new IllegalStateException(s"Multiple documents found for $uploadId")
+        case _ => throw new IllegalStateException(s"Multiple documents found for $uploadId/$partNumber")
       }
     log.info("Initiated multi part upload, upload_id={}, doc_id={}", uploadId, document.getId.getIdValue)
     Done
   }
+
+  private[repositories] def deleteUpload(uploadId: String, partNumber: Int): Int =
+    findById(uploadId, partNumber) match {
+      case Nil => throw new RuntimeException(s"upload not found: $uploadId/$partNumber")
+      case document :: Nil => collection.remove(document).getAffectedCount
+      case _ => throw new IllegalStateException(s"Multiple documents found for $uploadId/$partNumber")
+
+    }
 
   private[repositories] def getUpload(uploadId: String, partNumber: Int): Option[UploadInfo] =
     findById(uploadId, partNumber) match {
