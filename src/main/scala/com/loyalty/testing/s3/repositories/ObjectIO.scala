@@ -35,7 +35,7 @@ class ObjectIO(root: Path, fileStream: FileStream)
     val objectPath = getObjectPath(bucket.bucketName, key, bucket.version, versionId)
     fileStream.saveContent(contentSource, objectPath)
       .flatMap {
-        case (etag, contentMd5) =>
+        case (etag, contentMd5, length) =>
           if (Files.notExists(objectPath)) Future.failed(new RuntimeException("unable to save file"))
           else
             Future.successful(ObjectKey(
@@ -47,7 +47,7 @@ class ObjectIO(root: Path, fileStream: FileStream)
               versionId = versionId,
               eTag = etag,
               contentMd5 = contentMd5,
-              contentLength = Files.size(objectPath),
+              contentLength = length,
               lastModifiedTime = OffsetDateTime.now()
             ))
       }
@@ -57,13 +57,13 @@ class ObjectIO(root: Path, fileStream: FileStream)
     val objectPath = getUploadPath(uploadInfo)
     fileStream.saveContent(contentSource, objectPath)
       .flatMap {
-        case (etag, contentMd5) =>
+        case (etag, contentMd5, length) =>
           if (Files.notExists(objectPath)) Future.failed(new RuntimeException("unable to save file"))
           else {
             val updateUploadInfo = uploadInfo.copy(
               eTag = etag,
               contentMd5 = contentMd5,
-              contentLength = Files.size(objectPath)
+              contentLength = length
             )
             Future.successful(updateUploadInfo)
           }
@@ -84,7 +84,7 @@ class ObjectIO(root: Path, fileStream: FileStream)
     val finalETag = s"${toBase16(concatenatedETag)}-${parts.length}"
     fileStream.mergeFiles(objectPath, partPaths)
       .flatMap {
-        case (_, contentMd5) =>
+        case (_, contentMd5, length) =>
           if (Files.notExists(objectPath)) Future.failed(new RuntimeException("unable to save file"))
           else
             Future.successful(ObjectKey(
@@ -96,7 +96,7 @@ class ObjectIO(root: Path, fileStream: FileStream)
               versionId = versionId,
               eTag = finalETag,
               contentMd5 = contentMd5,
-              contentLength = Files.size(objectPath),
+              contentLength = length,
               lastModifiedTime = OffsetDateTime.now(),
               uploadId = Some(uploadInfo.uploadId)
             ))

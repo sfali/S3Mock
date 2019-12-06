@@ -218,11 +218,11 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
           Files.createDirectories(filePath.getParent)
           fileStream.saveContent(contentSource, filePath)
             .flatMap {
-              case (etag, contentMD5) =>
+              case (etag, contentMD5, length) =>
                 if (Files.notExists(filePath)) Future.failed(new RuntimeException("unable to save file"))
                 else {
                   bucketMetadata.addPart(uploadId, PartInfo(partNumber, etag))
-                  val response = ObjectMeta(filePath, createPutObjectResult(key, etag, contentMD5, Files.size(filePath)))
+                  val response = ObjectMeta(filePath, createPutObjectResult(key, etag, contentMD5, length))
                   bucketMetadata.putObject(key, response)
                   Future.successful(response)
                 }
@@ -252,11 +252,11 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
               val result = createCompleteMultipartUploadResult(bucketName, key, parts, maybeVersionId)
               fileStream.mergeFiles(filePath, tuples.map(_._2))
                 .flatMap {
-                  case (etag, contentMD5) =>
+                  case (etag, contentMD5, length) =>
                     if (Files.notExists(filePath)) Future.failed(new RuntimeException("unable to save file"))
                     else {
                       log.debug("etag={}, contentMD5={}, etag={}", etag, contentMD5, result.eTag)
-                      val contentLength = Files.size(filePath)
+                      val contentLength = length
                       val response = ObjectMeta(filePath,
                         createPutObjectResult(key, result.eTag, contentMD5, contentLength, maybeVersionId))
                       bucketMetadata.putObject(key, response)
@@ -293,8 +293,8 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
                 destBucketMetadata.maybeBucketVersioning.map(_.bucketVersioning))
               fileStream.copyPart(sourceObject.path, filePath)
                 .map {
-                  case (etag, contentMD5) =>
-                    val response = ObjectMeta(filePath, createPutObjectResult(key, etag, contentMD5, Files.size(filePath),
+                  case (etag, contentMD5, length) =>
+                    val response = ObjectMeta(filePath, createPutObjectResult(key, etag, contentMD5, length,
                       maybeVersionId))
                     destBucketMetadata.putObject(key, response)
                     (response, CopyObjectResult(etag))
@@ -331,7 +331,7 @@ class FileRepository(fileStore: FileStore, fileStream: FileStream, log: LoggingA
                 Files.createDirectories(destinationPath.getParent)
                 fileStream.copyPart(meta.path, destinationPath, maybeSourceRange)
                   .map {
-                    case (etag, _) =>
+                    case (etag, _, _) =>
                       log.debug("Copy part # {} for {} with etag {}", partNumber, key, etag)
                       CopyPartResult(etag)
                   }

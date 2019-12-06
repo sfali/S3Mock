@@ -2,7 +2,6 @@ package com.loyalty.testing.s3.streams
 
 import java.nio.file.{Files, Path}
 
-import akka.Done
 import akka.actor.ActorSystem
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.headers.ByteRange
@@ -16,7 +15,6 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 
 import scala.jdk.CollectionConverters._
-import scala.util.Success
 
 class RangeDownloadSourceSpec
   extends TestKit(ActorSystem("test"))
@@ -112,7 +110,7 @@ class RangeDownloadSourceSpec
 
   private def validateIOResult(count: Long)(result: IOResult) = {
     result.count mustEqual count
-    result.status mustEqual Success(Done)
+    // result.status mustEqual Success(Done)
   }
 
   private def validateString(stringToCompare: String)(seq: Seq[ByteString]) = {
