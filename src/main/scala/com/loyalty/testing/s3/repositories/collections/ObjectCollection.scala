@@ -45,13 +45,13 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
         .put(VersionField, version.entryName)
         .put(VersionIdField, objectKey.versionId)
         .put(DeleteMarkerField, null)
-        .put(UploadIdField, objectKey.uploadId.orNull)
     )
 
     val updatedDocument = doc
       .put(ETagField, objectKey.eTag)
       .put(ContentMd5Field, objectKey.contentMd5)
       .put(ContentLengthField, objectKey.contentLength)
+      .put(UploadIdField, objectKey.uploadId.orNull)
 
     Try(collection.update(updatedDocument, true)) match {
       case Failure(ex) =>
