@@ -4,16 +4,16 @@ import java.nio.file._
 import java.time.OffsetDateTime
 import java.util.UUID
 
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import akka.actor.typed.ActorSystem
+import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe}
+import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.{FileIO, Sink}
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.BucketOperationsBehavior._
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
-import com.loyalty.testing.s3.repositories._
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
-import com.loyalty.testing.s3.request.{BucketVersioning, VersioningConfiguration}
+import com.loyalty.testing.s3.repositories.{NitriteDatabase, NonVersionId, ObjectIO}
+import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo, VersioningConfiguration}
 import com.loyalty.testing.s3.streams.FileStream
 import com.loyalty.testing.s3.test._
 import org.scalatest.BeforeAndAfterAll
@@ -530,6 +530,56 @@ class BucketOperationsBehaviorSpec
     testKit.stop(actorRef)
   }
 
+  it should "multipart upload an object" in {
+    val key = "big-sample.txt"
+
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+
+    actorRef ! InitiateMultiPartUploadWrapper(key, probe.ref)
+    val event = probe.receiveMessage().asInstanceOf[MultiPartUploadedInitiated]
+    val uploadId = event.uploadId
+    uploadId must not be null
+
+    val partInfo1 = verifyUploadPart(key, uploadId, 1, 1, 100000, actorRef, probe)
+    val partInfo2 = verifyUploadPart(key, uploadId, 2, 100001, 100000, actorRef, probe)
+    val partInfo3 = verifyUploadPart(key, uploadId, 3, 200001, 5000, actorRef, probe)
+
+    val parts = partInfo1 :: partInfo2 :: partInfo3 :: Nil
+    actorRef ! CompleteUploadWrapper(key, uploadId, parts, probe.ref)
+    val actualObjectKey = probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey.copy(contentMd5 = "")
+
+    val eventualDigestInfo1 = calculateDigest(1, 100000)
+    val eventualDigestInfo2 = calculateDigest(100001, 100000)
+    val eventualDigestInfo3 = calculateDigest(200001, 5000)
+    val (concatenatedValue, contentLength) =
+      (for {
+        digestInfo1 <- eventualDigestInfo1
+        digestInfo2 <- eventualDigestInfo2
+        digestInfo3 <- eventualDigestInfo3
+        etag = digestInfo1.etag + digestInfo2.etag + digestInfo3.etag
+        length = digestInfo1.length + digestInfo2.length + digestInfo3.length
+      } yield (etag, length)).futureValue
+    val etag = s"${toBase16(concatenatedValue)}-${parts.length}"
+
+    val expectedObjectKey = ObjectKey(
+      id = createObjectId(defaultBucketName, key),
+      bucketName = defaultBucketName,
+      key = key,
+      index = 0,
+      version = NotExists,
+      versionId = NonVersionId,
+      eTag = etag,
+      contentMd5 = "",
+      contentLength = contentLength,
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime,
+      uploadId = Some(uploadId)
+    )
+    actualObjectKey mustEqual expectedObjectKey
+
+    testKit.stop(actorRef)
+  }
+
   it should "set delete marker on an object" in {
     val key = "sample.txt"
 
@@ -555,6 +605,22 @@ class BucketOperationsBehaviorSpec
 
     testKit.stop(actorRef)
   }
+
+  private def verifyUploadPart(key: String,
+                               uploadId: String,
+                               partNumber: Int,
+                               start: Int,
+                               totalSize: Int,
+                               actorRef: ActorRef[BucketProtocol],
+                               probe: TestProbe[Event]) = {
+    actorRef ! UploadPartWrapper(key, uploadId, partNumber, createContentSource(start, totalSize), probe.ref)
+    val partUploadEvent = probe.receiveMessage().asInstanceOf[PartUploaded]
+    val uploadInfo = partUploadEvent.uploadInfo
+    uploadInfo.uploadId mustEqual uploadId
+    uploadInfo.partNumber mustEqual partNumber
+    PartInfo(partNumber, uploadInfo.eTag)
+  }
+
 }
 
 object BucketOperationsBehaviorSpec {
