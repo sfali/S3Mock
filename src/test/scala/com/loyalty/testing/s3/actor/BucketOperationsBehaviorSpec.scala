@@ -4,16 +4,16 @@ import java.nio.file._
 import java.time.OffsetDateTime
 import java.util.UUID
 
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import akka.actor.typed.ActorSystem
+import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe}
+import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.{FileIO, Sink}
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.BucketOperationsBehavior._
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
-import com.loyalty.testing.s3.repositories._
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
-import com.loyalty.testing.s3.request.{BucketVersioning, VersioningConfiguration}
+import com.loyalty.testing.s3.repositories.{NitriteDatabase, NonVersionId, ObjectIO}
+import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo, VersioningConfiguration}
 import com.loyalty.testing.s3.streams.FileStream
 import com.loyalty.testing.s3.test._
 import org.scalatest.BeforeAndAfterAll
@@ -22,7 +22,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Millis, Seconds, Span}
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class BucketOperationsBehaviorSpec
   extends AnyFlatSpec
@@ -530,6 +530,41 @@ class BucketOperationsBehaviorSpec
     testKit.stop(actorRef)
   }
 
+  it should "multipart upload an object" in {
+    val key = "big-sample.txt"
+
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+
+    actorRef ! InitiateMultiPartUploadWrapper(key, probe.ref)
+    val event = probe.receiveMessage().asInstanceOf[MultiPartUploadedInitiated]
+    val uploadId = event.uploadId
+    uploadId must not be null
+
+    val partNumbers = 1 :: 2 :: 3 :: Nil
+    val partBoundaries = (1, 100000) :: (100001, 100000) :: (200001, 5000) :: Nil
+    val parts = verifyUploads(key, uploadId, partNumbers, partBoundaries, actorRef, probe)
+    actorRef ! CompleteUploadWrapper(key, uploadId, parts, probe.ref)
+    val actualObjectKey = probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey.copy(contentMd5 = "")
+    val (etag, contentLength) = calculateETagAndLength(partBoundaries)
+    val expectedObjectKey = ObjectKey(
+      id = createObjectId(defaultBucketName, key),
+      bucketName = defaultBucketName,
+      key = key,
+      index = 0,
+      version = NotExists,
+      versionId = NonVersionId,
+      eTag = etag,
+      contentMd5 = "",
+      contentLength = contentLength,
+      lastModifiedTime = dateTimeProvider.currentOffsetDateTime,
+      uploadId = Some(uploadId)
+    )
+    actualObjectKey mustEqual expectedObjectKey
+
+    testKit.stop(actorRef)
+  }
+
   it should "set delete marker on an object" in {
     val key = "sample.txt"
 
@@ -555,6 +590,48 @@ class BucketOperationsBehaviorSpec
 
     testKit.stop(actorRef)
   }
+
+  private def verifyUploadPart(key: String,
+                               uploadId: String,
+                               partNumber: Int,
+                               start: Int,
+                               totalSize: Int,
+                               actorRef: ActorRef[BucketProtocol],
+                               probe: TestProbe[Event]) = {
+    actorRef ! UploadPartWrapper(key, uploadId, partNumber, createContentSource(start, totalSize), probe.ref)
+    val partUploadEvent = probe.receiveMessage().asInstanceOf[PartUploaded]
+    val uploadInfo = partUploadEvent.uploadInfo
+    uploadInfo.uploadId mustEqual uploadId
+    uploadInfo.partNumber mustEqual partNumber
+    PartInfo(partNumber, uploadInfo.eTag)
+  }
+
+  private def verifyUploads(key: String,
+                            uploadId: String,
+                            partNumbers: List[Int],
+                            partBoundaries: List[(Int, Int)],
+                            actorRef: ActorRef[BucketProtocol],
+                            probe: TestProbe[Event]): List[PartInfo] = {
+    val ls = partNumbers.zip(partBoundaries).map(xs => (xs._1, xs._2._1, xs._2._2))
+    ls.map {
+      case (partNumber, start, totalSize) =>
+        verifyUploadPart(key, uploadId, partNumber, start, totalSize, actorRef, probe)
+    }
+  }
+
+  private def calculateETagAndLength(partBoundaries: List[(Int, Int)]): (String, Long) = {
+    val (concatenatedETag, totalLength) =
+      Future.sequence(
+        partBoundaries.map {
+          case (start, totalSize) => calculateDigest(start, totalSize)
+        })
+        .futureValue
+        .foldLeft(("", 0L)) {
+          case ((etag, length), digestInfo) => (etag + digestInfo.etag, length + digestInfo.length)
+        }
+    (s"${toBase16(concatenatedETag)}-${partBoundaries.length}", totalLength)
+  }
+
 }
 
 object BucketOperationsBehaviorSpec {
