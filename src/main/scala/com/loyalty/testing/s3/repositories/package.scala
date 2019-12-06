@@ -133,10 +133,10 @@ package object repositories {
     val (maybeVersionId, filePath) = getDestinationPathWithVersionId(key, bucketPath, maybeBucketVersioning)
     fileStream.saveContent(contentSource, filePath)
       .flatMap {
-        case (etag, contentMD5, length) =>
+        digestInfo =>
           if (Files.notExists(filePath)) Future.failed(new RuntimeException("unable to save file"))
           else Future.successful(ObjectMeta(filePath,
-            createPutObjectResult(key, etag, contentMD5, length, maybeVersionId)))
+            createPutObjectResult(key, digestInfo.etag, digestInfo.md5, digestInfo.length, maybeVersionId)))
       }
   }
 

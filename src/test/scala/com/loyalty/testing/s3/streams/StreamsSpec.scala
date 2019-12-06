@@ -44,10 +44,10 @@ class StreamsSpec
         .fromPath(srcPath)
         .via(DigestCalculator())
         .runWith(Sink.head)
-    val (etag, md5, length) = eventualDigest.futureValue
-    etagDigest mustEqual etag
-    md5Digest mustEqual md5
-    length mustEqual Files.size(srcPath)
+    val digestInfo = eventualDigest.futureValue
+    etagDigest mustEqual digestInfo.etag
+    md5Digest mustEqual digestInfo.md5
+    digestInfo.length mustEqual Files.size(srcPath)
   }
 
   it should "save bytes and calculate digest" in {
@@ -61,10 +61,10 @@ class StreamsSpec
         .toMat(Sink.head)(Keep.both)
         .run()
 
-    val (etag, md5, length) = eventualDigest.futureValue
-    etagDigest mustEqual etag
-    md5Digest mustEqual md5
-    length mustEqual Files.size(srcPath)
+    val digestInfo = eventualDigest.futureValue
+    etagDigest mustEqual digestInfo.etag
+    md5Digest mustEqual digestInfo.md5
+    digestInfo.length mustEqual Files.size(srcPath)
 
     /*val ioResult: IOResult = eventualIoResult.futureValue
     ioResult.status match {
@@ -84,43 +84,43 @@ class StreamsSpec
     val destinationPath = Files.createTempFile("test", ".txt")
     val entity = HttpEntity(Files.readAllBytes(srcPath))
     val request = HttpRequest(entity = entity)
-    val (etag, md5, length) = fileStream.saveContent(request.entity.dataBytes, destinationPath).futureValue
+    val digestInfo = fileStream.saveContent(request.entity.dataBytes, destinationPath).futureValue
     Files.exists(destinationPath) mustBe true
     Files.deleteIfExists(destinationPath)
-    etagDigest mustEqual etag
-    md5Digest mustEqual md5
-    length mustEqual Files.size(srcPath)
+    etagDigest mustEqual digestInfo.etag
+    md5Digest mustEqual digestInfo.md5
+    digestInfo.length mustEqual Files.size(srcPath)
   }
 
   it should "merge files and calculate digest" in {
     val files = Files.list(Paths.get(basePath, "sub-files")).iterator().asScala.toList
     val destinationPath = Files.createTempFile("test", ".txt")
-    val (etag, md5, length) = fileStream.mergeFiles(destinationPath, files).futureValue
+    val digestInfo = fileStream.mergeFiles(destinationPath, files).futureValue
     Files.exists(destinationPath) mustBe true
     Files.deleteIfExists(destinationPath)
-    etagDigest mustEqual etag
-    md5Digest mustEqual md5
-    length mustEqual Files.size(srcPath)
+    etagDigest mustEqual digestInfo.etag
+    md5Digest mustEqual digestInfo.md5
+    digestInfo.length mustEqual Files.size(srcPath)
   }
 
   it should "copy entire file to destination path when no range is provided" in {
     val sourcePath = Paths.get("src", "test", "resources", "sample.txt")
     val destinationPath = Files.createTempFile("test", ".txt")
-    val (etag, md5, length) = fileStream.copyPart(sourcePath, destinationPath).futureValue
+    val digestInfo = fileStream.copyPart(sourcePath, destinationPath).futureValue
     Files.size(sourcePath) must equal(Files.size(destinationPath))
-    etagDigest mustEqual etag
-    md5Digest mustEqual md5
-    length mustEqual Files.size(srcPath)
+    etagDigest mustEqual digestInfo.etag
+    md5Digest mustEqual digestInfo.md5
+    digestInfo.length mustEqual Files.size(srcPath)
     Files.deleteIfExists(destinationPath)
   }
 
   it should "copy range of bytes from source to destination when range is provided" in {
     val sourcePath = Paths.get("src", "test", "resources", "sample.txt")
     val destinationPath = Files.createTempFile("test", ".txt")
-    val (etag, md5, length) = fileStream.copyPart(sourcePath, destinationPath, Some(ByteRange(265, 318))).futureValue
-    etag mustEqual toBase16("6. A quick brown fox jumps over the silly lazy dog.\r\n")
-    md5 mustEqual toBase64("6. A quick brown fox jumps over the silly lazy dog.\r\n")
-    length mustEqual 53
+    val digestInfo = fileStream.copyPart(sourcePath, destinationPath, Some(ByteRange(265, 318))).futureValue
+    digestInfo.etag mustEqual toBase16("6. A quick brown fox jumps over the silly lazy dog.\r\n")
+    digestInfo.md5 mustEqual toBase64("6. A quick brown fox jumps over the silly lazy dog.\r\n")
+    digestInfo.length mustEqual 53
     Files.deleteIfExists(destinationPath)
   }
 

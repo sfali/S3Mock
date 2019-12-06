@@ -13,7 +13,7 @@ class FileStream private(implicit mat: Materializer) {
 
   import com.loyalty.testing.s3._
 
-  def saveContent(contentSource: Source[ByteString, _], destinationPath: Path): Future[(String, String, Long)] =
+  def saveContent(contentSource: Source[ByteString, _], destinationPath: Path): Future[DigestInfo] =
     contentSource
       .via(saveAndCalculateDigest(destinationPath))
       .toMat(Sink.head)(Keep.right)
@@ -21,14 +21,14 @@ class FileStream private(implicit mat: Materializer) {
 
   def saveAndCalculateDigest(destinationPath: Path,
                              digestCalculator: DigestCalculator = DigestCalculator())
-  : Flow[ByteString, (String, String, Long), Future[IOResult]] =
+  : Flow[ByteString, DigestInfo, Future[IOResult]] =
     Flow.fromGraph(GraphDSL.create(FileIO.toPath(destinationPath)) {
       implicit builder =>
         sink =>
           import GraphDSL.Implicits._
 
           val broadcast = builder.add(Broadcast[ByteString](2))
-          val merge = builder.add(Merge[(String, String, Long)](1))
+          val merge = builder.add(Merge[DigestInfo](1))
 
           broadcast ~> digestCalculator ~> merge
           broadcast ~> sink
@@ -36,7 +36,7 @@ class FileStream private(implicit mat: Materializer) {
           FlowShape(broadcast.in, merge.out)
     })
 
-  def mergeFiles(destinationPath: Path, paths: List[Path]): Future[(String, String, Long)] =
+  def mergeFiles(destinationPath: Path, paths: List[Path]): Future[DigestInfo] =
     Source.fromIterator(() => paths.iterator)
       .flatMapConcat(path => FileIO.fromPath(path))
       .via(saveAndCalculateDigest(destinationPath))
@@ -44,7 +44,7 @@ class FileStream private(implicit mat: Materializer) {
       .run()
 
   def downloadFile(path: Path, chunkSize: Int = 8192, maybeRange: Option[ByteRange] = None):
-                  (DownloadRange, Source[ByteString, Future[IOResult]]) = {
+  (DownloadRange, Source[ByteString, Future[IOResult]]) = {
     val downloadRange = DownloadRange(path, maybeRange)
     val source = Source.fromGraph(RangeDownloadSource(path, chunkSize, downloadRange))
     (downloadRange, source)
@@ -52,7 +52,7 @@ class FileStream private(implicit mat: Materializer) {
 
   def copyPart(sourcePath: Path,
                destinationPath: Path,
-               maybeSourceRange: Option[ByteRange] = None): Future[(String, String, Long)] = {
+               maybeSourceRange: Option[ByteRange] = None): Future[DigestInfo] = {
     val downloadSource = downloadFile(sourcePath, maybeRange = maybeSourceRange)
     saveContent(downloadSource._2, destinationPath)
   }

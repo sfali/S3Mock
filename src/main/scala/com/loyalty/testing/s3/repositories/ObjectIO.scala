@@ -35,7 +35,7 @@ class ObjectIO(root: Path, fileStream: FileStream)
     val objectPath = getObjectPath(bucket.bucketName, key, bucket.version, versionId)
     fileStream.saveContent(contentSource, objectPath)
       .flatMap {
-        case (etag, contentMd5, length) =>
+        digestInfo =>
           if (Files.notExists(objectPath)) Future.failed(new RuntimeException("unable to save file"))
           else
             Future.successful(ObjectKey(
@@ -45,9 +45,9 @@ class ObjectIO(root: Path, fileStream: FileStream)
               index = versionIndex,
               version = bucket.version,
               versionId = versionId,
-              eTag = etag,
-              contentMd5 = contentMd5,
-              contentLength = length,
+              eTag = digestInfo.etag,
+              contentMd5 = digestInfo.md5,
+              contentLength = digestInfo.length,
               lastModifiedTime = OffsetDateTime.now()
             ))
       }
@@ -57,13 +57,13 @@ class ObjectIO(root: Path, fileStream: FileStream)
     val objectPath = getUploadPath(uploadInfo)
     fileStream.saveContent(contentSource, objectPath)
       .flatMap {
-        case (etag, contentMd5, length) =>
+        digestInfo =>
           if (Files.notExists(objectPath)) Future.failed(new RuntimeException("unable to save file"))
           else {
             val updateUploadInfo = uploadInfo.copy(
-              eTag = etag,
-              contentMd5 = contentMd5,
-              contentLength = length
+              eTag = digestInfo.etag,
+              contentMd5 = digestInfo.md5,
+              contentLength = digestInfo.length
             )
             Future.successful(updateUploadInfo)
           }
@@ -84,7 +84,7 @@ class ObjectIO(root: Path, fileStream: FileStream)
     val finalETag = s"${toBase16(concatenatedETag)}-${parts.length}"
     fileStream.mergeFiles(objectPath, partPaths)
       .flatMap {
-        case (_, contentMd5, length) =>
+        digestInfo =>
           if (Files.notExists(objectPath)) Future.failed(new RuntimeException("unable to save file"))
           else
             Future.successful(ObjectKey(
@@ -95,8 +95,8 @@ class ObjectIO(root: Path, fileStream: FileStream)
               version = uploadInfo.version,
               versionId = versionId,
               eTag = finalETag,
-              contentMd5 = contentMd5,
-              contentLength = length,
+              contentMd5 = digestInfo.md5,
+              contentLength = digestInfo.length,
               lastModifiedTime = OffsetDateTime.now(),
               uploadId = Some(uploadInfo.uploadId)
             ))

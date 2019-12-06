@@ -7,12 +7,12 @@ import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.util.ByteString
 import javax.xml.bind.DatatypeConverter
 
-class DigestCalculator(algorithm: String) extends GraphStage[FlowShape[ByteString, (String, String, Long)]] {
+class DigestCalculator(algorithm: String) extends GraphStage[FlowShape[ByteString, DigestInfo]] {
 
   private val in = Inlet[ByteString]("DigestCalculator.in")
-  private val out = Outlet[(String, String, Long)]("DigestCalculator.out")
+  private val out = Outlet[DigestInfo]("DigestCalculator.out")
 
-  override def shape: FlowShape[ByteString, (String, String, Long)] = FlowShape(in, out)
+  override def shape: FlowShape[ByteString, DigestInfo] = FlowShape(in, out)
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new GraphStageLogic(shape) {
@@ -35,7 +35,7 @@ class DigestCalculator(algorithm: String) extends GraphStage[FlowShape[ByteStrin
           val bytes = digest.digest()
           val etag = DatatypeConverter.printHexBinary(bytes).toLowerCase
           val contentMd5 = DatatypeConverter.printBase64Binary(bytes)
-          emit(out, (etag, contentMd5, size))
+          emit(out, DigestInfo(etag, contentMd5, size))
           completeStage()
         }
       })
@@ -49,3 +49,5 @@ object DigestCalculator {
 
   def apply(algorithm: String): DigestCalculator = new DigestCalculator(algorithm)
 }
+
+case class DigestInfo(etag: String, md5: String, length: Long)
