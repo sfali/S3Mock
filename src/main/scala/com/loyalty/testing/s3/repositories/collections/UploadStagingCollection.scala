@@ -4,10 +4,13 @@ import akka.Done
 import com.loyalty.testing.s3.repositories._
 import com.loyalty.testing.s3.repositories.model.UploadInfo
 import org.dizitart.no2.IndexOptions.indexOptions
-import org.dizitart.no2.IndexType.NonUnique
+import org.dizitart.no2.IndexType._
 import org.dizitart.no2._
 import org.dizitart.no2.filters.Filters.{eq => feq, _}
 import org.slf4j.LoggerFactory
+
+import scala.jdk.CollectionConverters._
+import scala.util.{Failure, Success, Try}
 
 class UploadStagingCollection(db: Nitrite) {
 
@@ -49,8 +52,19 @@ class UploadStagingCollection(db: Nitrite) {
           document
         case _ => throw new IllegalStateException(s"Multiple documents found for $uploadId/$partNumber")
       }
-    log.info("Initiated multi part upload, upload_id={}, doc_id={}", uploadId, document.getId.getIdValue)
-    Done
+    Try(collection.update(document, true)) match {
+      case Failure(ex) =>
+        log.error(s"Error creating/updating document, key=$key, bucket=$bucketName, upload_id=$uploadId", ex)
+        throw DatabaseAccessException(s"Error creating/updating `$key` in the bucket `$bucketName`")
+      case Success(writeResult) =>
+        val docId = writeResult.iterator().asScala.toList.headOption
+        if (docId.isEmpty) throw DatabaseAccessException(s"unable to get document id for $bucketName/$key/$uploadId")
+        else {
+          log.info("Initiated multi part upload, upload_id={}, doc_id={}", uploadId, docId.get.getIdValue)
+          Done
+        }
+
+    }
   }
 
   private[repositories] def deleteUpload(uploadId: String, partNumber: Int): Int =
