@@ -74,9 +74,17 @@ class ObjectIO(root: Path, fileStream: FileStream)
     val versionId = uploadInfo.versionIndex.toVersionId
     val objectPath = getObjectPath(uploadInfo.bucketName, uploadInfo.key, uploadInfo.version, versionId)
     val partPaths = parts.map(partInfo => uploadInfo.copy(partNumber = partInfo.partNumber)).map(getUploadPath)
+
+    val concatenatedETag =
+      parts
+        .map(_.eTag)
+        .foldLeft("") {
+          case (agg, etag) => agg + etag
+        }
+    val finalETag = s"${toBase16(concatenatedETag)}-${parts.length}"
     fileStream.mergeFiles(objectPath, partPaths)
       .flatMap {
-        case (etag, contentMd5) =>
+        case (_, contentMd5) =>
           if (Files.notExists(objectPath)) Future.failed(new RuntimeException("unable to save file"))
           else
             Future.successful(ObjectKey(
@@ -86,7 +94,7 @@ class ObjectIO(root: Path, fileStream: FileStream)
               index = uploadInfo.versionIndex,
               version = uploadInfo.version,
               versionId = versionId,
-              eTag = etag,
+              eTag = finalETag,
               contentMd5 = contentMd5,
               contentLength = Files.size(objectPath),
               lastModifiedTime = OffsetDateTime.now(),
