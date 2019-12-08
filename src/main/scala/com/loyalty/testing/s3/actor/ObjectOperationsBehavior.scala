@@ -155,7 +155,7 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
           key = key,
           version = bucket.version,
           versionIndex = versionIndex,
-          uploadId = toBase16FromRandomUUID
+          uploadId = createUploadId(bucket.bucketName, bucket.version, key, versionIndex)
         )
         context.pipeToSelf(database.createUpload(uploadInfo)) {
           case Failure(ex) =>

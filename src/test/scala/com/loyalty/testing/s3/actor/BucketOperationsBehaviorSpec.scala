@@ -539,7 +539,7 @@ class BucketOperationsBehaviorSpec
     actorRef ! InitiateMultiPartUploadWrapper(key, probe.ref)
     val event = probe.receiveMessage().asInstanceOf[MultiPartUploadedInitiated]
     val uploadId = event.uploadId
-    uploadId must not be null
+    createUploadId(defaultBucketName, NotExists, key, 0) mustEqual uploadId
 
     val partNumbers = 1 :: 2 :: 3 :: Nil
     val partBoundaries = (1, 100000) :: (100001, 100000) :: (200001, 5000) :: Nil

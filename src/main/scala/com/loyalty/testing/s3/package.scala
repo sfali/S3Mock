@@ -3,8 +3,8 @@ package com.loyalty.testing
 import java.io.IOException
 import java.net.{URI, URLDecoder, URLEncoder}
 import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file._
+import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
@@ -14,7 +14,7 @@ import akka.http.scaladsl.model.headers.{ByteRange, RawHeader}
 import com.amazonaws.services.sns.AmazonSNSAsync
 import com.amazonaws.services.sqs.AmazonSQSAsync
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
-import com.loyalty.testing.s3.request.PartInfo
+import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo}
 import com.loyalty.testing.s3.response.{CompleteMultipartUploadResult, InvalidNotificationConfigurationException, PutObjectResult}
 import com.typesafe.config.Config
 import javax.xml.bind.DatatypeConverter
@@ -302,6 +302,12 @@ package object s3 {
   }
 
   def createObjectId(bucketName: String, key: String): UUID = s"$bucketName-$key".toUUID
+
+  def createUploadId(bucketName: String,
+                     version: BucketVersioning,
+                     key: String,
+                     versionIndex: Int): String =
+    toBase16(s"$bucketName-$key-${version.entryName}-$versionIndex")
 
   implicit class IntOps(src: Int) {
     def toVersionId: String = toBase16(src.toString.toUUID.toString)
