@@ -15,14 +15,11 @@ import com.loyalty.testing.s3.{DBSettings, _}
 import org.dizitart.no2.Nitrite
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 class NitriteDatabase(rootPath: Path,
-                      dbSettings: DBSettings)(implicit system: ActorSystem[Nothing],
-                                              dateTimeProvider: DateTimeProvider) {
-
-  import system.executionContext
+                      dbSettings: DBSettings)(implicit dateTimeProvider: DateTimeProvider) {
 
   private val log = LoggerFactory.getLogger(classOf[NitriteDatabase])
 
@@ -63,7 +60,8 @@ class NitriteDatabase(rootPath: Path,
     }
   }
 
-  def setBucketNotifications(notifications: List[Notification]): Future[Done] = {
+  def setBucketNotifications(notifications: List[Notification])
+                            (implicit ec: ExecutionContext): Future[Done] = {
     def createNotification(notification: Notification) =
       Future.successful(notificationCollection.createNotification(notification))
 
@@ -102,8 +100,7 @@ class NitriteDatabase(rootPath: Path,
 
 object NitriteDatabase {
   def apply(rootPath: Path, dbSettings: DBSettings)
-           (implicit system: ActorSystem[Nothing],
-            dateTimeProvider: DateTimeProvider): NitriteDatabase = new NitriteDatabase(rootPath, dbSettings)
+           (implicit dateTimeProvider: DateTimeProvider): NitriteDatabase = new NitriteDatabase(rootPath, dbSettings)
 
   def apply(rootPath: Path)
            (implicit system: ActorSystem[Nothing],

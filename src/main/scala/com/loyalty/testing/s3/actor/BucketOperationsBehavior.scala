@@ -16,6 +16,7 @@ import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.{PartInfo, VersioningConfiguration}
 import com.loyalty.testing.s3.response.NoSuchBucketException
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
@@ -27,6 +28,7 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
 
   import BucketOperationsBehavior._
 
+  private implicit val ec: ExecutionContext = context.system.executionContext
   private val bucketId = UUID.fromString(context.self.path.name)
   context.setReceiveTimeout(5.minutes, Shutdown)
   context.self ! InitializeSnapshot

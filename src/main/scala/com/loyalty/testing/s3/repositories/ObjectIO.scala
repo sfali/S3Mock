@@ -5,7 +5,6 @@ import java.time.OffsetDateTime
 import java.util.UUID
 import java.util.stream.Collectors
 
-import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.IOResult
 import akka.stream.scaladsl.Source
@@ -15,12 +14,9 @@ import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
 import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo}
 import com.loyalty.testing.s3.streams.FileStream
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class ObjectIO(root: Path, fileStream: FileStream)
-              (implicit system: ActorSystem[Nothing]) {
-
-  import system.executionContext
+class ObjectIO(root: Path, fileStream: FileStream) {
 
   private val workDir: Path = root.toAbsolutePath
   private val dataDir: Path = workDir + "data"
@@ -30,7 +26,8 @@ class ObjectIO(root: Path, fileStream: FileStream)
                  key: String,
                  keyId: UUID,
                  versionIndex: Int,
-                 contentSource: Source[ByteString, _]): Future[ObjectKey] = {
+                 contentSource: Source[ByteString, _])
+                (implicit ec: ExecutionContext): Future[ObjectKey] = {
     val versionId = versionIndex.toVersionId
     val objectPath = getObjectPath(bucket.bucketName, key, bucket.version, versionId)
     fileStream.saveContent(contentSource, objectPath)
@@ -53,7 +50,8 @@ class ObjectIO(root: Path, fileStream: FileStream)
       }
   }
 
-  def savePart(uploadInfo: UploadInfo, contentSource: Source[ByteString, _]): Future[UploadInfo] = {
+  def savePart(uploadInfo: UploadInfo, contentSource: Source[ByteString, _])
+              (implicit ec: ExecutionContext): Future[UploadInfo] = {
     val objectPath = getUploadPath(uploadInfo)
     fileStream.saveContent(contentSource, objectPath)
       .flatMap {
@@ -70,7 +68,8 @@ class ObjectIO(root: Path, fileStream: FileStream)
       }
   }
 
-  def completeUpload(uploadInfo: UploadInfo, parts: List[PartInfo]): Future[ObjectKey] = {
+  def completeUpload(uploadInfo: UploadInfo, parts: List[PartInfo])
+                    (implicit ec: ExecutionContext): Future[ObjectKey] = {
     val versionId = uploadInfo.versionIndex.toVersionId
     val objectPath = getObjectPath(uploadInfo.bucketName, uploadInfo.key, uploadInfo.version, versionId)
     val partPaths = parts.map(partInfo => uploadInfo.copy(partNumber = partInfo.partNumber)).map(getUploadPath)
@@ -142,6 +141,5 @@ class ObjectIO(root: Path, fileStream: FileStream)
 }
 
 object ObjectIO {
-  def apply(root: Path, fileStream: FileStream)
-           (implicit system: ActorSystem[Nothing]): ObjectIO = new ObjectIO(root, fileStream)
+  def apply(root: Path, fileStream: FileStream): ObjectIO = new ObjectIO(root, fileStream)
 }

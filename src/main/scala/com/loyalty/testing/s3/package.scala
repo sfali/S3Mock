@@ -73,6 +73,8 @@ package object s3 {
     def toPath: Path = Paths.get(s)
 
     def toUUID: UUID = UUID.nameUUIDFromBytes(s.getBytes)
+
+    def replaceNewLine: String = s.replaceAll(System.lineSeparator(), "")
   }
 
   implicit class PathOps(path: Path) {
