@@ -48,6 +48,7 @@ class UploadStagingCollection(db: Nitrite) {
               """Attempt to access upload of different object, upload_id={}, bucket_name={}, key={},
                 |other_bucket_name={}, other_key={}""".stripMargin, uploadId,
               bucketName, key, other.bucketName, other.key)
+            throw new IllegalArgumentException("Attempt to access upload of different object")
           }
           document
         case _ => throw new IllegalStateException(s"Multiple documents found for $uploadId/$partNumber")
@@ -67,6 +68,9 @@ class UploadStagingCollection(db: Nitrite) {
     }
   }
 
+  private[repositories] def insert(elements: Document*): Int =
+    collection.insert(elements.asJava.toArray(Array.ofDim[Document](elements.size))).getAffectedCount
+
   private[repositories] def deleteUpload(uploadId: String, partNumber: Int): Int =
     findById(uploadId, partNumber) match {
       case Nil => throw new RuntimeException(s"upload not found: $uploadId/$partNumber")
@@ -74,6 +78,9 @@ class UploadStagingCollection(db: Nitrite) {
       case _ => throw new IllegalStateException(s"Multiple documents found for $uploadId/$partNumber")
 
     }
+
+  private[repositories] def deleteAll(uploadId: String): Int =
+    collection.remove(feq(UploadIdField, uploadId)).getAffectedCount
 
   private[repositories] def getUpload(uploadId: String, partNumber: Int): Option[UploadInfo] =
     findById(uploadId, partNumber) match {
