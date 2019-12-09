@@ -6,7 +6,7 @@ import java.util.UUID
 import akka.Done
 import akka.actor.typed.ActorSystem
 import com.loyalty.testing.s3.notification.Notification
-import com.loyalty.testing.s3.repositories.collections.{BucketCollection, NotificationCollection, ObjectCollection, UploadStagingCollection}
+import com.loyalty.testing.s3.repositories.collections.{BucketCollection, NotificationCollection, ObjectCollection, UploadCollection}
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
 import com.loyalty.testing.s3.request.VersioningConfiguration
 import com.loyalty.testing.s3.settings.Settings
@@ -38,7 +38,7 @@ class NitriteDatabase(rootPath: Path,
   private[repositories] val bucketCollection = BucketCollection(db)
   private[repositories] val notificationCollection = NotificationCollection(db)
   private[repositories] val objectCollection = ObjectCollection(db)
-  private[repositories] val uploadCollection = UploadStagingCollection(db)
+  private[repositories] val uploadCollection = UploadCollection(db)
 
   def getBucket(id: UUID): Future[Bucket] =
     Try(bucketCollection.findBucket(id)) match {
