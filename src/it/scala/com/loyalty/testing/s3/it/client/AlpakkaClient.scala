@@ -23,6 +23,7 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
                    (implicit system: ActorSystem[Nothing]) extends S3Client {
 
   import Framing.delimiter
+  import system.executionContext
 
   private val windowsSplitter = delimiter(ByteString("\r\n"), maximumFrameLength = 1024, allowTruncation = true)
 
@@ -96,6 +97,21 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
                             key: String,
                             maybeVersionId: Option[String]): Future[(Option[Boolean], Option[String])] =
     awsClient.deleteObject(bucketName, key, maybeVersionId)
+
+  override def multiPartUpload(bucketName: String,
+                               key: String,
+                               totalSize: Int): Future[ObjectInfo] = {
+    createContentSource(1, totalSize)
+      .runWith(S3.multipartUpload(bucketName, key))
+      .map(result => ObjectInfo(
+        bucketName = result.bucket,
+        key = result.key,
+        eTag = result.etag,
+        contentMd5 = "",
+        contentLength = 0,
+        versionId = result.versionId
+      ))
+  }
 
   private def getHeader(headers: Seq[HttpHeader], headerName: String): Option[HttpHeader] =
     headers.find(_.lowercaseName() == headerName.toLowerCase)

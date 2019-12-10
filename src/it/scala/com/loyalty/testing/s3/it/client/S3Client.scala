@@ -30,4 +30,8 @@ trait S3Client {
   def deleteObject(bucketName: String,
                    key: String,
                    maybeVersionId: Option[String] = None): Future[(Option[Boolean], Option[String])]
+
+  def multiPartUpload(bucketName: String,
+                      key: String,
+                      totalSize: Int): Future[ObjectInfo]
 }

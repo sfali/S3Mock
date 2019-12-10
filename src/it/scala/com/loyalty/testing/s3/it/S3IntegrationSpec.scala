@@ -304,6 +304,12 @@ abstract class S3IntegrationSpec(rootPath: Path,
     extractErrorResponse(ex) mustEqual AwsError(404, "The resource you requested does not exist", "NoSuchKey")
   }
 
+  it should "multipart upload an object" in {
+    val key = "big-sample.txt"
+    val objectInfo = s3Client.multiPartUpload(defaultBucketName, key, 205000).futureValue
+    println(objectInfo)
+  }
+
   it should "set delete marker on an object" in {
     val key = "sample.txt"
     val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(defaultBucketName, key).futureValue

@@ -113,6 +113,8 @@ class AwsClient(override protected val awsSettings: AwsSettings) extends S3Clien
     val response = s3Client.deleteObject(request)
     Future.successful((Option(response.deleteMarker()).map(_.booleanValue()), Option(response.versionId())))
   }
+
+  override def multiPartUpload(bucketName: String, key: String, totalSize: Int): Future[ObjectInfo] = ???
 }
 
 object AwsClient {
