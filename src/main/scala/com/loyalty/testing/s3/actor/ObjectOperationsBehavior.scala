@@ -5,6 +5,7 @@ import java.util.UUID
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
 import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.actor.model.{DeleteInfo, InternalError, InvalidAccess, InvalidPart, InvalidPartOrder, MultiPartUploadedInitiated, NoSuchKeyExists, NoSuchUpload, ObjectContent, ObjectInfo, PartUploaded}
 import com.loyalty.testing.s3.actor.model.`object`._
 import com.loyalty.testing.s3.repositories.collections.NoSuchId
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}

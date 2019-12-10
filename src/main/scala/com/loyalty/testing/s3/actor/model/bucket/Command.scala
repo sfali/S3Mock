@@ -4,7 +4,7 @@ import akka.actor.typed.ActorRef
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import com.loyalty.testing.s3.actor.Event
+import com.loyalty.testing.s3.actor.model.Event
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.{PartInfo, VersioningConfiguration}

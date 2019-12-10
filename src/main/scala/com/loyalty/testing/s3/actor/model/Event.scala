@@ -1,4 +1,4 @@
-package com.loyalty.testing.s3.actor
+package com.loyalty.testing.s3.actor.model
 
 import akka.stream.IOResult
 import akka.stream.scaladsl.Source

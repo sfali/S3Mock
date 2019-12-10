@@ -10,8 +10,8 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.util.Timeout
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
-import com.loyalty.testing.s3.actor._
 import com.loyalty.testing.s3.actor.model.bucket.DeleteObjectWrapper
+import com.loyalty.testing.s3.actor.model.{DeleteInfo, InvalidAccess, NoSuchBucketExists, NoSuchKeyExists}
 import com.loyalty.testing.s3.repositories.model.ObjectKey
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException, NoSuchKeyException}

@@ -8,8 +8,8 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.util.Timeout
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
+import com.loyalty.testing.s3.actor.model.{BucketInfo, Event, NoSuchBucketExists}
 import com.loyalty.testing.s3.actor.model.bucket.SetBucketVersioning
-import com.loyalty.testing.s3.actor.{BucketInfo, Event, NoSuchBucketExists}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.VersioningConfiguration
 import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException}

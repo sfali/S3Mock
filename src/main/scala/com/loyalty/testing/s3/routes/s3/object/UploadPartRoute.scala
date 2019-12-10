@@ -8,7 +8,7 @@ import akka.http.scaladsl.server.Route
 import akka.util.Timeout
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
 import com.loyalty.testing.s3.actor.model.bucket.UploadPartWrapper
-import com.loyalty.testing.s3.actor.{InvalidAccess, NoSuchBucketExists, NoSuchUpload, PartUploaded}
+import com.loyalty.testing.s3.actor.model.{InvalidAccess, NoSuchBucketExists, NoSuchUpload, PartUploaded}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException, NoSuchUploadException}
 import com.loyalty.testing.s3.routes.CustomMarshallers

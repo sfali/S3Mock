@@ -8,9 +8,10 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.SpawnBehavior.{Command => SpawnCommand, Spawn}
+import com.loyalty.testing.s3.actor.SpawnBehavior.{Spawn, Command => SpawnCommand}
 import com.loyalty.testing.s3.actor.model.bucket.Command
-import com.loyalty.testing.s3.actor.{BucketOperationsBehavior, Event}
+import com.loyalty.testing.s3.actor.BucketOperationsBehavior
+import com.loyalty.testing.s3.actor.model.Event
 import com.loyalty.testing.s3.repositories.model.ObjectKey
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 
