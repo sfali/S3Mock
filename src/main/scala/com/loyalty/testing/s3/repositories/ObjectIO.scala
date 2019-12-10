@@ -71,16 +71,8 @@ class ObjectIO(root: Path, fileStream: FileStream) {
       }
   }
 
-  def completeUpload(uploadInfo: UploadInfo, parts: List[PartInfo])
-                    (implicit ec: ExecutionContext): Future[ObjectKey] = {
-    for {
-      objectKey <- mergeFiles(uploadInfo, parts)
-      _ <- moveParts(objectKey, uploadInfo)
-    } yield objectKey
-  }
-
-  private def mergeFiles(uploadInfo: UploadInfo, parts: List[PartInfo])
-                        (implicit ec: ExecutionContext) = {
+  def mergeFiles(uploadInfo: UploadInfo, parts: List[PartInfo])
+                (implicit ec: ExecutionContext): Future[ObjectKey] = {
     val versionId = uploadInfo.versionIndex.toVersionId
     val objectPath = getObjectPath(uploadInfo.bucketName, uploadInfo.key, uploadInfo.version, versionId)
     val partPaths = parts.map(partInfo => uploadInfo.copy(partNumber = partInfo.partNumber))
@@ -114,7 +106,7 @@ class ObjectIO(root: Path, fileStream: FileStream) {
       }
   }
 
-  private def moveParts(objectKey: ObjectKey, uploadInfo: UploadInfo) = {
+  def moveParts(objectKey: ObjectKey, uploadInfo: UploadInfo): Future[Done] = {
     val stagingPath = getUploadPath(uploadInfo, staging = true)
     val path = getUploadPath(uploadInfo, staging = false)
     Try {

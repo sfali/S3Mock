@@ -80,8 +80,9 @@ class ObjectService(objectIO: ObjectIO, database: NitriteDatabase) {
         Future.failed(InvalidPartException(diff.head.partNumber))
       } else {
         for {
-          objectKey <- objectIO.completeUpload(uploadInfo, parts)
+          objectKey <- objectIO.mergeFiles(uploadInfo, parts)
           savedObjectKey <- database.createObject(objectKey)
+          _ <- objectIO.moveParts(savedObjectKey, uploadInfo)
           _ <- database.moveParts(savedObjectKey)
         } yield savedObjectKey
       }
