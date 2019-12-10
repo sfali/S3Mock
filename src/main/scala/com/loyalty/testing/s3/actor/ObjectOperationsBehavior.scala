@@ -2,17 +2,14 @@ package com.loyalty.testing.s3.actor
 
 import java.util.UUID
 
+import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
-import akka.actor.typed.{ActorRef, Behavior}
-import akka.http.scaladsl.model.headers.ByteRange
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.ObjectOperationsBehavior.ObjectProtocol
+import com.loyalty.testing.s3.actor.model.`object`._
 import com.loyalty.testing.s3.repositories.collections.NoSuchId
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
-import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo}
+import com.loyalty.testing.s3.request.BucketVersioning
 import com.loyalty.testing.s3.service._
 
 import scala.concurrent.ExecutionContext
@@ -230,78 +227,6 @@ object ObjectOperationsBehavior {
         new ObjectOperationsBehavior(context, buffer, ObjectService(objectIO, database))
       }
     }
-
-  sealed trait ObjectProtocol
-
-  sealed trait ObjectProtocolWithReply extends ObjectProtocol {
-    val replyTo: ActorRef[Event]
-  }
-
-  sealed trait ObjectInput extends ObjectProtocolWithReply {
-    val bucket: Bucket
-    val key: String
-    lazy val objectId: UUID = createObjectId(bucket.bucketName, key)
-  }
-
-  sealed trait UploadInput extends ObjectInput {
-    val uploadId: String
-  }
-
-  private final case object Shutdown extends ObjectProtocol
-
-  private final case object DatabaseError extends ObjectProtocol
-
-  private final case class ReplyToSender(reply: Event,
-                                         replyTo: ActorRef[Event],
-                                         maybeObjectKey: Option[ObjectKey] = None) extends ObjectProtocol
-
-  private final case object InitializeSnapshot extends ObjectProtocol
-
-  private final case class ObjectResult(values: List[ObjectKey]) extends ObjectProtocol
-
-  final case class PutObject(bucket: Bucket,
-                             key: String,
-                             contentSource: Source[ByteString, _],
-                             replyTo: ActorRef[Event]) extends ObjectInput
-
-  final case class GetObjectMeta(replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
-
-  final case class GetObject(bucket: Bucket,
-                             key: String,
-                             maybeVersionId: Option[String],
-                             maybeRange: Option[ByteRange],
-                             replyTo: ActorRef[Event]) extends ObjectInput
-
-  final case class DeleteObject(bucket: Bucket,
-                                key: String,
-                                maybeVersionId: Option[String],
-                                replyTo: ActorRef[Event]) extends ObjectInput
-
-  final case class InitiateMultiPartUpload(bucket: Bucket,
-                                           key: String,
-                                           replyTo: ActorRef[Event]) extends ObjectInput
-
-  private final case class UploadInfoCreated(uploadInfo: UploadInfo,
-                                             replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
-
-  final case class UploadPart(bucket: Bucket,
-                              key: String,
-                              uploadId: String,
-                              partNumber: Int,
-                              contentSource: Source[ByteString, _],
-                              replyTo: ActorRef[Event]) extends UploadInput
-
-  private final case class PartSaved(uploadInfo: UploadInfo,
-                                     replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
-
-  final case class CompleteUpload(bucket: Bucket,
-                                  key: String,
-                                  uploadId: String,
-                                  parts: List[PartInfo],
-                                  replyTo: ActorRef[Event]) extends UploadInput
-
-  private final case class ResetUploadInfo(objectKey: ObjectKey,
-                                           replyTo: ActorRef[Event]) extends ObjectProtocolWithReply
 
   private def sanitizeVersionId(bucket: Bucket, maybeVersionId: Option[String]): Option[String] =
     if (BucketVersioning.NotExists == bucket.version && maybeVersionId.isDefined) {

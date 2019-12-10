@@ -9,7 +9,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.BucketOperationsBehavior.BucketProtocol
-import com.loyalty.testing.s3.actor.ObjectOperationsBehavior._
+import com.loyalty.testing.s3.actor.model.`object`._
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
