@@ -4,6 +4,7 @@ import java.nio.file.{Files, Path}
 
 import akka.Done
 import akka.http.scaladsl.model.headers.ByteRange
+import akka.http.scaladsl.model.headers.ByteRange.{FromOffset, Slice, Suffix}
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.it._
 import com.loyalty.testing.s3.repositories.model.Bucket
@@ -78,14 +79,37 @@ class AwsClient(override protected val awsSettings: AwsSettings) extends S3Clien
   }
 
   override def getObject(bucketName: String,
-                         key: String, maybeVersionId: Option[String],
-                         maybeRange: Option[ByteRange]): Future[(String, ObjectInfo)] = ???
+                         key: String,
+                         maybeVersionId: Option[String],
+                         maybeRange: Option[ByteRange]): Future[(String, ObjectInfo)] = {
+    val range =
+      maybeRange match {
+        case Some(range: Slice) => s"${range.first}-${range.last}"
+        case Some(range: FromOffset) => s"${range.offset}-"
+        case Some(range: Suffix) => s"-${range.length}"
+        case None => null
+      }
+    val request = GetObjectRequest.builder().bucket(bucketName).key(key).range(range).versionId(maybeVersionId.orNull)
+      .build()
+    val bytesResponse = s3Client.getObjectAsBytes(request)
+    val response = bytesResponse.response()
+    val md5 = Option(response.metadata().get(CONTENT_MD5)).getOrElse("")
+    val objectInfo = ObjectInfo(
+      bucketName = bucketName,
+      key = key,
+      eTag = response.eTag(),
+      contentMd5 = md5,
+      contentLength = response.contentLength(),
+      versionId = Option(response.versionId())
+    )
+
+    Future.successful((bytesResponse.asUtf8String(), objectInfo))
+  }
 
   override def deleteObject(bucketName: String,
                             key: String,
                             maybeVersionId: Option[String]): Future[(Option[Boolean], Option[String])] = {
-    val builder = DeleteObjectRequest.builder().bucket(bucketName).key(key)
-    val request = maybeVersionId.map(builder.versionId).map(_.build()).getOrElse(builder.build())
+    val request = DeleteObjectRequest.builder().bucket(bucketName).key(key).versionId(maybeVersionId.orNull).build()
     val response = s3Client.deleteObject(request)
     Future.successful((Option(response.deleteMarker()).map(_.booleanValue()), Option(response.versionId())))
   }
