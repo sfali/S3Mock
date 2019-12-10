@@ -12,12 +12,13 @@ import org.slf4j.LoggerFactory
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-class UploadCollection(db: Nitrite, collectionName: String) {
+class UploadCollection(db: Nitrite, staging: Boolean) {
 
   import Document._
 
   private val log = LoggerFactory.getLogger(classOf[UploadCollection])
 
+  private val collectionName: String = if (staging) "uploads_staging" else "uploads"
   private[repositories] val collection = db.getCollection(collectionName)
   if (!collection.hasIndex(PartNumberField)) {
     collection.createIndex(PartNumberField, indexOptions(NonUnique))
@@ -95,5 +96,5 @@ class UploadCollection(db: Nitrite, collectionName: String) {
 }
 
 object UploadCollection {
-  def apply(db: Nitrite, collectionName: String): UploadCollection = new UploadCollection(db, collectionName)
+  def apply(db: Nitrite, staging: Boolean): UploadCollection = new UploadCollection(db, staging)
 }

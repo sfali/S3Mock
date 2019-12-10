@@ -37,8 +37,8 @@ class NitriteDatabase(rootPath: Path,
   private[repositories] val bucketCollection = BucketCollection(db)
   private[repositories] val notificationCollection = NotificationCollection(db)
   private[repositories] val objectCollection = ObjectCollection(db)
-  private[repositories] val uploadStagingCollection = UploadCollection(db, "upload_staging")
-  private[repositories] val uploadCollection = UploadCollection(db, "upload")
+  private[repositories] val uploadStagingCollection = UploadCollection(db, staging = true)
+  private[repositories] val uploadCollection = UploadCollection(db, staging = false)
 
   def getBucket(id: UUID): Future[Bucket] =
     Try(bucketCollection.findBucket(id)) match {
