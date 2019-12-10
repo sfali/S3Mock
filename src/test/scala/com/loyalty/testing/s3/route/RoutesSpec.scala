@@ -45,6 +45,7 @@ class RoutesSpec
   private val settings = AppSettings(spawnSystem.settings.config)
   protected override val objectIO: ObjectIO = ObjectIO(rootPath, FileStream())
   protected override val database: NitriteDatabase = NitriteDatabase(rootPath, settings.dbSettings)
+  private val xmlContentType = ContentType(MediaTypes.`application/xml`, HttpCharsets.`UTF-8`)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -79,7 +80,7 @@ class RoutesSpec
         |<LocationConstraint>us-west-1</LocationConstraint>
         |</CreateBucketConfiguration>
        """.stripMargin.replaceAll(System.lineSeparator(), "")
-    val entity = HttpEntity(ContentType(MediaTypes.`application/xml`, HttpCharsets.`UTF-8`), xml)
+    val entity = HttpEntity(xmlContentType, xml)
     Put(s"/$versionedBucketName", entity) ~> routes ~> check {
       headers.head mustBe Location(s"/$versionedBucketName")
       status mustBe OK
@@ -93,7 +94,7 @@ class RoutesSpec
         |<Status>Enabled</Status>
         |</VersioningConfiguration>
       """.stripMargin.replaceAll(System.lineSeparator(), "")
-    val entity = HttpEntity(`text/xml(UTF-8)`, xml)
+    val entity = HttpEntity(xmlContentType, xml)
     Put(s"/$versionedBucketName?versioning", entity) ~> routes ~> check {
       headers.head mustBe Location(s"/$versionedBucketName")
       status mustBe OK

@@ -1,15 +1,12 @@
 package com.loyalty.testing.s3.routes
 
-import java.nio.charset.StandardCharsets.UTF_8
-
 import akka.http.scaladsl.marshallers.xml.ScalaXmlSupport
 import akka.http.scaladsl.marshalling.Marshaller.{fromStatusCodeAndHeadersAndValue, fromToEntityMarshaller}
 import akka.http.scaladsl.marshalling.{Marshaller, ToEntityMarshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, HttpHeader, MediaTypes}
+import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, Unmarshaller}
-import akka.util.ByteString
 import com.loyalty.testing.s3.VersionIdHeader
 import com.loyalty.testing.s3.response._
 import de.heikoseeberger.akkahttpcirce.ErrorAccumulatingCirceSupport
@@ -65,7 +62,7 @@ trait CustomMarshallers
     xmlResponseMarshallers(`application/octet-stream`)
 
   implicit val CompleteMultipartUploadResultMarshallers: ToEntityMarshaller[CompleteMultipartUploadResult] =
-    xmlResponseMarshallers(`application/octet-stream`)
+    xmlResponseMarshallers(`text/xml(UTF-8)`)
 
   implicit val ListBucketResultMarshallers: ToEntityMarshaller[ListBucketResult] =
     xmlResponseMarshallers(`application/octet-stream`)
@@ -96,7 +93,12 @@ trait CustomMarshallers
 
   private def xmlResponseMarshallers(contentType: ContentType): ToEntityMarshaller[XmlResponse] =
     Marshaller.withFixedContentType(contentType) { result =>
-      HttpEntity(contentType, ByteString(result.toXml.toString().getBytes(UTF_8)))
+      contentType match {
+        case `text/xml(UTF-8)` => HttpEntity(MediaTypes.`application/xml`.toContentType(HttpCharsets.`UTF-8`),
+          result.toByteString.utf8String)
+        case `application/octet-stream` => HttpEntity(contentType, result.toByteString)
+        case _ => throw new RuntimeException(s"unsupported content type: $contentType")
+      }
     }
 
   implicit val InitiateMultipartUploadResultResponse: ToResponseMarshaller[InitiateMultipartUploadResult] =
