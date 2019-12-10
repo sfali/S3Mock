@@ -15,18 +15,18 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
-                                       buffer: StashBuffer[BucketProtocol],
+class BucketOperationsBehavior private(context: ActorContext[Command],
+                                       buffer: StashBuffer[Command],
                                        objectIO: ObjectIO,
                                        database: NitriteDatabase)
-  extends AbstractBehavior[BucketProtocol](context) {
+  extends AbstractBehavior[Command](context) {
 
   private implicit val ec: ExecutionContext = context.system.executionContext
   private val bucketId = UUID.fromString(context.self.path.name)
   context.setReceiveTimeout(5.minutes, Shutdown)
   context.self ! InitializeSnapshot
 
-  override def onMessage(msg: BucketProtocol): Behavior[BucketProtocol] =
+  override def onMessage(msg: Command): Behavior[Command] =
     msg match {
       case InitializeSnapshot =>
         context.pipeToSelf(database.getBucket(bucketId)) {
@@ -55,7 +55,7 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
 
     }
 
-  private def noSuchBucket: Behavior[BucketProtocol] =
+  private def noSuchBucket: Behavior[Command] =
     Behaviors.receiveMessagePartial {
       case CreateBucket(bucket, replyTo) =>
         context.pipeToSelf(database.createBucket(bucket)) {
@@ -72,7 +72,7 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
         context.self ! ReplyToSender(BucketInfo(bucket), replyTo)
         bucketOperation(bucket)
 
-      case reply: BucketProtocolWithReply =>
+      case reply: CommandWithReply =>
         context.self ! ReplyToSender(NoSuchBucketExists, reply.replyTo)
         Behaviors.same
 
@@ -87,7 +87,7 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
         Behaviors.unhandled
     }
 
-  private def bucketOperation(bucket: Bucket): Behavior[BucketProtocol] =
+  private def bucketOperation(bucket: Bucket): Behavior[Command] =
     Behaviors.receiveMessagePartial {
       case CreateBucket(_, replyTo) =>
         context.self ! ReplyToSender(BucketAlreadyExists(bucket), replyTo)
@@ -182,7 +182,7 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
 
 object BucketOperationsBehavior {
 
-  def apply(objectIO: ObjectIO, database: NitriteDatabase): Behavior[BucketProtocol] =
+  def apply(objectIO: ObjectIO, database: NitriteDatabase): Behavior[Command] =
     Behaviors.setup { context =>
       Behaviors.withStash(1000)(buffer => new BucketOperationsBehavior(context, buffer, objectIO, database))
     }

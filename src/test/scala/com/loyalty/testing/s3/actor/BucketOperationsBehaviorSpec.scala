@@ -596,7 +596,7 @@ class BucketOperationsBehaviorSpec
                                partNumber: Int,
                                start: Int,
                                totalSize: Int,
-                               actorRef: ActorRef[BucketProtocol],
+                               actorRef: ActorRef[Command],
                                probe: TestProbe[Event]) = {
     actorRef ! UploadPartWrapper(key, uploadId, partNumber, createContentSource(start, totalSize), probe.ref)
     val partUploadEvent = probe.receiveMessage().asInstanceOf[PartUploaded]
@@ -610,7 +610,7 @@ class BucketOperationsBehaviorSpec
                             uploadId: String,
                             partNumbers: List[Int],
                             partBoundaries: List[(Int, Int)],
-                            actorRef: ActorRef[BucketProtocol],
+                            actorRef: ActorRef[Command],
                             probe: TestProbe[Event]): List[PartInfo] = {
     val ls = partNumbers.zip(partBoundaries).map(xs => (xs._1, xs._2._1, xs._2._2))
     ls.map {

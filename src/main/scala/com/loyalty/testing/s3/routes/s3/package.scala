@@ -8,8 +8,8 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.SpawnBehavior.{Command, Spawn}
-import com.loyalty.testing.s3.actor.model.bucket.BucketProtocol
+import com.loyalty.testing.s3.actor.SpawnBehavior.{Command => SpawnCommand, Spawn}
+import com.loyalty.testing.s3.actor.model.bucket.Command
 import com.loyalty.testing.s3.actor.{BucketOperationsBehavior, Event}
 import com.loyalty.testing.s3.repositories.model.ObjectKey
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
@@ -22,14 +22,14 @@ package object s3 {
   def spawnBucketBehavior(bucketName: String,
                           objectIO: ObjectIO,
                           database: NitriteDatabase)
-                         (implicit system: ActorSystem[Command],
-                          timeout: Timeout): Future[ActorRef[BucketProtocol]] =
-    system.ask[ActorRef[BucketProtocol]](Spawn(BucketOperationsBehavior(objectIO, database),
+                         (implicit system: ActorSystem[SpawnCommand],
+                          timeout: Timeout): Future[ActorRef[Command]] =
+    system.ask[ActorRef[Command]](Spawn(BucketOperationsBehavior(objectIO, database),
       bucketName.toUUID.toString, _))
 
-  def askBucketBehavior(actorRef: ActorRef[BucketProtocol],
-                        toProtocol: ActorRef[Event] => BucketProtocol)
-                       (implicit system: ActorSystem[Command],
+  def askBucketBehavior(actorRef: ActorRef[Command],
+                        toProtocol: ActorRef[Event] => Command)
+                       (implicit system: ActorSystem[SpawnCommand],
                         timeout: Timeout): Future[Event] = actorRef.ask[Event](toProtocol)
 
   def createResponseHeaders(objectKey: ObjectKey): List[RawHeader] = {
