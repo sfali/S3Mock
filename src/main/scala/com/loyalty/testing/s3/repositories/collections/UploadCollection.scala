@@ -12,13 +12,13 @@ import org.slf4j.LoggerFactory
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-class UploadCollection(db: Nitrite) {
+class UploadCollection(db: Nitrite, collectionName: String) {
 
   import Document._
 
   private val log = LoggerFactory.getLogger(classOf[UploadCollection])
 
-  private[repositories] val collection = db.getCollection("upload_staging")
+  private[repositories] val collection = db.getCollection(collectionName)
   if (!collection.hasIndex(PartNumberField)) {
     collection.createIndex(PartNumberField, indexOptions(NonUnique))
   }
@@ -64,9 +64,11 @@ class UploadCollection(db: Nitrite) {
           log.info("Initiated multi part upload, upload_id={}, doc_id={}", uploadId, docId.get.getIdValue)
           Done
         }
-
     }
   }
+
+  private[repositories] def findAll(uploadId: String): List[Document] =
+    collection.find(feq(UploadIdField, uploadId)).toScalaList
 
   private[repositories] def insert(elements: Document*): Int =
     collection.insert(elements.asJava.toArray(Array.ofDim[Document](elements.size))).getAffectedCount
@@ -76,7 +78,6 @@ class UploadCollection(db: Nitrite) {
       case Nil => throw new RuntimeException(s"upload not found: $uploadId/$partNumber")
       case document :: Nil => collection.remove(document).getAffectedCount
       case _ => throw new IllegalStateException(s"Multiple documents found for $uploadId/$partNumber")
-
     }
 
   private[repositories] def deleteAll(uploadId: String): Int =
@@ -94,5 +95,5 @@ class UploadCollection(db: Nitrite) {
 }
 
 object UploadCollection {
-  def apply(db: Nitrite): UploadCollection = new UploadCollection(db)
+  def apply(db: Nitrite, collectionName: String): UploadCollection = new UploadCollection(db, collectionName)
 }

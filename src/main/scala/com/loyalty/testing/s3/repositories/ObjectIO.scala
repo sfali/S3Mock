@@ -5,6 +5,7 @@ import java.time.OffsetDateTime
 import java.util.UUID
 import java.util.stream.Collectors
 
+import akka.Done
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.IOResult
 import akka.stream.scaladsl.Source
@@ -15,11 +16,13 @@ import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo}
 import com.loyalty.testing.s3.streams.FileStream
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 class ObjectIO(root: Path, fileStream: FileStream) {
 
   private val workDir: Path = root.toAbsolutePath
   private val dataDir: Path = workDir + "data"
+  private val uploadsStagingDir: Path = workDir + "uploads-staging"
   private val uploadsDir: Path = workDir + "uploads"
 
   def saveObject(bucket: Bucket,
@@ -52,7 +55,7 @@ class ObjectIO(root: Path, fileStream: FileStream) {
 
   def savePart(uploadInfo: UploadInfo, contentSource: Source[ByteString, _])
               (implicit ec: ExecutionContext): Future[UploadInfo] = {
-    val objectPath = getUploadPath(uploadInfo)
+    val objectPath = getUploadPath(uploadInfo, staging = true)
     fileStream.saveContent(contentSource, objectPath)
       .flatMap {
         digestInfo =>
@@ -70,9 +73,18 @@ class ObjectIO(root: Path, fileStream: FileStream) {
 
   def completeUpload(uploadInfo: UploadInfo, parts: List[PartInfo])
                     (implicit ec: ExecutionContext): Future[ObjectKey] = {
+    for {
+      objectKey <- mergeFiles(uploadInfo, parts)
+      _ <- moveParts(objectKey, uploadInfo)
+    } yield objectKey
+  }
+
+  private def mergeFiles(uploadInfo: UploadInfo, parts: List[PartInfo])
+                        (implicit ec: ExecutionContext) = {
     val versionId = uploadInfo.versionIndex.toVersionId
     val objectPath = getObjectPath(uploadInfo.bucketName, uploadInfo.key, uploadInfo.version, versionId)
-    val partPaths = parts.map(partInfo => uploadInfo.copy(partNumber = partInfo.partNumber)).map(getUploadPath)
+    val partPaths = parts.map(partInfo => uploadInfo.copy(partNumber = partInfo.partNumber))
+      .map(uploadInfo => getUploadPath(uploadInfo, staging = true))
 
     val concatenatedETag =
       parts
@@ -102,6 +114,19 @@ class ObjectIO(root: Path, fileStream: FileStream) {
       }
   }
 
+  private def moveParts(objectKey: ObjectKey, uploadInfo: UploadInfo) = {
+    val stagingPath = getUploadPath(uploadInfo, staging = true)
+    val path = getUploadPath(uploadInfo, staging = false)
+    Try {
+      if (BucketVersioning.Enabled != objectKey.version) clean(path) // first clean existing folder, if applicable
+      Files.move(stagingPath, path)
+      clean(getUploadPath(uploadInfo, staging = true))
+    } match {
+      case Failure(ex) => Future.failed(ex)
+      case Success(_) => Future.successful(Done)
+    }
+  }
+
   def getObject(objectKey: ObjectKey,
                 maybeRange: Option[ByteRange] = None): (ObjectKey, Source[ByteString, Future[IOResult]]) = {
     val objectPath = getObjectPath(objectKey.bucketName, objectKey.key, objectKey.version, objectKey.versionId)
@@ -118,7 +143,7 @@ class ObjectIO(root: Path, fileStream: FileStream) {
     if (empty) clean(parent)
   }
 
-  def initiateMultipartUpload(uploadInfo: UploadInfo): Path = getUploadPath(uploadInfo)
+  def initiateMultipartUpload(uploadInfo: UploadInfo): Path = getUploadPath(uploadInfo, staging = true)
 
   private def getObjectPath(bucketName: String,
                             key: String,
@@ -128,8 +153,9 @@ class ObjectIO(root: Path, fileStream: FileStream) {
     objectParentPath -> ContentFileName
   }
 
-  private def getUploadPath(uploadInfo: UploadInfo) = {
-    val uploadPath = uploadsDir + (uploadInfo.bucketName, uploadInfo.key, uploadInfo.uploadId,
+  private def getUploadPath(uploadInfo: UploadInfo, staging: Boolean) = {
+    val path = if (staging) uploadsStagingDir else uploadsDir
+    val uploadPath = path + (uploadInfo.bucketName, uploadInfo.key, uploadInfo.uploadId,
       toBase16(uploadInfo.version.entryName), uploadInfo.versionIndex.toVersionId)
     if (uploadInfo.partNumber > 0) {
       val partPath = uploadPath + uploadInfo.partNumber.toString

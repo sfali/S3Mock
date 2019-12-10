@@ -4,11 +4,10 @@ import java.nio.file.Path
 import java.util.UUID
 
 import akka.Done
-import akka.actor.typed.ActorSystem
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.collections.{BucketCollection, NotificationCollection, ObjectCollection, UploadCollection}
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
-import com.loyalty.testing.s3.request.VersioningConfiguration
+import com.loyalty.testing.s3.request.{BucketVersioning, VersioningConfiguration}
 import com.loyalty.testing.s3.settings.Settings
 import com.loyalty.testing.s3.utils.DateTimeProvider
 import com.loyalty.testing.s3.{DBSettings, _}
@@ -38,7 +37,8 @@ class NitriteDatabase(rootPath: Path,
   private[repositories] val bucketCollection = BucketCollection(db)
   private[repositories] val notificationCollection = NotificationCollection(db)
   private[repositories] val objectCollection = ObjectCollection(db)
-  private[repositories] val uploadCollection = UploadCollection(db)
+  private[repositories] val uploadStagingCollection = UploadCollection(db, "upload_staging")
+  private[repositories] val uploadCollection = UploadCollection(db, "upload")
 
   def getBucket(id: UUID): Future[Bucket] =
     Try(bucketCollection.findBucket(id)) match {
@@ -83,13 +83,26 @@ class NitriteDatabase(rootPath: Path,
     }
 
   def createUpload(uploadInfo: UploadInfo): Future[Done] =
-    Try(uploadCollection.createUpload(uploadInfo)) match {
+    Try(uploadStagingCollection.createUpload(uploadInfo)) match {
       case Failure(ex) => Future.failed(ex)
       case Success(_) => Future.successful(Done)
     }
 
+  def moveParts(objectKey: ObjectKey): Future[Done] = {
+    val uploadId = objectKey.uploadId.get
+    Try {
+      if (BucketVersioning.Enabled != objectKey.version) uploadCollection.deleteAll(uploadId)
+      val allUploads = uploadStagingCollection.findAll(uploadId).tail
+      uploadCollection.insert(allUploads: _*)
+      uploadStagingCollection.deleteAll(uploadId)
+    } match {
+      case Failure(ex) => Future.failed(ex)
+      case Success(_) => Future.successful(Done)
+    }
+  }
+
   def deleteUpload(uploadId: String, partNumber: Int): Future[Done] =
-    Try(uploadCollection.deleteUpload(uploadId, partNumber)) match {
+    Try(uploadStagingCollection.deleteUpload(uploadId, partNumber)) match {
       case Failure(ex) => Future.failed(ex)
       case Success(_) => Future.successful(Done)
     }
@@ -103,7 +116,6 @@ object NitriteDatabase {
            (implicit dateTimeProvider: DateTimeProvider): NitriteDatabase = new NitriteDatabase(rootPath, dbSettings)
 
   def apply(rootPath: Path)
-           (implicit system: ActorSystem[Nothing],
-            dateTimeProvider: DateTimeProvider,
+           (implicit dateTimeProvider: DateTimeProvider,
             settings: Settings): NitriteDatabase = NitriteDatabase(rootPath, settings.dbSettings)
 }

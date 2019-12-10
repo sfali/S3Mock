@@ -82,6 +82,7 @@ class ObjectService(objectIO: ObjectIO, database: NitriteDatabase) {
         for {
           objectKey <- objectIO.completeUpload(uploadInfo, parts)
           savedObjectKey <- database.createObject(objectKey)
+          _ <- database.moveParts(savedObjectKey)
         } yield savedObjectKey
       }
     } else Future.failed(InvalidPartOrderException)
