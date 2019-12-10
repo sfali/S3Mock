@@ -5,7 +5,7 @@ import java.util.UUID
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
 import akka.actor.typed.{ActorRef, Behavior}
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.model.`object`.{CompleteUpload, DeleteObject, GetObject, GetObjectMeta, InitiateMultiPartUpload, ObjectProtocol, PutObject, UploadPart}
+import com.loyalty.testing.s3.actor.model.`object`.{CompleteUpload, DeleteObject, GetObject, GetObjectMeta, InitiateMultiPartUpload, Command => ObjectCommand, PutObject, UploadPart}
 import com.loyalty.testing.s3.actor.model.bucket._
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
@@ -170,10 +170,10 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
         Behaviors.unhandled
     }
 
-  private def objectActor(bucket: Bucket, key: String): ActorRef[ObjectProtocol] = {
+  private def objectActor(bucket: Bucket, key: String): ActorRef[ObjectCommand] = {
     val id = createObjectId(bucket.bucketName, key).toString
     context.child(id) match {
-      case Some(behavior) => behavior.unsafeUpcast[ObjectProtocol]
+      case Some(behavior) => behavior.unsafeUpcast[ObjectCommand]
       case None => context.spawn(ObjectOperationsBehavior(objectIO, database), id)
     }
   }

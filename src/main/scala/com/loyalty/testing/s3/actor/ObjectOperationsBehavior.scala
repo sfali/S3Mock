@@ -16,8 +16,8 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
-                               buffer: StashBuffer[ObjectProtocol],
+class ObjectOperationsBehavior(context: ActorContext[Command],
+                               buffer: StashBuffer[Command],
                                objectService: ObjectService)
   extends AbstractBehavior(context) {
 
@@ -32,7 +32,7 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
   context.setReceiveTimeout(5.minutes, Shutdown)
   context.self ! InitializeSnapshot
 
-  override def onMessage(msg: ObjectProtocol): Behavior[ObjectProtocol] =
+  override def onMessage(msg: Command): Behavior[Command] =
     msg match {
       case InitializeSnapshot =>
         context.pipeToSelf(objectService.getAllObjects(objectId)) {
@@ -59,7 +59,7 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
         Behaviors.same
     }
 
-  private def objectOperations: Behavior[ObjectProtocol] =
+  private def objectOperations: Behavior[Command] =
     Behaviors.receiveMessagePartial {
       case protocol: ObjectInput if protocol.objectId != objectId =>
         context.self ! ReplyToSender(InvalidAccess, protocol.replyTo)
@@ -221,9 +221,9 @@ class ObjectOperationsBehavior(context: ActorContext[ObjectProtocol],
 object ObjectOperationsBehavior {
 
   def apply(objectIO: ObjectIO,
-            database: NitriteDatabase): Behavior[ObjectProtocol] =
-    Behaviors.setup[ObjectProtocol] { context =>
-      Behaviors.withStash[ObjectProtocol](1000) { buffer =>
+            database: NitriteDatabase): Behavior[Command] =
+    Behaviors.setup[Command] { context =>
+      Behaviors.withStash[Command](1000) { buffer =>
         new ObjectOperationsBehavior(context, buffer, ObjectService(objectIO, database))
       }
     }
