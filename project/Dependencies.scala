@@ -57,7 +57,7 @@ object Dependencies {
     val AkkaVersion = "2.6.1"
     val AkkaHttpVersion = "10.1.11"
     val LightbendVersion = "1.1.2"
-    val AwsSdk2Version = "2.10.21"
+    val AwsSdk2Version = "2.10.31"
     val LogbackVersion = "1.2.3"
     val CirceVersion = "0.12.1"
     val EnumeratumVersion = "1.5.13"
