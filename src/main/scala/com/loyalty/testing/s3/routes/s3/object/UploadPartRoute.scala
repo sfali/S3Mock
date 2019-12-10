@@ -6,9 +6,9 @@ import akka.http.scaladsl.model.StatusCodes.OK
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.util.Timeout
-import com.loyalty.testing.s3.actor.BucketOperationsBehavior.UploadPartWrapper
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
-import com.loyalty.testing.s3.actor.{InvalidAccess, NoSuchBucketExists, PartUploaded, NoSuchUpload}
+import com.loyalty.testing.s3.actor.model.bucket.UploadPartWrapper
+import com.loyalty.testing.s3.actor.{InvalidAccess, NoSuchBucketExists, NoSuchUpload, PartUploaded}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException, NoSuchUploadException}
 import com.loyalty.testing.s3.routes.CustomMarshallers

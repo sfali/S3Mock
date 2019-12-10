@@ -7,8 +7,8 @@ import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.util.Timeout
-import com.loyalty.testing.s3.actor.BucketOperationsBehavior._
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
+import com.loyalty.testing.s3.actor.model.bucket.CreateBucket
 import com.loyalty.testing.s3.actor.{BucketAlreadyExists, BucketInfo, Event}
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}

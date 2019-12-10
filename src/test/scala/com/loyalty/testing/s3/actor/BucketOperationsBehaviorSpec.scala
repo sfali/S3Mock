@@ -9,7 +9,7 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.{FileIO, Sink}
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.BucketOperationsBehavior._
+import com.loyalty.testing.s3.actor.model.bucket._
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, NonVersionId, ObjectIO}

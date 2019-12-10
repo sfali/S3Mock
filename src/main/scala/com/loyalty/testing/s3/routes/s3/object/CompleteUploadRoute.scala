@@ -4,9 +4,9 @@ import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.util.Timeout
-import com.loyalty.testing.s3.actor.BucketOperationsBehavior.CompleteUploadWrapper
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
 import com.loyalty.testing.s3.actor._
+import com.loyalty.testing.s3.actor.model.bucket.CompleteUploadWrapper
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.CompleteMultipartUpload
 import com.loyalty.testing.s3.response._

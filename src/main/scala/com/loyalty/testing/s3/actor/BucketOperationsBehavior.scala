@@ -4,16 +4,11 @@ import java.util.UUID
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
 import akka.actor.typed.{ActorRef, Behavior}
-import akka.http.scaladsl.model.headers.ByteRange
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.BucketOperationsBehavior.BucketProtocol
-import com.loyalty.testing.s3.actor.model.`object`._
-import com.loyalty.testing.s3.notification.Notification
+import com.loyalty.testing.s3.actor.model.`object`.{CompleteUpload, DeleteObject, GetObject, GetObjectMeta, InitiateMultiPartUpload, ObjectProtocol, PutObject, UploadPart}
+import com.loyalty.testing.s3.actor.model.bucket._
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
-import com.loyalty.testing.s3.request.{PartInfo, VersioningConfiguration}
 import com.loyalty.testing.s3.response.NoSuchBucketException
 
 import scala.concurrent.ExecutionContext
@@ -25,8 +20,6 @@ class BucketOperationsBehavior private(context: ActorContext[BucketProtocol],
                                        objectIO: ObjectIO,
                                        database: NitriteDatabase)
   extends AbstractBehavior[BucketProtocol](context) {
-
-  import BucketOperationsBehavior._
 
   private implicit val ec: ExecutionContext = context.system.executionContext
   private val bucketId = UUID.fromString(context.self.path.name)
@@ -193,68 +186,4 @@ object BucketOperationsBehavior {
     Behaviors.setup { context =>
       Behaviors.withStash(1000)(buffer => new BucketOperationsBehavior(context, buffer, objectIO, database))
     }
-
-  sealed trait BucketProtocol
-
-  sealed trait BucketProtocolWithReply extends BucketProtocol {
-    val replyTo: ActorRef[Event]
-  }
-
-  private final case object Shutdown extends BucketProtocol
-
-  private final case object InitializeSnapshot extends BucketProtocol
-
-  private final case object NoSuchBucket extends BucketProtocol
-
-  private final case object DatabaseError extends BucketProtocol
-
-  private final case class ReplyToSender(reply: Event, replyTo: ActorRef[Event]) extends BucketProtocol
-
-  private case class NewBucketCreated(bucket: Bucket, replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
-  private final case class BucketResult(bucket: Bucket) extends BucketProtocol
-
-  private final case class VersioningSet(updatedBucket: Bucket, replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
-  final case class CreateBucket(bucket: Bucket, replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
-  final case class GetBucket(replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
-  final case class GetBucketNotifications(replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
-  final case class SetBucketVersioning(versioningConfiguration: VersioningConfiguration,
-                                       replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
-  final case class CreateBucketNotifications(notifications: List[Notification],
-                                             replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
-  final case class PutObjectWrapper(key: String,
-                                    contentSource: Source[ByteString, _],
-                                    replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
-  final case class GetObjectMetaWrapper(key: String, replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
-  final case class GetObjectWrapper(key: String,
-                                    maybeVersionId: Option[String] = None,
-                                    maybeRange: Option[ByteRange] = None,
-                                    replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
-  final case class DeleteObjectWrapper(key: String,
-                                       maybeVersionId: Option[String] = None,
-                                       replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
-  final case class InitiateMultiPartUploadWrapper(key: String,
-                                                  replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
-  final case class UploadPartWrapper(key: String,
-                                     uploadId: String,
-                                     partNumber: Int,
-                                     contentSource: Source[ByteString, _],
-                                     replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
-  final case class CompleteUploadWrapper(key: String,
-                                         uploadId: String,
-                                         parts: List[PartInfo],
-                                         replyTo: ActorRef[Event]) extends BucketProtocolWithReply
-
 }

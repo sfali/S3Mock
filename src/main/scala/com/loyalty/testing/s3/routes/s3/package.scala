@@ -8,12 +8,11 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.BucketOperationsBehavior.BucketProtocol
 import com.loyalty.testing.s3.actor.SpawnBehavior.{Command, Spawn}
+import com.loyalty.testing.s3.actor.model.bucket.BucketProtocol
 import com.loyalty.testing.s3.actor.{BucketOperationsBehavior, Event}
 import com.loyalty.testing.s3.repositories.model.ObjectKey
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
-import com.loyalty.testing.s3.request.BucketVersioning
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
