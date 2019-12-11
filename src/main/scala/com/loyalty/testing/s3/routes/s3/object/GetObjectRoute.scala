@@ -39,7 +39,7 @@ object GetObjectRoute extends CustomMarshallers {
               .withHeaders(createResponseHeaders(objectKey)))
           case Success(ObjectInfo(objectKey)) => complete(HttpResponse(NotFound)
             .withHeaders(createResponseHeaders(objectKey)))
-          case Success(NoSuchBucketExists) => complete(NoSuchBucketException(bucketName))
+          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
           case Success(NoSuchKeyExists) => complete(NoSuchKeyException(bucketName, key))
           case Success(InvalidAccess) =>
             system.log.warn("GetObjectRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)

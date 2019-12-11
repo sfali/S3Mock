@@ -36,7 +36,7 @@ object UploadPartRoute extends CustomMarshallers {
         onComplete(eventualEvent) {
           case Success(PartUploaded(uploadInfo)) => complete(HttpResponse(OK)
             .withHeaders(createResponseHeaders(uploadInfo.toObjectKey)))
-          case Success(NoSuchBucketExists) => complete(NoSuchBucketException(bucketName))
+          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
           case Success(NoSuchUpload) => complete(NoSuchUploadException(bucketName, key))
           case Success(InvalidAccess) =>
             system.log.warn("UploadPartRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)

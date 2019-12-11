@@ -52,7 +52,7 @@ object DeleteObjectRoute extends CustomMarshallers {
               deleteMarker = Some(deleteMarker)
             )
             complete(HttpResponse(NoContent).withHeaders(createResponseHeaders(objectKey)))
-          case Success(NoSuchBucketExists) => complete(NoSuchBucketException(bucketName))
+          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
           case Success(NoSuchKeyExists) => complete(NoSuchKeyException(bucketName, key))
           case Success(InvalidAccess) =>
             system.log.warn("DeleteObjectRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)

@@ -31,7 +31,7 @@ object InitiateMultipartUploadRoute extends CustomMarshallers {
       onComplete(eventualEvent) {
         case Success(MultiPartUploadedInitiated(uploadId)) =>
           complete(InitiateMultipartUploadResult(bucketName, key, uploadId))
-        case Success(NoSuchBucketExists) => complete(NoSuchBucketException(bucketName))
+        case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
         case Success(InvalidAccess) =>
           system.log.warn("InitiateMultipartUploadRoute: invalid access to actor. bucket_name={}, key={}", bucketName,
             key)

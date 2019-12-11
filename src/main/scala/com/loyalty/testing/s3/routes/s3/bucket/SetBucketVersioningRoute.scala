@@ -35,7 +35,7 @@ object SetBucketVersioningRoute extends CustomMarshallers {
         onComplete(eventualEvent) {
           case Success(BucketInfo(bucket)) =>
             complete(HttpResponse(OK).withHeaders(Location(s"/${bucket.bucketName}")))
-          case Success(NoSuchBucketExists) => complete(NoSuchBucketException(bucketName))
+          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
           case Success(event: Event) =>
             system.log.warn("SetBucketVersioningRoute: invalid event received. event={}, bucket_name={}", event, bucketName)
             complete(InternalServiceException(bucketName))

@@ -6,6 +6,7 @@ import akka.http.scaladsl.model.StatusCodes.NotFound
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.util.Timeout
+import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.CopyBehavior.Copy
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
 import com.loyalty.testing.s3.actor.model.{InvalidAccess, NoSuchBucketExists, NoSuchKeyExists, ObjectInfo}
@@ -32,6 +33,8 @@ object CopyObjectRoute extends CustomMarshallers {
       val sourceBucketName = source.bucketName
       val sourceKey = source.key
       val maybeSourceVersionId = source.maybeVersionId
+      val sourceBucketId = sourceBucketName.toUUID
+      val targetBucketId = bucketName.toUUID
 
       val eventualEvent =
         for {
@@ -44,7 +47,10 @@ object CopyObjectRoute extends CustomMarshallers {
           complete(HttpResponse(NotFound).withHeaders(createResponseHeaders(objectKey)))
         case Success(ObjectInfo(objectKey)) =>
           complete(CopyObjectResult(objectKey.eTag, objectKey.actualVersionId, maybeSourceVersionId))
-        case Success(NoSuchBucketExists) => complete(NoSuchBucketException(bucketName))
+        case Success(NoSuchBucketExists(bucketId)) if bucketId == sourceBucketId =>
+          complete(NoSuchBucketException(sourceBucketName))
+        case Success(NoSuchBucketExists(bucketId)) if bucketId == targetBucketId =>
+          complete(NoSuchBucketException(bucketName))
         case Success(NoSuchKeyExists) => complete(NoSuchKeyException(sourceBucketName, sourceKey))
         case Success(InvalidAccess) =>
           system.log.warn("CopyObjectRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)

@@ -35,7 +35,7 @@ object PutObjectRoute extends CustomMarshallers {
 
       onComplete(eventualEvent) {
         case Success(ObjectInfo(objectKey)) => complete(HttpResponse(OK).withHeaders(createResponseHeaders(objectKey)))
-        case Success(NoSuchBucketExists) => complete(NoSuchBucketException(bucketName))
+        case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
         case Success(InvalidAccess) =>
           system.log.warn("PutObjectRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
           complete(InternalServiceException(s"$bucketName/$key"))

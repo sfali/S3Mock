@@ -60,7 +60,6 @@ trait CustomMarshallers
           import system.executionContext
           x.dataBytes.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).map {
             s =>
-              println(s">>>>>>>>>>>>>>>>>>>>>>>> $s")
               CreateBucketConfiguration()
           }
       }*/

@@ -34,7 +34,7 @@ object CompleteUploadRoute extends CustomMarshallers {
           val result = CompleteMultipartUploadResult(bucketName, key, objectKey.eTag, objectKey.contentLength,
             objectKey.actualVersionId)
           complete(result)
-        case Success(NoSuchBucketExists) => complete(NoSuchBucketException(bucketName))
+        case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
         case Success(NoSuchUpload) => complete(NoSuchUploadException(bucketName, key))
         case Success(InvalidPartOrder) => complete(InvalidPartOrderException(bucketName, key))
         case Success(InvalidPart(partNumber)) => complete(InvalidPartException(bucketName, key, partNumber, uploadId))

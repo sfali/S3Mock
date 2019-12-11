@@ -1,5 +1,7 @@
 package com.loyalty.testing.s3.actor.model
 
+import java.util.UUID
+
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3.notification.Notification
@@ -8,7 +10,7 @@ import com.loyalty.testing.s3.request.BucketVersioning
 
 sealed trait Event
 
-case object NoSuchBucketExists extends Event
+case class NoSuchBucketExists(bucketId: UUID) extends Event
 
 case object NoSuchKeyExists extends Event
 

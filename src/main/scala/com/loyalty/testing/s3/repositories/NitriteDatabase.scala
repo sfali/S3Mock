@@ -52,9 +52,12 @@ class NitriteDatabase(rootPath: Path,
       case Success(bucket) => Future.successful(bucket)
     }
 
-  def setBucketVersioning(bucketId: UUID, versioningConfiguration: VersioningConfiguration): Future[Bucket] = {
+  def setBucketVersioning(bucketId: UUID,
+                          bucketName: String,
+                          versioningConfiguration: VersioningConfiguration): Future[Bucket] = {
     log.info("Setting bucket versioning on bucket_id={}, config={}", bucketId, versioningConfiguration)
-    Try(bucketCollection.setBucketVersioning(bucketId, versioningConfiguration.bucketVersioning)) match {
+    val versioning = versioningConfiguration.bucketVersioning
+    Try(bucketCollection.setBucketVersioning(bucketId, bucketName, versioning)) match {
       case Failure(ex) => Future.failed(ex)
       case Success(bucket) => Future.successful(bucket)
     }

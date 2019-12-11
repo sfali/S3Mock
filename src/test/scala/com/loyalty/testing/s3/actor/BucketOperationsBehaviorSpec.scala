@@ -144,7 +144,8 @@ class BucketOperationsBehaviorSpec
     )
 
     actorRef ! CreateBucketNotifications(notification :: Nil, probe.ref)
-    probe.expectMessage(NoSuchBucketExists)
+    val actualEvent = probe.receiveMessage().asInstanceOf[NoSuchBucketExists]
+    actualEvent mustEqual NoSuchBucketExists(UUID.fromString(nonExistentBucketUUID))
 
     testKit.stop(actorRef)
   }

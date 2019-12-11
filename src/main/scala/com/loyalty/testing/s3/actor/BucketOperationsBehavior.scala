@@ -8,9 +8,9 @@ import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model.{BucketAlreadyExists, BucketInfo, NoSuchBucketExists, NotificationsCreated, NotificationsInfo}
 import com.loyalty.testing.s3.actor.model.`object`.{CompleteUpload, DeleteObject, GetObject, GetObjectMeta, InitiateMultiPartUpload, PutObject, UploadPart, Command => ObjectCommand}
 import com.loyalty.testing.s3.actor.model.bucket._
+import com.loyalty.testing.s3.repositories.collections.NoSuckBucketException
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
-import com.loyalty.testing.s3.response.NoSuchBucketException
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -31,8 +31,8 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
     msg match {
       case InitializeSnapshot =>
         context.pipeToSelf(database.getBucket(bucketId)) {
-          case Failure(_: NoSuchBucketException) =>
-            // context.log.error(s"No such bucket: $bucketId", ex)
+          case Failure(_: NoSuckBucketException) =>
+            context.log.error(s"No such bucket: {}", bucketId)
             NoSuchBucket
           case Failure(ex: Throwable) =>
             context.log.error("database error", ex)
@@ -74,7 +74,7 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         bucketOperation(bucket)
 
       case reply: CommandWithReply =>
-        context.self ! ReplyToSender(NoSuchBucketExists, reply.replyTo)
+        context.self ! ReplyToSender(NoSuchBucketExists(bucketId), reply.replyTo)
         Behaviors.same
 
       case ReplyToSender(reply, replyTo) =>
@@ -95,7 +95,7 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         Behaviors.same
 
       case SetBucketVersioning(versioningConfiguration, replyTo) =>
-        context.pipeToSelf(database.setBucketVersioning(bucketId, versioningConfiguration)) {
+        context.pipeToSelf(database.setBucketVersioning(bucketId, bucket.bucketName, versioningConfiguration)) {
           case Failure(ex) =>
             context.log.error(s"unable to set bucket versioning: $bucket", ex)
             // TODO: reply properly
