@@ -51,7 +51,7 @@ object CopyObjectRoute extends CustomMarshallers {
           complete(NoSuchBucketException(sourceBucketName))
         case Success(NoSuchBucketExists(bucketId)) if bucketId == targetBucketId =>
           complete(NoSuchBucketException(bucketName))
-        case Success(NoSuchKeyExists) => complete(NoSuchKeyException(sourceBucketName, sourceKey))
+        case Success(NoSuchKeyExists(bucketName, key)) => complete(NoSuchKeyException(bucketName, key))
         case Success(InvalidAccess) =>
           system.log.warn("CopyObjectRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
           complete(InternalServiceException(s"$bucketName/$key"))

@@ -543,7 +543,7 @@ class BucketOperationsBehaviorSpec
     val probe = testKit.createTestProbe[Event]()
     val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
     actorRef ! GetObjectWrapper(key, maybeVersionId = Some(UUID.randomUUID().toString), replyTo = probe.ref)
-    probe.expectMessage(NoSuchKeyExists)
+    probe.expectMessage(NoSuchKeyExists(defaultBucketName, key))
 
     testKit.stop(actorRef)
   }

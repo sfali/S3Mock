@@ -137,7 +137,7 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         Behaviors.same
 
       case GetObjectMetaWrapper(key, replyTo) =>
-        objectActor(bucket, key) ! GetObjectMeta(replyTo)
+        objectActor(bucket, key) ! GetObjectMeta(bucket, key, replyTo)
         Behaviors.same
 
       case GetObjectWrapper(key, maybeVersionId, maybeRange, replyTo) =>

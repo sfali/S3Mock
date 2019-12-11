@@ -12,7 +12,7 @@ sealed trait Event
 
 case class NoSuchBucketExists(bucketId: UUID) extends Event
 
-case object NoSuchKeyExists extends Event
+case class NoSuchKeyExists(bucketName: String, key: String) extends Event
 
 case object InvalidAccess extends Event
 

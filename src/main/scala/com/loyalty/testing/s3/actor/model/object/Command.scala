@@ -44,7 +44,9 @@ final case class PutObject(bucket: Bucket,
                            contentSource: Source[ByteString, _],
                            replyTo: ActorRef[Event]) extends ObjectInput
 
-final case class GetObjectMeta(replyTo: ActorRef[Event]) extends CommandWithReply
+final case class GetObjectMeta(bucket: Bucket,
+                               key: String,
+                               replyTo: ActorRef[Event]) extends ObjectInput
 
 final case class GetObject(bucket: Bucket,
                            key: String,

@@ -85,11 +85,11 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
       case DatabaseError =>
         Behaviors.same
 
-      case GetObject(bucket, _, maybeVersionId, maybeRange, replyTo) =>
+      case GetObject(bucket, key, maybeVersionId, maybeRange, replyTo) =>
         val maybeObjectKey = getObject(sanitizeVersionId(bucket, maybeVersionId))
         val command =
           maybeObjectKey match {
-            case None => ReplyToSender(NoSuchKeyExists, replyTo)
+            case None => ReplyToSender(NoSuchKeyExists(bucket.bucketName, key), replyTo)
             case Some(objectKey) =>
               objectKey.deleteMarker match {
                 case None =>
@@ -114,7 +114,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
           case Failure(_: NoSuchKeyException.type) =>
             context.log.warn("unable to delete, reason=NoSuchKey, bucket_name={}, key={}, version_id={}",
               bucket.bucketName, key, maybeVersionId.getOrElse("None"))
-            ReplyToSender(NoSuchKeyExists, replyTo)
+            ReplyToSender(NoSuchKeyExists(bucket.bucketName, key), replyTo)
           case Failure(ex) =>
             context.log.error(
               s"""unable to delete object: bucket_name=${bucket.bucketName}, key=$key,
@@ -183,9 +183,9 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
         context.self ! ReplyToSender(ObjectInfo(objectKey), replyTo, Some(objectKey))
         Behaviors.same
 
-      case GetObjectMeta(replyTo) =>
+      case GetObjectMeta(bucket, key, replyTo) =>
         val maybeObjectKey = objects.find(_.id == objectId)
-        val event = maybeObjectKey.map(ObjectInfo.apply).getOrElse(NoSuchKeyExists)
+        val event = maybeObjectKey.map(ObjectInfo.apply).getOrElse(NoSuchKeyExists(bucket.bucketName, key))
         context.self ! ReplyToSender(event, replyTo)
         Behaviors.same
 
