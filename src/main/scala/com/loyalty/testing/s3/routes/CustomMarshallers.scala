@@ -157,7 +157,7 @@ trait CustomMarshallers
     fromStatusCodeAndHeadersAndValue[CopyObjectResult]
       .compose { result =>
         val headers = Nil +
-          ("x-amz-copy-source-version-id", result.maybeSourceVersionId) +
+          (SourceVersionIdHeader, result.maybeSourceVersionId) +
           (VersionIdHeader, result.maybeVersionId)
         (OK, headers, result)
       }
