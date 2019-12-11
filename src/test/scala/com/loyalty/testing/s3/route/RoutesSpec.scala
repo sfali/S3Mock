@@ -187,6 +187,19 @@ class RoutesSpec
     }
   }
 
+  it should "update object in the specified bucket with bucket versioning on" in {
+    val key = "sample.txt"
+    val path = resourcePath -> "sample1.txt"
+    val contentSource = FileIO.fromPath(path)
+    val entity = HttpEntity(`application/octet-stream`, contentSource)
+    Put(s"/$versionedBucketName/$key", entity) ~> routes ~> check {
+      status mustEqual OK
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest1""""))
+      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest1"))
+      getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, 2.toVersionId))
+    }
+  }
+
   it should "create different buckets" in {
     Put(s"/$bucket2") ~> routes ~> check {
       status mustBe OK
@@ -214,9 +227,9 @@ class RoutesSpec
     val copySourceHeader = RawHeader("x-amz-copy-source", s"/$defaultBucketName/$key")
     Put(s"/$bucket2/$key").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
       status mustEqual OK
-      val lastModified = Instant.now()
-      val actualResult = entityAs[CopyObjectResult].copy(lastModifiedDate = lastModified)
-      CopyObjectResult(etagDigest1, lastModifiedDate = lastModified) mustEqual actualResult
+      val expectedResult = createCopyObjectResult(etagDigest1, headers)
+      val actualResult = entityAs[CopyObjectResult].merge(expectedResult)
+      expectedResult mustEqual actualResult
     }
   }
 
@@ -225,11 +238,71 @@ class RoutesSpec
     val copySourceHeader = RawHeader("x-amz-copy-source", s"/$versionedBucketName/$key")
     Put(s"/$bucket3/$key").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
       status mustEqual OK
-      val versionId = getHeader(headers, VersionIdHeader).map(_.value())
-      val lastModified = Instant.now()
-      val expectedResult = CopyObjectResult(etagDigest, maybeVersionId = versionId, lastModifiedDate = lastModified)
-      val actualResult = entityAs[CopyObjectResult].copy(lastModifiedDate = lastModified, maybeVersionId = versionId)
+      val expectedResult = createCopyObjectResult(etagDigest1, headers)
+      val actualResult = entityAs[CopyObjectResult].merge(expectedResult)
       expectedResult mustEqual actualResult
+    }
+  }
+
+  it should "copy object between versioned buckets with source version id provided" in {
+    val key = "sample.txt"
+    val copySourceHeader = RawHeader("x-amz-copy-source", s"/$versionedBucketName/$key?versionId=${1.toVersionId}")
+    Put(s"/$bucket3/$key").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
+      status mustEqual OK
+      val expectedResult = createCopyObjectResult(etagDigest, headers)
+      val actualResult = entityAs[CopyObjectResult].merge(expectedResult)
+      expectedResult mustEqual actualResult
+    }
+  }
+
+  it should "copy object from non-versioned bucket to versioned bucket" in {
+    val sourceKey = "sample.txt"
+    val targetKey = s"input/sample.txt"
+    val copySourceHeader = RawHeader("x-amz-copy-source", s"/$defaultBucketName/$sourceKey")
+    Put(s"/$bucket3/$targetKey").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
+      status mustEqual OK
+      val expectedResult = createCopyObjectResult(etagDigest1, headers)
+      val actualResult = entityAs[CopyObjectResult].merge(expectedResult)
+      expectedResult mustEqual actualResult
+    }
+  }
+
+  it should "copy object from versioned bucket to non-versioned bucket" in {
+    val sourceKey = "sample.txt"
+    val targetKey = s"input/sample.txt"
+    val copySourceHeader = RawHeader("x-amz-copy-source", s"/$versionedBucketName/$sourceKey")
+    Put(s"/$bucket2/$targetKey").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
+      status mustEqual OK
+      val expectedResult = createCopyObjectResult(etagDigest1, headers)
+      val actualResult = entityAs[CopyObjectResult].merge(expectedResult)
+      expectedResult mustEqual actualResult
+    }
+  }
+
+  it should "get NoSuchBucket when source bucket doesn't exists" in {
+    val key = "sample.txt"
+    val copySourceHeader = RawHeader("x-amz-copy-source", s"/$nonExistentBucketName/$key")
+    Put(s"/$bucket2/$key").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
+      status mustEqual NotFound
+      responseAs[NoSuchBucketException] mustEqual NoSuchBucketException(nonExistentBucketName)
+    }
+  }
+
+  it should "get NoSuchBucket when target bucket doesn't exists" in {
+    val key = "sample.txt"
+    val copySourceHeader = RawHeader("x-amz-copy-source", s"/$defaultBucketName/$key")
+    Put(s"/$nonExistentBucketName/$key").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
+      status mustEqual NotFound
+      responseAs[NoSuchBucketException] mustEqual NoSuchBucketException(nonExistentBucketName)
+    }
+  }
+
+  it should "get NoSuchKey when source key doesn't exists" in {
+    val key = "_sample.txt"
+    val copySourceHeader = RawHeader("x-amz-copy-source", s"/$defaultBucketName/$key")
+    Put(s"/$bucket2/$key").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
+      status mustEqual NotFound
+      responseAs[NoSuchKeyException] mustEqual NoSuchKeyException(defaultBucketName, key)
     }
   }
 
@@ -317,4 +390,11 @@ class RoutesSpec
   private def getContent(response: HttpResponse) =
     response.entity.dataBytes.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
 
+  private def createCopyObjectResult(eTag: String, headers: Seq[HttpHeader]) =
+    CopyObjectResult(
+      eTag = eTag,
+      maybeVersionId = getHeader(headers, VersionIdHeader).map(_.value()),
+      maybeSourceVersionId = getHeader(headers, SourceVersionIdHeader).map(_.value()),
+      lastModifiedDate = Instant.now()
+    )
 }

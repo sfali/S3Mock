@@ -6,6 +6,7 @@ import akka.NotUsed
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
+import com.loyalty.testing.s3.response.CopyObjectResult
 import com.loyalty.testing.s3.streams.{DigestCalculator, DigestInfo}
 import com.loyalty.testing.s3.utils.StaticDateTimeProvider
 
@@ -31,7 +32,6 @@ package object test {
     createContentSource(start, totalSize)
       .via(DigestCalculator()).runWith(Sink.head)
 
-
   val userDir: String = System.getProperty("user.dir")
   val rootPath: Path = Paths.get(userDir, "target", ".s3mock")
   val resourcePath: Path = Paths.get("src", "test", "resources")
@@ -44,4 +44,15 @@ package object test {
   val md5Digest: String = "a0uyqEjx+seX4yDXuQMPPg=="
   val etagDigest1: String = "84043a46fafcdc5451db399625915436"
   val md5Digest1: String = "hAQ6Rvr83FRR2zmWJZFUNg=="
+
+  implicit class CopyObjectResultOps(src: CopyObjectResult) {
+    def merge(target: CopyObjectResult): CopyObjectResult =
+      src
+        .copy(
+          maybeVersionId = target.maybeVersionId,
+          maybeSourceVersionId = target.maybeSourceVersionId,
+          lastModifiedDate = target.lastModifiedDate
+        )
+  }
+
 }

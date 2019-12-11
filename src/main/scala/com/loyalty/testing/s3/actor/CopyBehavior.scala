@@ -56,7 +56,7 @@ class CopyBehavior(context: ActorContext[Command],
 
       case EventWrapper(event) =>
         context.log.warn(
-          """Invalid event: event={}, source_bucket_name={}, source_key={}, target_bucket_name={},
+          """Error response: event={}, source_bucket_name={}, source_key={}, target_bucket_name={},
             | target_key={}""".stripMargin.replaceNewLine, event, sourceBucketName, sourceKey, targetBucketName, targetKey)
         replyTo ! event
         Behaviors.same
