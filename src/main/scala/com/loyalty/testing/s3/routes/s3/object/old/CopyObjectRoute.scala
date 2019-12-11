@@ -23,7 +23,7 @@ class CopyObjectRoute private(notificationRouterRef: ActorRef,
   import directives._
 
   def route(bucketName: String, key: String): Route = {
-    (put & headerValueByType[`x-amz-copy-source`]()) {
+    (put & headerValueByType[`x-amz-copy-source`](())) {
       source =>
         val sourceBucketName = source.bucketName
         val sourceKey = source.key

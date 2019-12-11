@@ -15,7 +15,7 @@ import scala.util.{Failure, Success}
 class GetObjectRoute private(log: LoggingAdapter, repository: Repository) {
 
   def route(bucketName: String, key: String): Route = {
-    (get & parameters("versionId".?) & optionalHeaderValueByType[Range]()) { (maybeVersionId, maybeRanges) =>
+    (get & parameters("versionId".?) & optionalHeaderValueByType[Range](())) { (maybeVersionId, maybeRanges) =>
       val maybeRange: Option[ByteRange] = maybeRanges.map(_.ranges.head)
       onComplete(repository.getObject(bucketName, key, maybeVersionId, maybeRange)) {
         case Success(getObjectResponse) =>

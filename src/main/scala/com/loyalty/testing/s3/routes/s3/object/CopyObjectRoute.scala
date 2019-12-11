@@ -27,7 +27,7 @@ object CopyObjectRoute extends CustomMarshallers {
             database: NitriteDatabase)
            (implicit system: ActorSystem[Command],
             timeout: Timeout): Route =
-    headerValueByType[`x-amz-copy-source`]() { source =>
+    headerValueByType[`x-amz-copy-source`](()) { source =>
       import system.executionContext
 
       val sourceBucketName = source.bucketName
