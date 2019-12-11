@@ -1,5 +1,7 @@
 package com.loyalty.testing.s3.routes
 
+import java.util.UUID
+
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model.headers._
@@ -10,7 +12,8 @@ import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.SpawnBehavior.{Spawn, Command => SpawnCommand}
 import com.loyalty.testing.s3.actor.model.bucket.Command
-import com.loyalty.testing.s3.actor.BucketOperationsBehavior
+import com.loyalty.testing.s3.actor.{BucketOperationsBehavior, CopyBehavior}
+import com.loyalty.testing.s3.actor.CopyBehavior.{Command => CopyCommand}
 import com.loyalty.testing.s3.actor.model.Event
 import com.loyalty.testing.s3.repositories.model.ObjectKey
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
@@ -32,6 +35,17 @@ package object s3 {
                         toProtocol: ActorRef[Event] => Command)
                        (implicit system: ActorSystem[SpawnCommand],
                         timeout: Timeout): Future[Event] = actorRef.ask[Event](toProtocol)
+
+  def spawnCopyBehavior(objectIO: ObjectIO,
+                        database: NitriteDatabase)
+                       (implicit system: ActorSystem[SpawnCommand],
+                        timeout: Timeout): Future[ActorRef[CopyCommand]] =
+    system.ask[ActorRef[CopyCommand]](Spawn(CopyBehavior(objectIO, database), UUID.randomUUID().toString, _))
+
+  def askCopyActor(actorRef: ActorRef[CopyCommand],
+                   toProtocol: ActorRef[Event] => CopyCommand)
+                  (implicit system: ActorSystem[SpawnCommand],
+                   timeout: Timeout): Future[Event] = actorRef.ask[Event](toProtocol)
 
   def createResponseHeaders(objectKey: ObjectKey): List[RawHeader] = {
     val headers = ListBuffer[RawHeader]()

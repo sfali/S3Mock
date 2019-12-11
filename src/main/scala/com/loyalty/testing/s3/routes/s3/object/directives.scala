@@ -43,7 +43,7 @@ object directives {
         val maybeVersionId = parseQueryString(Option(uri.getQuery))
         val source: `x-amz-copy-source` = new `x-amz-copy-source`(value)
         source._bucketName = bucketName
-        source._key = key
+        source._key = key.drop(1)
         source._maybeVersionId = maybeVersionId
         source
       }

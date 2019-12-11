@@ -9,6 +9,7 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.{FileIO, Sink}
 import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.actor.CopyBehavior.Copy
 import com.loyalty.testing.s3.actor.model.{BucketAlreadyExists, BucketInfo, DeleteInfo, Event, MultiPartUploadedInitiated, NoSuchBucketExists, NoSuchKeyExists, NotificationsCreated, NotificationsInfo, ObjectContent, ObjectInfo, PartUploaded}
 import com.loyalty.testing.s3.actor.model.bucket._
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
@@ -146,6 +147,21 @@ class BucketOperationsBehaviorSpec
     probe.expectMessage(NoSuchBucketExists)
 
     testKit.stop(actorRef)
+  }
+
+  it should "create different buckets" in {
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef1 = testKit.spawn(BucketOperationsBehavior(objectIO, database), bucket2UUID)
+    val actorRef2 = testKit.spawn(BucketOperationsBehavior(objectIO, database), bucket3UUID)
+
+    actorRef1 ! CreateBucket(Bucket(bucket2, defaultRegion, NotExists), probe.ref)
+    probe.expectMessage(BucketInfo(Bucket(bucket2, defaultRegion, NotExists)))
+
+    actorRef2 ! CreateBucket(Bucket(bucket3, defaultRegion, Enabled), probe.ref)
+    probe.expectMessage(BucketInfo(Bucket(bucket3, defaultRegion, Enabled)))
+
+    testKit.stop(actorRef1)
+    testKit.stop(actorRef2)
   }
 
   it should "put an object in the specified non-version bucket" in {
@@ -531,6 +547,19 @@ class BucketOperationsBehaviorSpec
     testKit.stop(actorRef)
   }
 
+  it should "copy object between non-versioned buckets" in {
+    val key = "sample.txt"
+
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(CopyBehavior(objectIO, database), UUID.randomUUID().toString)
+
+    actorRef ! Copy(defaultBucketName, key, bucket2, key, None, probe.ref)
+    val objectKey = probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey
+    print(objectKey)
+
+    testKit.stop(actorRef)
+  }
+
   it should "multipart upload an object" in {
     val key = "big-sample.txt"
 
@@ -636,23 +665,7 @@ class BucketOperationsBehaviorSpec
 }
 
 object BucketOperationsBehaviorSpec {
-  private val userDir: String = System.getProperty("user.dir")
-  private val rootPath: Path = Paths.get(userDir, "target", ".s3mock")
-  private val resourcePath = Paths.get("src", "test", "resources")
-  private val defaultBucketName = "non-versioned-bucket"
-  private val defaultBucketNameUUID = defaultBucketName.toUUID.toString
-  private val versionedBucketName = "versioned-bucket"
-  private val versionedBucketNameUUID = versionedBucketName.toUUID.toString
-  private val nonExistentBucketName = "dummy"
-  private val nonExistentBucketUUID = nonExistentBucketName.toUUID.toString
-
   private val dBSettings: DBSettings = new DBSettings {
     override val fileName: String = "s3mock.db"
   }
-
-  private val etagDigest = "6b4bb2a848f1fac797e320d7b9030f3e"
-  private val md5Digest = "a0uyqEjx+seX4yDXuQMPPg=="
-  /*private val etagDigest1 = "84043a46fafcdc5451db399625915436"
-  private val md5Digest1 = "hAQ6Rvr83FRR2zmWJZFUNg=="*/
-
 }

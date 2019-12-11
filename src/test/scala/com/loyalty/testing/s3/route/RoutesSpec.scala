@@ -1,7 +1,7 @@
 package com.loyalty.testing.s3.route
 
-import java.nio.file.{Files, Path, Paths}
-import java.time.OffsetDateTime
+import java.nio.file.Files
+import java.time.{Instant, OffsetDateTime}
 
 import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.ContentTypes._
@@ -35,8 +35,6 @@ class RoutesSpec
     with CustomMarshallers
     with BeforeAndAfterAll
     with ScalaFutures {
-
-  import RoutesSpec._
 
   protected implicit val spawnSystem: ActorSystem[Command] = ActorSystem(SpawnBehavior(), "s3mock")
   protected override implicit val timeout: Timeout = Timeout(10.seconds)
@@ -159,8 +157,7 @@ class RoutesSpec
       getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest1""""))
       getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest1"))
       response.entity.contentLengthOption mustBe Some(Files.size(path))
-      val actualContent = response.entity.dataBytes.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
-      expectedContent mustEqual actualContent
+      expectedContent mustEqual getContent(response)
     }
   }
 
@@ -173,8 +170,66 @@ class RoutesSpec
       getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest1""""))
       getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest1"))
       response.entity.contentLengthOption mustBe Some(53)
-      val actualContent = response.entity.dataBytes.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
-      expectedContent mustEqual actualContent
+      expectedContent mustEqual getContent(response)
+    }
+  }
+
+  it should "put an object in the specified bucket with bucket versioning on" in {
+    val key = "sample.txt"
+    val path = resourcePath -> key
+    val contentSource = FileIO.fromPath(path)
+    val entity = HttpEntity(`application/octet-stream`, contentSource)
+    Put(s"/$versionedBucketName/$key", entity) ~> routes ~> check {
+      status mustEqual OK
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest""""))
+      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest"))
+      getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, 1.toVersionId))
+    }
+  }
+
+  it should "create different buckets" in {
+    Put(s"/$bucket2") ~> routes ~> check {
+      status mustBe OK
+      headers.head mustBe Location(s"/$bucket2")
+    }
+    Put(s"/$bucket3") ~> routes ~> check {
+      status mustBe OK
+      headers.head mustBe Location(s"/$bucket3")
+    }
+    val xml =
+      """
+        |<VersioningConfiguration xmlns="http:/.amazonaws.com/doc/2006-03-01/">
+        |<Status>Enabled</Status>
+        |</VersioningConfiguration>
+      """.stripMargin.replaceAll(System.lineSeparator(), "")
+    val entity = HttpEntity(xmlContentType, xml)
+    Put(s"/$bucket3?versioning", entity) ~> routes ~> check {
+      headers.head mustBe Location(s"/$bucket3")
+      status mustBe OK
+    }
+  }
+
+  it should "copy object between non-versioned buckets" in {
+    val key = "sample.txt"
+    val copySourceHeader = RawHeader("x-amz-copy-source", s"/$defaultBucketName/$key")
+    Put(s"/$bucket2/$key").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
+      status mustEqual OK
+      val lastModified = Instant.now()
+      val actualResult = entityAs[CopyObjectResult].copy(lastModifiedDate = lastModified)
+      CopyObjectResult(etagDigest1, lastModifiedDate = lastModified) mustEqual actualResult
+    }
+  }
+
+  it should "copy object between versioned buckets" in {
+    val key = "sample.txt"
+    val copySourceHeader = RawHeader("x-amz-copy-source", s"/$versionedBucketName/$key")
+    Put(s"/$bucket3/$key").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
+      status mustEqual OK
+      val versionId = getHeader(headers, VersionIdHeader).map(_.value())
+      val lastModified = Instant.now()
+      val expectedResult = CopyObjectResult(etagDigest, maybeVersionId = versionId, lastModifiedDate = lastModified)
+      val actualResult = entityAs[CopyObjectResult].copy(lastModifiedDate = lastModified, maybeVersionId = versionId)
+      expectedResult mustEqual actualResult
     }
   }
 
@@ -199,19 +254,6 @@ class RoutesSpec
     Delete(s"/$defaultBucketName/$key") ~> routes ~> check {
       status mustEqual NoContent
       getHeader(headers, DeleteMarkerHeader) mustBe Some(RawHeader(DeleteMarkerHeader, "true"))
-    }
-  }
-
-  it should "put an object in the specified bucket with bucket versioning on" in {
-    val key = "sample.txt"
-    val path = resourcePath -> key
-    val contentSource = FileIO.fromPath(path)
-    val entity = HttpEntity(`application/octet-stream`, contentSource)
-    Put(s"/$versionedBucketName/$key", entity) ~> routes ~> check {
-      status mustEqual OK
-      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest""""))
-      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest"))
-      getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, 1.toVersionId))
     }
   }
 
@@ -272,17 +314,7 @@ class RoutesSpec
   private def getHeader(headers: Seq[HttpHeader], headerName: String): Option[HttpHeader] =
     headers.find(_.lowercaseName() == headerName.toLowerCase)
 
-}
+  private def getContent(response: HttpResponse) =
+    response.entity.dataBytes.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
 
-object RoutesSpec {
-  private val userDir: String = System.getProperty("user.dir")
-  private val rootPath: Path = Paths.get(userDir, "target", ".s3mock")
-  private val resourcePath = Paths.get("src", "test", "resources")
-  private val defaultBucketName = "non-versioned-bucket"
-  private val versionedBucketName = "versioned-bucket"
-  private val nonExistentBucketName = "dummy"
-  private val etagDigest = "6b4bb2a848f1fac797e320d7b9030f3e"
-  private val md5Digest = "a0uyqEjx+seX4yDXuQMPPg=="
-  private val etagDigest1 = "84043a46fafcdc5451db399625915436"
-  private val md5Digest1 = "hAQ6Rvr83FRR2zmWJZFUNg=="
 }

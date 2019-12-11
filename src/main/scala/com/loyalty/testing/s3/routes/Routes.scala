@@ -7,7 +7,7 @@ import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
-import com.loyalty.testing.s3.routes.s3.`object`.{CompleteUploadRoute, DeleteObjectRoute, GetObjectRoute, InitiateMultipartUploadRoute, PutObjectRoute, UploadPartRoute}
+import com.loyalty.testing.s3.routes.s3.`object`.{CompleteUploadRoute, CopyObjectRoute, DeleteObjectRoute, GetObjectRoute, InitiateMultipartUploadRoute, PutObjectRoute, UploadPartRoute}
 import com.loyalty.testing.s3.routes.s3.bucket.{CreateBucketRoute, SetBucketVersioningRoute}
 
 trait Routes {
@@ -34,6 +34,7 @@ trait Routes {
             val objectName = key.toString().decode
             put {
               UploadPartRoute(bucketName, objectName, objectIO, database) ~
+                CopyObjectRoute(bucketName, objectName, objectIO, database) ~
                 PutObjectRoute(bucketName, objectName, objectIO, database)
             } ~ get {
               GetObjectRoute(bucketName, objectName, objectIO, database)
