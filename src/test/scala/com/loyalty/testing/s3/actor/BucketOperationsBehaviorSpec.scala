@@ -9,8 +9,8 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.{FileIO, Sink}
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.CopyBehavior.Copy
-import com.loyalty.testing.s3.actor.model.{BucketAlreadyExists, BucketInfo, DeleteInfo, Event, MultiPartUploadedInitiated, NoSuchBucketExists, NoSuchKeyExists, NotificationsCreated, NotificationsInfo, ObjectContent, ObjectInfo, PartUploaded}
+import com.loyalty.testing.s3.actor.CopyBehavior.{Copy, CopyPart}
+import com.loyalty.testing.s3.actor.model.{BucketAlreadyExists, BucketInfo, CopyObjectInfo, CopyPartInfo, DeleteInfo, Event, MultiPartUploadedInitiated, NoSuchBucketExists, NoSuchKeyExists, NotificationsCreated, NotificationsInfo, ObjectContent, ObjectInfo, PartUploaded}
 import com.loyalty.testing.s3.actor.model.bucket._
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
@@ -220,7 +220,7 @@ class BucketOperationsBehaviorSpec
 
   it should "update object in non-version bucket" in {
     val key = "sample.txt"
-    val path = resourcePath -> key
+    val path = resourcePath -> "sample1.txt"
     val contentSource = FileIO.fromPath(path)
 
     val probe = testKit.createTestProbe[Event]()
@@ -234,8 +234,8 @@ class BucketOperationsBehaviorSpec
       index = 0,
       version = NotExists,
       versionId = NonVersionId,
-      eTag = etagDigest,
-      contentMd5 = md5Digest,
+      eTag = etagDigest1,
+      contentMd5 = md5Digest1,
       contentLength = Files.size(path),
       lastModifiedTime = dateTimeProvider.currentOffsetDateTime
     )
@@ -300,7 +300,7 @@ class BucketOperationsBehaviorSpec
 
   it should "update object in the specified bucket with bucket versioning on" in {
     val key = "sample.txt"
-    val path = resourcePath -> key
+    val path = resourcePath -> "sample1.txt"
     val contentSource = FileIO.fromPath(path)
 
     val probe = testKit.createTestProbe[Event]()
@@ -315,8 +315,8 @@ class BucketOperationsBehaviorSpec
       index = index,
       version = Enabled,
       versionId = index.toVersionId,
-      eTag = etagDigest,
-      contentMd5 = md5Digest,
+      eTag = etagDigest1,
+      contentMd5 = md5Digest1,
       contentLength = Files.size(path),
       lastModifiedTime = dateTimeProvider.currentOffsetDateTime
     )
@@ -327,7 +327,7 @@ class BucketOperationsBehaviorSpec
 
   it should "get entire object when range is not specified" in {
     val key = "sample.txt"
-    val path = resourcePath -> key
+    val path = resourcePath -> "sample1.txt"
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val expectedObjectKey = ObjectKey(
       id = createObjectId(defaultBucketName, key),
@@ -336,8 +336,8 @@ class BucketOperationsBehaviorSpec
       index = 0,
       version = NotExists,
       versionId = NonVersionId,
-      eTag = etagDigest,
-      contentMd5 = md5Digest,
+      eTag = etagDigest1,
+      contentMd5 = md5Digest1,
       contentLength = Files.size(path),
       lastModifiedTime = dateTimeProvider.currentOffsetDateTime
     )
@@ -365,8 +365,8 @@ class BucketOperationsBehaviorSpec
       index = 0,
       version = NotExists,
       versionId = NonVersionId,
-      eTag = etagDigest,
-      contentMd5 = md5Digest,
+      eTag = etagDigest1,
+      contentMd5 = md5Digest1,
       contentLength = expectedContent.length,
       lastModifiedTime = dateTimeProvider.currentOffsetDateTime
     )
@@ -394,8 +394,8 @@ class BucketOperationsBehaviorSpec
       index = 0,
       version = NotExists,
       versionId = NonVersionId,
-      eTag = etagDigest,
-      contentMd5 = md5Digest,
+      eTag = etagDigest1,
+      contentMd5 = md5Digest1,
       contentLength = expectedContent.length,
       lastModifiedTime = dateTimeProvider.currentOffsetDateTime
     )
@@ -415,7 +415,7 @@ class BucketOperationsBehaviorSpec
 
   it should "get object with suffix range" in {
     val key = "sample.txt"
-    val expectedContent = "7. A quick brown fox jumps over the silly lazy dog.\r\n"
+    val expectedContent = "8. A quick brown fox jumps over the silly lazy dog.\r\n"
     val expectedObjectKey = ObjectKey(
       id = createObjectId(defaultBucketName, key),
       bucketName = defaultBucketName,
@@ -423,8 +423,8 @@ class BucketOperationsBehaviorSpec
       index = 0,
       version = NotExists,
       versionId = NonVersionId,
-      eTag = etagDigest,
-      contentMd5 = md5Digest,
+      eTag = etagDigest1,
+      contentMd5 = md5Digest1,
       contentLength = expectedContent.length,
       lastModifiedTime = dateTimeProvider.currentOffsetDateTime
     )
@@ -444,7 +444,7 @@ class BucketOperationsBehaviorSpec
 
   it should "get object with range with offset" in {
     val key = "sample.txt"
-    val expectedContent = "7. A quick brown fox jumps over the silly lazy dog.\r\n"
+    val expectedContent = "8. A quick brown fox jumps over the silly lazy dog.\r\n"
     val expectedObjectKey = ObjectKey(
       id = createObjectId(defaultBucketName, key),
       bucketName = defaultBucketName,
@@ -452,15 +452,15 @@ class BucketOperationsBehaviorSpec
       index = 0,
       version = NotExists,
       versionId = NonVersionId,
-      eTag = etagDigest,
-      contentMd5 = md5Digest,
+      eTag = etagDigest1,
+      contentMd5 = md5Digest1,
       contentLength = expectedContent.length,
       lastModifiedTime = dateTimeProvider.currentOffsetDateTime
     )
 
     val probe = testKit.createTestProbe[Event]()
     val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
-    actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange.fromOffset(318)), replyTo = probe.ref)
+    actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange.fromOffset(371)), replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
     val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
@@ -473,7 +473,7 @@ class BucketOperationsBehaviorSpec
 
   it should "get latest object from versioned bucket without providing version" in {
     val key = "sample.txt"
-    val path = resourcePath -> key
+    val path = resourcePath -> "sample1.txt"
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 2
     val expectedObjectKey = ObjectKey(
@@ -483,8 +483,8 @@ class BucketOperationsBehaviorSpec
       index = index,
       version = Enabled,
       versionId = index.toVersionId,
-      eTag = etagDigest,
-      contentMd5 = md5Digest,
+      eTag = etagDigest1,
+      contentMd5 = md5Digest1,
       contentLength = Files.size(path),
       lastModifiedTime = dateTimeProvider.currentOffsetDateTime
     )
@@ -555,8 +555,9 @@ class BucketOperationsBehaviorSpec
     val actorRef = testKit.spawn(CopyBehavior(objectIO, database), UUID.randomUUID().toString)
 
     actorRef ! Copy(defaultBucketName, key, bucket2, key, None, probe.ref)
-    val objectKey = probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey
-    print(objectKey)
+    val copyObjectInfo = probe.receiveMessage().asInstanceOf[CopyObjectInfo]
+    copyObjectInfo.objectKey.eTag mustEqual etagDigest1
+    copyObjectInfo.sourceVersionId mustBe empty
 
     testKit.stop(actorRef)
   }
