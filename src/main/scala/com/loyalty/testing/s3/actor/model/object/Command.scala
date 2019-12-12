@@ -32,12 +32,12 @@ private[actor] case object Shutdown extends Command
 private[actor] case object DatabaseError extends Command
 
 private[actor] final case class ReplyToSender(reply: Event,
-                                       replyTo: ActorRef[Event],
-                                       maybeObjectKey: Option[ObjectKey] = None) extends Command
+                                              replyTo: ActorRef[Event],
+                                              maybeObjectKey: Option[ObjectKey] = None) extends Command
 
 private[actor] case object InitializeSnapshot extends Command
 
-private[actor] final case class ObjectResult(values: List[ObjectKey]) extends Command
+private[actor] final case class ObjectResult(objects: List[ObjectKey], uploads: List[UploadInfo]) extends Command
 
 final case class PutObject(bucket: Bucket,
                            key: String,
@@ -64,7 +64,7 @@ final case class InitiateMultiPartUpload(bucket: Bucket,
                                          replyTo: ActorRef[Event]) extends ObjectInput
 
 private[actor] final case class UploadInfoCreated(uploadInfo: UploadInfo,
-                                           replyTo: ActorRef[Event]) extends CommandWithReply
+                                                  replyTo: ActorRef[Event]) extends CommandWithReply
 
 final case class UploadPart(bucket: Bucket,
                             key: String,
@@ -74,7 +74,7 @@ final case class UploadPart(bucket: Bucket,
                             replyTo: ActorRef[Event]) extends UploadInput
 
 private[actor] final case class PartSaved(uploadInfo: UploadInfo,
-                                   replyTo: ActorRef[Event]) extends CommandWithReply
+                                          replyTo: ActorRef[Event]) extends CommandWithReply
 
 final case class CompleteUpload(bucket: Bucket,
                                 key: String,
@@ -83,4 +83,4 @@ final case class CompleteUpload(bucket: Bucket,
                                 replyTo: ActorRef[Event]) extends UploadInput
 
 private[actor] final case class ResetUploadInfo(objectKey: ObjectKey,
-                                         replyTo: ActorRef[Event]) extends CommandWithReply
+                                                replyTo: ActorRef[Event]) extends CommandWithReply

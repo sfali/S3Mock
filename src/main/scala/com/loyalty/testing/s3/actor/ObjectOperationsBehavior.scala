@@ -37,20 +37,26 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
     msg match {
       case InitializeSnapshot =>
         context.pipeToSelf(objectService.getAllObjects(objectId)) {
-          case Failure(NoSuchId(_)) => ObjectResult(Nil)
+          case Failure(NoSuchId(_)) => ObjectResult(Nil, Nil)
           case Failure(ex) =>
             context.log.error(s"unable to load snapshot: $objectId", ex)
             // TODO: reply properly
             Shutdown
-          case Success(values) => ObjectResult(values)
+          case Success((objects, uploads)) => ObjectResult(objects, uploads)
         }
         Behaviors.same
 
-      case ObjectResult(values) =>
-        val tuples = values.map(ok => (ok.index, ok.versionId))
+      case ObjectResult(objects, uploads) =>
+        val tuples = objects.map(ok => (ok.index, ok.versionId))
         context.log.info("Current values: {} for {}", tuples, objectId)
         versionIndex = tuples.lastOption.map(_._1).getOrElse(0)
-        objects = values
+        this.objects = objects
+        val uploadsMap = uploads.groupBy(_.uploadId)
+        if (uploadsMap.nonEmpty) {
+          val ls = uploadsMap.head._2
+          uploadInfo = ls.find(_.partNumber == 0)
+          uploadParts = ls.filterNot(_.partNumber == 0).toSet.groupBy(_.uploadId)
+        }
         buffer.unstashAll(objectOperations)
 
       case Shutdown => Behaviors.stopped

@@ -85,6 +85,8 @@ class NitriteDatabase(rootPath: Path,
       case Success(_) => Future.successful(Done)
     }
 
+  def findUploads: Future[List[UploadInfo]] = Future.successful(uploadStagingCollection.findAll)
+
   def createUpload(uploadInfo: UploadInfo): Future[Done] =
     Try(uploadStagingCollection.createUpload(uploadInfo)) match {
       case Failure(ex) => Future.failed(ex)

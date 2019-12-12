@@ -20,7 +20,11 @@ class ObjectService(objectIO: ObjectIO, database: NitriteDatabase) {
 
   private val log = LoggerFactory.getLogger(classOf[ObjectService])
 
-  def getAllObjects(objectId: UUID): Future[List[ObjectKey]] = database.getAllObjects(objectId)
+  def getAllObjects(objectId: UUID)(implicit ec: ExecutionContext): Future[(List[ObjectKey], List[UploadInfo])] =
+    for {
+      objects <- database.getAllObjects(objectId)
+      uploads <- database.findUploads
+    } yield (objects, uploads)
 
   def saveObject(bucket: Bucket,
                  key: String,

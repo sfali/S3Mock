@@ -69,6 +69,8 @@ class UploadCollection(db: Nitrite, staging: Boolean) {
     }
   }
 
+  private[repositories] def findAll: List[UploadInfo] = collection.find().toScalaList.map(UploadInfo(_))
+
   private[repositories] def findAll(uploadId: String): List[Document] =
     collection.find(feq(UploadIdField, uploadId)).toScalaList
 
