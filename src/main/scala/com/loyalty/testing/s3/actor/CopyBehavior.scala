@@ -2,10 +2,11 @@ package com.loyalty.testing.s3.actor
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
+import akka.http.scaladsl.model.headers.ByteRange
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.CopyBehavior.Command
-import com.loyalty.testing.s3.actor.model.bucket.{GetObjectWrapper, PutObjectWrapper, Command => BucketCommand}
-import com.loyalty.testing.s3.actor.model.{CopyObjectInfo, Event, ObjectContent, ObjectInfo}
+import com.loyalty.testing.s3.actor.model.bucket.{GetObjectWrapper, PutObjectWrapper, UploadPartWrapper, Command => BucketCommand}
+import com.loyalty.testing.s3.actor.model.{CopyObjectInfo, CopyPartInfo, Event, ObjectContent, ObjectInfo, PartUploaded}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 
 import scala.concurrent.duration._
@@ -25,7 +26,13 @@ class CopyBehavior(context: ActorContext[Command],
     msg match {
       case Copy(sourceBucketName, sourceKey, targetBucketName, targetKey, maybeSourceVersionId, replyTo) =>
         context.self ! GetObject
-        copyOperation(sourceBucketName, sourceKey, targetBucketName, targetKey, maybeSourceVersionId, replyTo)
+        copyOperation(sourceBucketName, sourceKey, targetBucketName, targetKey, None, None, maybeSourceVersionId, replyTo)
+
+      case CopyPart(sourceBucketName, sourceKey, targetBucketName, targetKey, uploadId, partNumber, range,
+      maybeSourceVersionId, replyTo) =>
+        context.self ! GetObject
+        copyOperation(sourceBucketName, sourceKey, targetBucketName, targetKey, Some(PartInfo(uploadId, partNumber)),
+          range, maybeSourceVersionId, replyTo)
 
       case Shutdown => Behaviors.stopped
 
@@ -38,23 +45,40 @@ class CopyBehavior(context: ActorContext[Command],
                             sourceKey: String,
                             targetBucketName: String,
                             targetKey: String,
+                            partInfo: Option[PartInfo],
+                            maybeRange: Option[ByteRange],
                             maybeSourceVersionId: Option[String],
                             replyTo: ActorRef[Event]): Behavior[Command] =
     Behaviors.receiveMessagePartial {
       case GetObject =>
         context.log.info(
-          """Copy Object: source_bucket_name={}, source_key={},  target_bucket_name={},
+          """Copy Object/Part: source_bucket_name={}, source_key={},  target_bucket_name={},
             | target_key={}""".stripMargin.replaceNewLine, sourceBucketName, sourceKey, targetBucketName, targetKey)
-        getBucketActor(sourceBucketName) ! GetObjectWrapper(sourceKey, maybeSourceVersionId, None, eventResponseWrapper)
+        getBucketActor(sourceBucketName) ! GetObjectWrapper(sourceKey, maybeSourceVersionId, maybeRange, eventResponseWrapper)
+        Behaviors.same
+
+      case EventWrapper(ObjectContent(objectKey, content)) if partInfo.isDefined =>
+        sourceVersionId = objectKey.actualVersionId
+        val uploadId = partInfo.get.uploadId
+        val partNumber = partInfo.get.partNumber
+        context.log.info(
+          """Copy part: Got source content: source_bucket_name={}, source_key={},  target_bucket_name={},
+            | target_key={}, source_version_id={}, upload_id={}, part_number={}""".stripMargin.replaceNewLine,
+          sourceBucketName, sourceKey, targetBucketName, targetKey, sourceVersionId, uploadId, partNumber)
+        getBucketActor(targetBucketName) ! UploadPartWrapper(targetKey, uploadId, partNumber, content, eventResponseWrapper)
         Behaviors.same
 
       case EventWrapper(ObjectContent(objectKey, content)) =>
         sourceVersionId = objectKey.actualVersionId
         context.log.info(
-          """Got source content: source_bucket_name={}, source_key={},  target_bucket_name={},
-            | target_key={}, source_version_id={}""".stripMargin.replaceNewLine, sourceBucketName, sourceKey,
-          targetBucketName, targetKey, sourceVersionId)
+          """Copy object: Got source content: source_bucket_name={}, source_key={},  target_bucket_name={},
+            | target_key={}, source_version_id={}, range={}""".stripMargin.replaceNewLine, sourceBucketName, sourceKey,
+          targetBucketName, targetKey, sourceVersionId, maybeRange)
         getBucketActor(targetBucketName) ! PutObjectWrapper(targetKey, content, eventResponseWrapper)
+        Behaviors.same
+
+      case EventWrapper(PartUploaded(uploadInfo)) =>
+        replyTo ! CopyPartInfo(uploadInfo, sourceVersionId)
         Behaviors.same
 
       case EventWrapper(ObjectInfo(objectKey)) if objectKey.deleteMarker.contains(true) =>
@@ -105,8 +129,20 @@ object CopyBehavior {
                         maybeSourceVersionId: Option[String],
                         replyTo: ActorRef[Event]) extends Command
 
+  final case class CopyPart(sourceBucketName: String,
+                            sourceKey: String,
+                            targetBucketName: String,
+                            targetKey: String,
+                            uploadId: String,
+                            partNumber: Int,
+                            maybeRange: Option[ByteRange],
+                            maybeSourceVersionId: Option[String],
+                            replyTo: ActorRef[Event]) extends Command
+
   private final case object GetObject extends Command
 
   private final case class EventWrapper(event: Event) extends Command
+
+  private case class PartInfo(uploadId: String, partNumber: Int)
 
 }
