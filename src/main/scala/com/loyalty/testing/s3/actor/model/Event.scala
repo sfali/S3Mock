@@ -26,6 +26,8 @@ final case class ObjectInfo(objectKey: ObjectKey) extends Event
 
 final case class ObjectContent(objectKey: ObjectKey, content: Source[ByteString, _]) extends Event
 
+final case class CopyObjectInfo(objectKey: ObjectKey, sourceVersionId: Option[String]) extends Event
+
 final case class DeleteInfo(deleteMarker: Boolean,
                             version: BucketVersioning,
                             maybeVersionId: Option[String] = None) extends Event

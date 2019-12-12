@@ -9,7 +9,7 @@ import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.CopyBehavior.Copy
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
-import com.loyalty.testing.s3.actor.model.{InvalidAccess, NoSuchBucketExists, NoSuchKeyExists, ObjectInfo}
+import com.loyalty.testing.s3.actor.model.{CopyObjectInfo, InvalidAccess, NoSuchBucketExists, NoSuchKeyExists, ObjectInfo}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.response.{CopyObjectResult, InternalServiceException, NoSuchBucketException, NoSuchKeyException}
 import com.loyalty.testing.s3.routes.CustomMarshallers
@@ -45,8 +45,11 @@ object CopyObjectRoute extends CustomMarshallers {
       onComplete(eventualEvent) {
         case Success(ObjectInfo(objectKey)) if objectKey.deleteMarker.contains(true) =>
           complete(HttpResponse(NotFound).withHeaders(createResponseHeaders(objectKey)))
-        case Success(ObjectInfo(objectKey)) =>
-          complete(CopyObjectResult(objectKey.eTag, objectKey.actualVersionId, maybeSourceVersionId))
+        case Success(CopyObjectInfo(objectKey, sourceVersionId)) =>
+          complete(CopyObjectResult(objectKey.eTag, objectKey.actualVersionId, sourceVersionId))
+        case Success(ObjectInfo(_)) =>
+          system.log.warn("CopyObjectRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
+          complete(InternalServiceException(s"$bucketName/$key"))
         case Success(NoSuchBucketExists(bucketId)) if bucketId == sourceBucketId =>
           complete(NoSuchBucketException(sourceBucketName))
         case Success(NoSuchBucketExists(bucketId)) if bucketId == targetBucketId =>

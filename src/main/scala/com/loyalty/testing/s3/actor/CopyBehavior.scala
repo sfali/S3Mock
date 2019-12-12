@@ -5,7 +5,7 @@ import akka.actor.typed.{ActorRef, Behavior}
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.CopyBehavior.Command
 import com.loyalty.testing.s3.actor.model.bucket.{GetObjectWrapper, PutObjectWrapper, Command => BucketCommand}
-import com.loyalty.testing.s3.actor.model.{Event, ObjectContent}
+import com.loyalty.testing.s3.actor.model.{CopyObjectInfo, Event, ObjectContent, ObjectInfo}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 
 import scala.concurrent.duration._
@@ -19,6 +19,7 @@ class CopyBehavior(context: ActorContext[Command],
 
   context.setReceiveTimeout(2.minutes, Shutdown)
   private val eventResponseWrapper = context.messageAdapter[Event](EventWrapper.apply)
+  private var sourceVersionId: Option[String] = None
 
   override def onMessage(msg: Command): Behavior[Command] =
     msg match {
@@ -47,11 +48,21 @@ class CopyBehavior(context: ActorContext[Command],
         getBucketActor(sourceBucketName) ! GetObjectWrapper(sourceKey, maybeSourceVersionId, None, eventResponseWrapper)
         Behaviors.same
 
-      case EventWrapper(ObjectContent(_, content)) =>
+      case EventWrapper(ObjectContent(objectKey, content)) =>
+        sourceVersionId = objectKey.actualVersionId
         context.log.info(
           """Got source content: source_bucket_name={}, source_key={},  target_bucket_name={},
-            | target_key={}""".stripMargin.replaceNewLine, sourceBucketName, sourceKey, targetBucketName, targetKey)
-        getBucketActor(targetBucketName) ! PutObjectWrapper(targetKey, content, replyTo)
+            | target_key={}, source_version_id={}""".stripMargin.replaceNewLine, sourceBucketName, sourceKey,
+          targetBucketName, targetKey, sourceVersionId)
+        getBucketActor(targetBucketName) ! PutObjectWrapper(targetKey, content, eventResponseWrapper)
+        Behaviors.same
+
+      case EventWrapper(ObjectInfo(objectKey)) if objectKey.deleteMarker.contains(true) =>
+        replyTo ! ObjectInfo(objectKey)
+        Behaviors.same
+
+      case EventWrapper(ObjectInfo(objectKey)) =>
+        replyTo ! CopyObjectInfo(objectKey, sourceVersionId)
         Behaviors.same
 
       case EventWrapper(event) =>
