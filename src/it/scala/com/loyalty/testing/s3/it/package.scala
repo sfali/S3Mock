@@ -40,4 +40,12 @@ package object it {
     createContentSource(start, totalSize)
       .via(DigestCalculator()).runWith(Sink.head)
 
+  val resourcePath: Path = Paths.get("src", "it", "resources")
+  val defaultBucketName: String = "non-versioned-bucket"
+  val versionedBucketName: String = "versioned-bucket"
+  val nonExistentBucketName: String = "dummy"
+  val etagDigest: String = "6b4bb2a848f1fac797e320d7b9030f3e"
+  // private val md5Digest = "a0uyqEjx+seX4yDXuQMPPg=="
+  val etagDigest1: String = "84043a46fafcdc5451db399625915436"
+  // private val md5Digest1 = "hAQ6Rvr83FRR2zmWJZFUNg=="
 }

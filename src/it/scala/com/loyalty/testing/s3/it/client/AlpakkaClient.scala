@@ -44,11 +44,12 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
             bucketName = bucketName,
             key = key,
             eTag = objectMetadata.eTag.getOrElse(""),
-            contentMd5 = getHeader(objectMetadata.metadata, CONTENT_MD5).map(_.value()).getOrElse(""),
+            contentMd5 = "",
             contentLength = contentLength,
             versionId = objectMetadata.versionId,
           )
-      }.runWith(Sink.head)
+      }
+      .runWith(Sink.head)
   }
 
   override def getObject(bucketName: String,
@@ -75,7 +76,7 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
             bucketName = bucketName,
             key = key,
             eTag = objectMetadata.eTag.getOrElse(""),
-            contentMd5 = getHeader(objectMetadata.metadata, CONTENT_MD5).map(_.value()).getOrElse(""),
+            contentMd5 = "",
             contentLength = objectMetadata.getContentLength,
             versionId = objectMetadata.versionId
           )
@@ -113,8 +114,8 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
       ))
   }
 
-  private def getHeader(headers: Seq[HttpHeader], headerName: String): Option[HttpHeader] =
-    headers.find(_.lowercaseName() == headerName.toLowerCase)
+  /*private def getHeader(headers: Seq[HttpHeader], headerName: String): Option[HttpHeader] =
+    headers.find(_.lowercaseName() == headerName.toLowerCase)*/
 }
 
 object AlpakkaClient {

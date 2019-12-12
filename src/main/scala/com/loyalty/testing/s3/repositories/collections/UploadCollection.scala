@@ -29,7 +29,8 @@ class UploadCollection(db: Nitrite, staging: Boolean) {
     val bucketName = uploadInfo.bucketName
     val key = uploadInfo.key
     val partNumber = uploadInfo.partNumber
-    log.info("upload part, upload_id={}, part_number={},bucket_name={}, key={}", uploadId, partNumber, bucketName, key)
+    log.info("upload part, upload_id={}, part_number={},bucket_name={}, key={}, etag={}", uploadId, partNumber,
+      bucketName, key, uploadInfo.eTag)
     val document =
       findById(uploadId, partNumber) match {
         case Nil =>
@@ -62,7 +63,7 @@ class UploadCollection(db: Nitrite, staging: Boolean) {
         val docId = writeResult.iterator().asScala.toList.headOption
         if (docId.isEmpty) throw DatabaseAccessException(s"unable to get document id for $bucketName/$key/$uploadId")
         else {
-          log.info("Initiated multi part upload, upload_id={}, doc_id={}", uploadId, docId.get.getIdValue)
+          log.info("part uploaded, upload_id={}, doc_id={}", uploadId, docId.get.getIdValue)
           Done
         }
     }

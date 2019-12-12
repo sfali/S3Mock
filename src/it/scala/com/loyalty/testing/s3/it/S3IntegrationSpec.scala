@@ -2,6 +2,7 @@ package com.loyalty.testing.s3.it
 
 import java.nio.file._
 import java.time.OffsetDateTime
+import java.util.concurrent.CompletionException
 
 import akka.Done
 import akka.actor.typed.ActorSystem
@@ -25,7 +26,7 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{BucketVersioningStatus, S3Exception}
 
 import scala.concurrent.ExecutionContextExecutor
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 abstract class S3IntegrationSpec(rootPath: Path,
                                  resourceBasename: String)
@@ -97,7 +98,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
       bucketName = defaultBucketName,
       key = key,
       eTag = etagDigest,
-      contentMd5 = md5Digest,
+      contentMd5 = "",
       contentLength = contentLength
     )
     actualObjectInfo mustEqual expectedObjectInfo
@@ -112,7 +113,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
       bucketName = defaultBucketName,
       key = key,
       eTag = etagDigest1,
-      contentMd5 = md5Digest1,
+      contentMd5 = "",
       contentLength = contentLength
     )
     actualObjectInfo mustEqual expectedObjectInfo
@@ -128,7 +129,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
       bucketName = defaultBucketName,
       key = key,
       eTag = etagDigest,
-      contentMd5 = md5Digest,
+      contentMd5 = "",
       contentLength = contentLength
     )
     actualObjectInfo mustEqual expectedObjectInfo
@@ -152,7 +153,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
       bucketName = versionedBucketName,
       key = key,
       eTag = etagDigest,
-      contentMd5 = md5Digest,
+      contentMd5 = "",
       contentLength = contentLength,
       versionId = Some(index.toVersionId)
     )
@@ -169,7 +170,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
       bucketName = versionedBucketName,
       key = key,
       eTag = etagDigest1,
-      contentMd5 = md5Digest1,
+      contentMd5 = "",
       contentLength = contentLength,
       versionId = Some(index.toVersionId),
     )
@@ -184,7 +185,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
       bucketName = defaultBucketName,
       key = key,
       eTag = etagDigest1,
-      contentMd5 = md5Digest1,
+      contentMd5 = "",
       contentLength = Files.size(path)
     )
     val (actualContent, actualObjectInfo) = s3Client.getObject(defaultBucketName, key).futureValue
@@ -199,7 +200,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
       bucketName = defaultBucketName,
       key = key,
       eTag = etagDigest1,
-      contentMd5 = md5Digest1,
+      contentMd5 = "",
       contentLength = expectedContent.length
     )
     val range = ByteRange(0, 53)
@@ -215,7 +216,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
       bucketName = defaultBucketName,
       key = key,
       eTag = etagDigest1,
-      contentMd5 = md5Digest1,
+      contentMd5 = "",
       contentLength = expectedContent.length
     )
     val range = ByteRange(265, 318)
@@ -231,7 +232,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
       bucketName = defaultBucketName,
       key = key,
       eTag = etagDigest1,
-      contentMd5 = md5Digest1,
+      contentMd5 = "",
       contentLength = expectedContent.length
     )
     val range = ByteRange.suffix(53)
@@ -247,7 +248,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
       bucketName = defaultBucketName,
       key = key,
       eTag = etagDigest1,
-      contentMd5 = md5Digest1,
+      contentMd5 = "",
       contentLength = expectedContent.length
     )
     val range = ByteRange.fromOffset(371)
@@ -265,7 +266,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
       bucketName = versionedBucketName,
       key = key,
       eTag = etagDigest1,
-      contentMd5 = md5Digest1,
+      contentMd5 = "",
       contentLength = expectedContent.length,
       versionId = Some(index.toVersionId),
     )
@@ -283,7 +284,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
       bucketName = versionedBucketName,
       key = key,
       eTag = etagDigest,
-      contentMd5 = md5Digest,
+      contentMd5 = "",
       contentLength = expectedContent.length,
       versionId = Some(index.toVersionId)
     )
@@ -320,7 +321,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
   it should "result in 404(NotFound) when attempt to get an item which is flag with delete marker" in {
     val key = "sample.txt"
     val ex = s3Client.getObject(defaultBucketName, key).failed.futureValue
-    extractErrorResponse(ex).copy(statusCode = 404) mustEqual AwsError(404, "", "404 Not Found")
+    extractErrorResponse(ex).statusCode mustEqual 404
   }
 
   it should "permanently delete an object" in {
@@ -345,12 +346,30 @@ abstract class S3IntegrationSpec(rootPath: Path,
     maybeVersionId mustBe Some(index.toVersionId)
   }
 
-  private def extractErrorResponse(ex: Throwable) = {
+  @scala.annotation.tailrec
+  private def extractErrorResponse(ex: Throwable): AwsError = {
     ex match {
       case e@(_: S3Exception) =>
         val details = e.awsErrorDetails()
         AwsError(e.statusCode(), details.errorMessage(), details.errorCode())
-      case e@(_: AlpakkaS3Exception) => AwsError(Try(e.code.toInt).toOption.getOrElse(-1), e.message, e.code)
+      case e@(_: AlpakkaS3Exception) =>
+        e.printStackTrace()
+        val code = e.code
+        val statusCode =
+          Try(code.toInt) match {
+            case Failure(_) =>
+              Try(code.take(3).toInt) match {
+                case Failure(_) =>
+                  code match {
+                    case "NoSuchBucket" | "NoSuchKey" => 404
+                    case _ => -1
+                  }
+                case Success(value) => value
+              }
+            case Success(value) => value
+          }
+        AwsError(statusCode, e.message, code)
+      case e@(_: CompletionException) => extractErrorResponse(e.getCause)
       case _ =>
         ex.printStackTrace()
         AwsError(503, ex.getMessage, "Unknown")
@@ -359,15 +378,6 @@ abstract class S3IntegrationSpec(rootPath: Path,
 }
 
 object S3IntegrationSpec {
-  private val resourcePath = Paths.get("src", "it", "resources")
-  private val defaultBucketName = "non-versioned-bucket"
-  private val versionedBucketName = "versioned-bucket"
-  private val nonExistentBucketName = "dummy"
-  private val etagDigest = "6b4bb2a848f1fac797e320d7b9030f3e"
-  private val md5Digest = "a0uyqEjx+seX4yDXuQMPPg=="
-  private val etagDigest1 = "84043a46fafcdc5451db399625915436"
-  private val md5Digest1 = "hAQ6Rvr83FRR2zmWJZFUNg=="
-
   case class AwsError(statusCode: Int, message: String, errorCode: String)
 
 }
