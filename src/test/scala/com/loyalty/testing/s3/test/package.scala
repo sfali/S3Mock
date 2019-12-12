@@ -4,7 +4,7 @@ import java.nio.file.{Path, Paths}
 
 import akka.NotUsed
 import akka.stream.Materializer
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.scaladsl.{Concat, Sink, Source}
 import akka.util.ByteString
 import com.loyalty.testing.s3.response.CopyObjectResult
 import com.loyalty.testing.s3.streams.{DigestCalculator, DigestInfo}
@@ -28,9 +28,18 @@ package object test {
       }
       .map(ByteString(_))
 
-  def calculateDigest(start: Int, totalSize: Int)(implicit mat: Materializer): Future[DigestInfo] =
-    createContentSource(start, totalSize)
-      .via(DigestCalculator()).runWith(Sink.head)
+  def calculateDigest(start: Int, totalSize: Int)
+                     (implicit mat: Materializer): Future[DigestInfo] =
+    calculateDigest(createContentSource(start, totalSize))
+
+  def calculateDigest(contentSource: Source[ByteString, _]*)
+                     (implicit mat: Materializer): Future[DigestInfo] =
+    contentSource.toList match {
+      case first :: Nil => first.via(DigestCalculator()).runWith(Sink.head)
+      case first :: second :: rest =>
+        Source.combine(first, second, rest: _*)(Concat(_)).via(DigestCalculator()).runWith(Sink.head)
+      case Nil => Future.failed(new RuntimeException("empty source"))
+    }
 
   val userDir: String = System.getProperty("user.dir")
   val rootPath: Path = Paths.get(userDir, "target", ".s3mock")
@@ -44,6 +53,7 @@ package object test {
   val md5Digest: String = "a0uyqEjx+seX4yDXuQMPPg=="
   val etagDigest1: String = "84043a46fafcdc5451db399625915436"
   val md5Digest1: String = "hAQ6Rvr83FRR2zmWJZFUNg=="
+  val chunkSize: Int = 5 * 1024 * 1024
 
   implicit class CopyObjectResultOps(src: CopyObjectResult) {
     def merge(target: CopyObjectResult): CopyObjectResult =

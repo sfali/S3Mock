@@ -552,13 +552,17 @@ class BucketOperationsBehaviorSpec
     val key = "sample.txt"
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(CopyBehavior(objectIO, database), UUID.randomUUID().toString)
+    val sourceActorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val targetActorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), bucket2UUID)
+    val actorRef = testKit.spawn(CopyBehavior(sourceActorRef, targetActorRef, objectIO, database), UUID.randomUUID().toString)
 
     actorRef ! Copy(defaultBucketName, key, bucket2, key, None, probe.ref)
     val copyObjectInfo = probe.receiveMessage().asInstanceOf[CopyObjectInfo]
     copyObjectInfo.objectKey.eTag mustEqual etagDigest1
     copyObjectInfo.sourceVersionId mustBe empty
 
+    testKit.stop(sourceActorRef)
+    testKit.stop(targetActorRef)
     testKit.stop(actorRef)
   }
 
@@ -594,6 +598,55 @@ class BucketOperationsBehaviorSpec
     )
     actualObjectKey mustEqual expectedObjectKey
 
+    testKit.stop(actorRef)
+  }
+
+  it should "multi part copy an object" in {
+    val key = "big-sample.txt"
+
+    val probe = testKit.createTestProbe[Event]()
+    val sourceActorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val targetActorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), bucket2UUID)
+    val actorRef = testKit.spawn(CopyBehavior(sourceActorRef, targetActorRef, objectIO, database), UUID.randomUUID().toString)
+
+    targetActorRef ! InitiateMultiPartUploadWrapper(key, probe.ref)
+    val event = probe.receiveMessage().asInstanceOf[MultiPartUploadedInitiated]
+    val uploadId = event.uploadId
+    createUploadId(bucket2, NotExists, key, 0) mustEqual uploadId
+
+    val range1 = ByteRange(0, chunkSize)
+    actorRef ! CopyPart(defaultBucketName, key, bucket2, key, uploadId, 1, Some(range1), None, probe.ref)
+    val partInfo1 = probe.receiveMessage().asInstanceOf[CopyPartInfo]
+    partInfo1.uploadInfo.uploadId mustEqual uploadId
+    partInfo1.uploadInfo.partNumber mustEqual 1
+    partInfo1.sourceVersionId mustBe empty
+
+    val range2 = ByteRange(chunkSize, chunkSize * 2)
+    actorRef ! CopyPart(defaultBucketName, key, bucket2, key, uploadId, 2, Some(range2), None, probe.ref)
+    val partInfo2 = probe.receiveMessage().asInstanceOf[CopyPartInfo]
+    partInfo2.uploadInfo.uploadId mustEqual uploadId
+    partInfo2.uploadInfo.partNumber mustEqual 2
+    partInfo2.sourceVersionId mustBe empty
+
+    val range3 = ByteRange.fromOffset(chunkSize * 2)
+    actorRef ! CopyPart(defaultBucketName, key, bucket2, key, uploadId, 3, Some(range3), None, probe.ref)
+    val partInfo3 = probe.receiveMessage().asInstanceOf[CopyPartInfo]
+    partInfo3.uploadInfo.uploadId mustEqual uploadId
+    partInfo3.uploadInfo.partNumber mustEqual 3
+    partInfo3.sourceVersionId mustBe empty
+
+    val parts = PartInfo(1, partInfo1.uploadInfo.eTag) :: PartInfo(2, partInfo2.uploadInfo.eTag) ::
+      PartInfo(3, partInfo3.uploadInfo.eTag) :: Nil
+    targetActorRef ! CompleteUploadWrapper(key, uploadId, parts, probe.ref)
+    val actualObjectKey = probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey.copy(contentMd5 = "")
+
+    sourceActorRef ! GetObjectWrapper(key, replyTo = probe.ref)
+    val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
+
+    actualObjectKey.contentLength mustEqual objectContent.objectKey.contentLength
+
+    testKit.stop(sourceActorRef)
+    testKit.stop(targetActorRef)
     testKit.stop(actorRef)
   }
 
