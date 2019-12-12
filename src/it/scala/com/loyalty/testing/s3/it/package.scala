@@ -44,6 +44,8 @@ package object it {
   val defaultBucketName: String = "non-versioned-bucket"
   val versionedBucketName: String = "versioned-bucket"
   val nonExistentBucketName: String = "dummy"
+  val otherBucket1: String = "other-bucket-1"
+  val otherBucket2: String = "other-bucket-2"
   val etagDigest: String = "6b4bb2a848f1fac797e320d7b9030f3e"
   // private val md5Digest = "a0uyqEjx+seX4yDXuQMPPg=="
   val etagDigest1: String = "84043a46fafcdc5451db399625915436"

@@ -10,6 +10,7 @@ import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.it._
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.BucketVersioning
+import com.loyalty.testing.s3.response.CopyObjectResult
 import software.amazon.awssdk.core.async.AsyncRequestBody
 import software.amazon.awssdk.core.internal.async.ByteArrayAsyncResponseTransformer
 import software.amazon.awssdk.regions.Region
@@ -163,6 +164,25 @@ class AwsClient(override protected val awsSettings: AwsSettings)
             contentMd5 = "",
             contentLength = 0,
             versionId = Option(response.versionId())
+          )
+      }
+  }
+
+  override def copyObject(sourceBucketName: String,
+                          sourceKey: String,
+                          targetBucketName: String,
+                          targetKey: String,
+                          maybeSourceVersionId: Option[String]): Future[CopyObjectResult] = {
+    var source = s"/$sourceBucketName/$sourceKey"
+    source = maybeSourceVersionId.map(versionId => s"$source?versionId=$versionId").getOrElse(source)
+    val request = CopyObjectRequest.builder().bucket(targetBucketName).key(targetKey).copySource(source).build()
+    s3Client.copyObject(request).asScala
+      .map {
+        response =>
+          CopyObjectResult(
+            eTag = response.copyObjectResult().eTag().drop(1).dropRight(1),
+            maybeSourceVersionId = Option(response.copySourceVersionId()),
+            maybeVersionId = Option(response.versionId())
           )
       }
   }

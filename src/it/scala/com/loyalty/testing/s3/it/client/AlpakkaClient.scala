@@ -4,7 +4,6 @@ import java.nio.file.{Files, Path}
 
 import akka.Done
 import akka.actor.typed.ActorSystem
-import akka.http.scaladsl.model.HttpHeader
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.alpakka.s3.S3Headers
 import akka.stream.alpakka.s3.scaladsl.S3
@@ -13,6 +12,7 @@ import akka.util.ByteString
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.it._
 import com.loyalty.testing.s3.repositories.model.Bucket
+import com.loyalty.testing.s3.response.CopyObjectResult
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{BucketVersioningStatus, NoSuchKeyException}
@@ -113,6 +113,13 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
         versionId = result.versionId
       ))
   }
+
+  override def copyObject(sourceBucketName: String,
+                          sourceKey: String,
+                          targetBucketName: String,
+                          targetKey: String,
+                          maybeSourceVersionId: Option[String]): Future[CopyObjectResult] =
+    awsClient.copyObject(sourceBucketName, sourceKey, targetBucketName, targetKey, maybeSourceVersionId)
 
   /*private def getHeader(headers: Seq[HttpHeader], headerName: String): Option[HttpHeader] =
     headers.find(_.lowercaseName() == headerName.toLowerCase)*/

@@ -7,6 +7,7 @@ import akka.http.scaladsl.model.headers.ByteRange
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.it.ObjectInfo
 import com.loyalty.testing.s3.repositories.model.Bucket
+import com.loyalty.testing.s3.response.CopyObjectResult
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.BucketVersioningStatus
 
@@ -34,4 +35,10 @@ trait S3Client {
   def multiPartUpload(bucketName: String,
                       key: String,
                       totalSize: Int): Future[ObjectInfo]
+
+  def copyObject(sourceBucketName: String,
+                 sourceKey: String,
+                 targetBucketName: String,
+                 targetKey: String,
+                 maybeSourceVersionId: Option[String] = None): Future[CopyObjectResult]
 }

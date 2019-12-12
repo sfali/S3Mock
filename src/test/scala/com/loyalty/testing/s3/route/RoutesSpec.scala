@@ -257,7 +257,7 @@ class RoutesSpec
 
   it should "copy object from non-versioned bucket to versioned bucket" in {
     val sourceKey = "sample.txt"
-    val targetKey = s"input/sample.txt"
+    val targetKey = s"input/$sourceKey"
     val copySourceHeader = RawHeader("x-amz-copy-source", s"/$defaultBucketName/$sourceKey")
     Put(s"/$bucket3/$targetKey").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
       status mustEqual OK
@@ -269,7 +269,7 @@ class RoutesSpec
 
   it should "copy object from versioned bucket to non-versioned bucket" in {
     val sourceKey = "sample.txt"
-    val targetKey = s"input/sample.txt"
+    val targetKey = s"input/$sourceKey"
     val copySourceHeader = RawHeader("x-amz-copy-source", s"/$versionedBucketName/$sourceKey")
     Put(s"/$bucket2/$targetKey").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
       status mustEqual OK

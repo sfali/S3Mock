@@ -1,7 +1,7 @@
 package com.loyalty.testing.s3.it
 
 import java.nio.file._
-import java.time.OffsetDateTime
+import java.time.{Instant, OffsetDateTime}
 import java.util.concurrent.CompletionException
 
 import akka.Done
@@ -15,6 +15,7 @@ import com.loyalty.testing.s3.it.client.S3Client
 import com.loyalty.testing.s3.repositories._
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.BucketVersioning
+import com.loyalty.testing.s3.response.CopyObjectResult
 import com.loyalty.testing.s3.streams.FileStream
 import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterAll
@@ -305,6 +306,70 @@ abstract class S3IntegrationSpec(rootPath: Path,
     extractErrorResponse(ex) mustEqual AwsError(404, "The resource you requested does not exist", "NoSuchKey")
   }
 
+  it should "create different buckets" in {
+    s3Client.createBucket(otherBucket1).futureValue.bucketName mustEqual otherBucket1
+    s3Client.createBucket(otherBucket2).futureValue.bucketName mustEqual otherBucket2
+    s3Client.setBucketVersioning(otherBucket2, BucketVersioningStatus.ENABLED).futureValue
+  }
+
+  it should "copy object between non-versioned buckets" in {
+    val key = "sample.txt"
+    val lastModified = Instant.now()
+    val actualResult = s3Client.copyObject(defaultBucketName, key, otherBucket1, key).futureValue
+      .copy(lastModifiedDate = lastModified)
+    val expectedResult = CopyObjectResult(etagDigest1, lastModifiedDate = lastModified)
+    actualResult mustEqual expectedResult
+  }
+
+  it should "copy object between versioned buckets" in {
+    val key = "sample.txt"
+    val lastModified = Instant.now()
+    val actualResult = s3Client.copyObject(versionedBucketName, key, otherBucket2, key).futureValue
+      .copy(lastModifiedDate = lastModified)
+    val expectedResult = CopyObjectResult(etagDigest1, Some(1.toVersionId), Some(2.toVersionId), lastModifiedDate = lastModified)
+    actualResult mustEqual expectedResult
+  }
+  it should "copy object between versioned buckets with source version id provided" in {
+    val key = "sample.txt"
+    val lastModified = Instant.now()
+    val actualResult = s3Client.copyObject(versionedBucketName, key, otherBucket2, key, Some(1.toVersionId)).futureValue
+      .copy(lastModifiedDate = lastModified)
+    val expectedResult = CopyObjectResult(etagDigest, Some(2.toVersionId), Some(1.toVersionId), lastModifiedDate = lastModified)
+    actualResult mustEqual expectedResult
+  }
+
+  it should "copy object from non-versioned bucket to versioned bucket" in {
+    val sourceKey = "sample.txt"
+    val targetKey = s"input/$sourceKey"
+    val lastModified = Instant.now()
+    val actualResult = s3Client.copyObject(defaultBucketName, sourceKey, otherBucket2, targetKey).futureValue
+      .copy(lastModifiedDate = lastModified)
+    val expectedResult = CopyObjectResult(etagDigest1, Some(1.toVersionId), None, lastModifiedDate = lastModified)
+    actualResult mustEqual expectedResult
+  }
+
+  it should "copy object from versioned bucket to non-versioned bucket" in {
+    val sourceKey = "sample.txt"
+    val targetKey = s"input/$sourceKey"
+    val lastModified = Instant.now()
+    val actualResult = s3Client.copyObject(versionedBucketName, sourceKey, otherBucket1, targetKey).futureValue
+      .copy(lastModifiedDate = lastModified)
+    val expectedResult = CopyObjectResult(etagDigest1, None, Some(2.toVersionId), lastModifiedDate = lastModified)
+    actualResult mustEqual expectedResult
+  }
+
+  it should "get NoSuchBucket when source bucket doesn't exists" in {
+    val key = "sample.txt"
+    val ex = s3Client.copyObject(nonExistentBucketName, key, otherBucket1, key).failed.futureValue
+    extractErrorResponse(ex) mustEqual AwsError(404, "The specified bucket does not exist", "NoSuchBucket")
+  }
+
+  it should "get NoSuchBucket when target bucket doesn't exists" in {
+    val key = "sample.txt"
+    val ex = s3Client.copyObject(defaultBucketName, key, nonExistentBucketName, key).failed.futureValue
+    extractErrorResponse(ex) mustEqual AwsError(404, "The specified bucket does not exist", "NoSuchBucket")
+  }
+
   it should "multipart upload an object" in {
     val key = "big-sample.txt"
     val objectInfo = s3Client.multiPartUpload(defaultBucketName, key, 205000).futureValue
@@ -353,7 +418,6 @@ abstract class S3IntegrationSpec(rootPath: Path,
         val details = e.awsErrorDetails()
         AwsError(e.statusCode(), details.errorMessage(), details.errorCode())
       case e@(_: AlpakkaS3Exception) =>
-        e.printStackTrace()
         val code = e.code
         val statusCode =
           Try(code.toInt) match {
@@ -378,6 +442,7 @@ abstract class S3IntegrationSpec(rootPath: Path,
 }
 
 object S3IntegrationSpec {
+
   case class AwsError(statusCode: Int, message: String, errorCode: String)
 
 }
