@@ -36,11 +36,23 @@ package object s3 {
                        (implicit system: ActorSystem[SpawnCommand],
                         timeout: Timeout): Future[Event] = actorRef.ask[Event](toProtocol)
 
-  def spawnCopyBehavior(objectIO: ObjectIO,
+  def spawnCopyBehavior(sourceBucketName: String,
+                        targetBucketName: String,
+                        objectIO: ObjectIO,
                         database: NitriteDatabase)
                        (implicit system: ActorSystem[SpawnCommand],
-                        timeout: Timeout): Future[ActorRef[CopyCommand]] =
-    system.ask[ActorRef[CopyCommand]](Spawn(CopyBehavior(objectIO, database), UUID.randomUUID().toString, _))
+                        timeout: Timeout): Future[ActorRef[CopyCommand]] = {
+    import system.executionContext
+    val eventualSourceActorRef = spawnBucketBehavior(sourceBucketName, objectIO, database)
+    val eventualTargetActorRef = spawnBucketBehavior(targetBucketName, objectIO, database)
+    for {
+      sourceActorRef <- eventualSourceActorRef
+      targetActorRef <- eventualTargetActorRef
+      copyBehavior = CopyBehavior(sourceActorRef, targetActorRef, objectIO, database)
+      actorRef <- system.ask[ActorRef[CopyCommand]](Spawn(copyBehavior, UUID.randomUUID().toString, _))
+    } yield actorRef
+  }
+
 
   def askCopyActor(actorRef: ActorRef[CopyCommand],
                    toProtocol: ActorRef[Event] => CopyCommand)

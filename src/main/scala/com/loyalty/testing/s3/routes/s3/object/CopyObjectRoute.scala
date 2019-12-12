@@ -38,7 +38,7 @@ object CopyObjectRoute extends CustomMarshallers {
 
       val eventualEvent =
         for {
-          actorRef <- spawnCopyBehavior(objectIO, database)
+          actorRef <- spawnCopyBehavior(sourceBucketName, bucketName, objectIO, database)
           event <- askCopyActor(actorRef, replyTo => Copy(sourceBucketName, sourceKey, bucketName, key,
             maybeSourceVersionId, replyTo))
         } yield event
