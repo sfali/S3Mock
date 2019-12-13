@@ -52,6 +52,15 @@ trait CustomMarshallers
         CopyObjectResult(etag, lastModifiedDate = lastModified)
     }
 
+  implicit val CopyPartResultUnmarshaller: FromEntityUnmarshaller[CopyPartResult] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x =>
+        val etag = (x \ "ETag").text.drop(1).dropRight(1)
+        val lastModified = Instant.parse((x \ "LastModified").text)
+        CopyPartResult(etag, lastModifiedDate = lastModified)
+    }
+
   /*
     implicit def v(implicit system: ActorSystem[_]): Marshaller[NodeSeq, Future[CreateBucketConfiguration]] =
       nodeSeqMarshaller(MediaTypes.`application/xml`) map {
@@ -71,7 +80,7 @@ trait CustomMarshallers
     xmlResponseMarshallers(`text/xml(UTF-8)`)
 
   implicit val CopyPartResultMarshallers: ToEntityMarshaller[CopyPartResult] =
-    xmlResponseMarshallers(`application/octet-stream`)
+    xmlResponseMarshallers(`text/xml(UTF-8)`)
 
   implicit val CompleteMultipartUploadResultMarshallers: ToEntityMarshaller[CompleteMultipartUploadResult] =
     xmlResponseMarshallers(`text/xml(UTF-8)`)
@@ -116,9 +125,6 @@ trait CustomMarshallers
   implicit val InitiateMultipartUploadResultResponse: ToResponseMarshaller[InitiateMultipartUploadResult] =
     fromToEntityMarshaller[InitiateMultipartUploadResult](OK)
 
-  implicit val CopyPartResultResponse: ToResponseMarshaller[CopyPartResult] =
-    fromToEntityMarshaller[CopyPartResult](OK)
-
   implicit val BucketAlreadyExistsExceptionResponse: ToResponseMarshaller[BucketAlreadyExistsException] =
     fromToEntityMarshaller[BucketAlreadyExistsException](BadRequest)
 
@@ -155,6 +161,15 @@ trait CustomMarshallers
 
   implicit val CopyObjectResultResponse: ToResponseMarshaller[CopyObjectResult] =
     fromStatusCodeAndHeadersAndValue[CopyObjectResult]
+      .compose { result =>
+        val headers = Nil +
+          (SourceVersionIdHeader, result.maybeSourceVersionId) +
+          (VersionIdHeader, result.maybeVersionId)
+        (OK, headers, result)
+      }
+
+  implicit val CopyPartResultResponse: ToResponseMarshaller[CopyPartResult] =
+    fromStatusCodeAndHeadersAndValue[CopyPartResult]
       .compose { result =>
         val headers = Nil +
           (SourceVersionIdHeader, result.maybeSourceVersionId) +

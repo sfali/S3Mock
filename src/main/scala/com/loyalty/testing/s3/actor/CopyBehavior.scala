@@ -27,6 +27,9 @@ class CopyBehavior(context: ActorContext[Command],
   override def onMessage(msg: Command): Behavior[Command] =
     msg match {
       case Copy(sourceBucketName, sourceKey, targetBucketName, targetKey, maybeSourceVersionId, replyTo) =>
+        context.log.info(
+          "Copy object: source_bucket_name={}, source_key={},  target_bucket_name={}, target_key={}",
+          sourceBucketName, sourceKey, targetBucketName, targetKey)
         val behavior = copyOperationBehavior(
           sourceActorRef,
           targetActorRef,
@@ -45,6 +48,9 @@ class CopyBehavior(context: ActorContext[Command],
 
       case CopyPart(sourceBucketName, sourceKey, targetBucketName, targetKey, uploadId, partNumber, range,
       maybeSourceVersionId, replyTo) =>
+        context.log.info(
+          "Copy part: source_bucket_name={}, source_key={},  target_bucket_name={}, target_key={}",
+          sourceBucketName, sourceKey, targetBucketName, targetKey)
         val behavior = copyOperationBehavior(
           sourceActorRef,
           targetActorRef,
@@ -126,9 +132,6 @@ object CopyBehavior {
 
       Behaviors.receiveMessagePartial {
         case GetObject =>
-          context.log.info(
-            "Copy Object/Part: source_bucket_name={}, source_key={},  target_bucket_name={}, target_key={}",
-            source.bucketName, source.key, target.bucketName, target.key)
           sourceActorRef ! GetObjectWrapper(source.key, maybeSourceVersionId, maybeRange, eventResponseWrapper)
           Behaviors.same
 

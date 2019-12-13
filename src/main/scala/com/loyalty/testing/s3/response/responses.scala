@@ -117,15 +117,12 @@ case class CopyObjectResult(eTag: String,
     <CopyObjectResult><LastModified>{lastModifiedDate.toString}</LastModified><ETag>"{eTag}"</ETag></CopyObjectResult>
 }
 
-case class CopyPartResult(eTag: String, lastModifiedDate: Instant = Instant.now(),
-                          maybeVersionId: Option[String] = None) extends XmlResponse {
-  override def toXml: Elem = <CopyPartResult>
-    <LastModified>
-      {lastModifiedDate.toString}
-    </LastModified> <ETag>"
-      {eTag}
-      "</ETag>
-  </CopyPartResult>
+case class CopyPartResult(eTag: String,
+                          maybeVersionId: Option[String] = None,
+                          maybeSourceVersionId: Option[String] = None,
+                          lastModifiedDate: Instant = Instant.now()) extends XmlResponse {
+  override def toXml: Elem =
+    <CopyPartResult><LastModified>{lastModifiedDate.toString}</LastModified><ETag>"{eTag}"</ETag></CopyPartResult>
 }
 
 case class CompleteMultipartUploadResult(bucketName: String, key: String, eTag: String, contentLength: Long,
