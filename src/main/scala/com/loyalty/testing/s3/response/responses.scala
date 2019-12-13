@@ -55,23 +55,12 @@ case class ListBucketResult(bucketName: String,
   extends XmlResponse {
   override def toXml: Elem = {
     val prefixElem = maybePrefix match {
-      case Some(prefix) => <Prefix>
-        {prefix}
-      </Prefix>
+      case Some(prefix) => <Prefix>{prefix}</Prefix>
       case None => <Prefix/>
     }
 
     <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-      <Name>
-        {bucketName}
-      </Name>{prefixElem}<KeyCount>
-      {keyCount}
-    </KeyCount> <MaxKeys>
-      {maxKeys}
-    </MaxKeys> <EncodingType>url</EncodingType> <IsTruncated>
-      {isTruncated}
-    </IsTruncated>{contents.map(_.toXml)}
-    </ListBucketResult>
+      <Name>{bucketName}</Name>{prefixElem}<KeyCount>{keyCount}</KeyCount><MaxKeys>{maxKeys}</MaxKeys><EncodingType>url</EncodingType> <IsTruncated>{isTruncated}</IsTruncated>{contents.map(_.toXml)}</ListBucketResult>
   }
 }
 
@@ -83,24 +72,8 @@ case class BucketContent(expand: Boolean,
                          storageClass: String = "STANDARD") extends XmlResponse {
   override def toXml: Elem =
     if (expand || size > 0)
-      <Contents>
-        <Key>
-          {key}
-        </Key> <LastModified>
-        {lastModifiedDate.toString}
-      </LastModified> <Size>
-        {size}
-      </Size> <StorageClass>
-        {storageClass}
-      </StorageClass> <ETag>"
-        {eTag}
-        "</ETag>
-      </Contents>
-    else <CommonPrefixes>
-      <Prefix>
-        {key}
-      </Prefix>
-    </CommonPrefixes>
+      <Contents><Key>{key}</Key><LastModified>{lastModifiedDate.toString}</LastModified><Size>{size}</Size><StorageClass>{storageClass}</StorageClass><ETag>"{eTag}"</ETag></Contents>
+    else <CommonPrefixes><Prefix>{key}</Prefix></CommonPrefixes>
 }
 
 case class InitiateMultipartUploadResult(bucketName: String, key: String, uploadId: String) extends XmlResponse {
