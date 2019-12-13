@@ -1,10 +1,10 @@
 package com.loyalty.testing.s3
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 
 import akka.NotUsed
-import akka.stream.Materializer
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.scaladsl.{FileIO, Sink, Source}
+import akka.stream.{IOResult, Materializer}
 import akka.util.ByteString
 import com.loyalty.testing.s3.streams.{DigestCalculator, DigestInfo}
 import com.loyalty.testing.s3.utils.StaticDateTimeProvider
@@ -35,6 +35,19 @@ package object it {
         case (s, index) => s"${"%06d".format(index + start)}. $s\r\n"
       }
       .map(ByteString(_))
+
+  def saveFile(start: Int,
+               totalSize: Int,
+               filePrefix: String,
+               fileSuffix: String)
+              (implicit mat: Materializer): Future[Path] = {
+    import mat.executionContext
+    val path = Files.createTempFile(filePrefix, fileSuffix)
+    path.toFile.deleteOnExit()
+    createContentSource(start, totalSize)
+      .runWith(FileIO.toPath(path))
+      .map(_ => path)
+  }
 
   def calculateDigest(start: Int, totalSize: Int)(implicit mat: Materializer): Future[DigestInfo] =
     createContentSource(start, totalSize)

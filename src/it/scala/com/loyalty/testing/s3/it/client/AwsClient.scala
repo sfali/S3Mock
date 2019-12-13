@@ -24,8 +24,8 @@ class AwsClient(override protected val awsSettings: AwsSettings)
                (implicit system: ActorSystem[Nothing])
   extends S3Client {
 
-  import system.executionContext
   import AwsClient.MinChunkSize
+  import system.executionContext
 
   private val s3Client = S3AsyncClient
     .builder()
@@ -148,6 +148,18 @@ class AwsClient(override protected val awsSettings: AwsSettings)
   }
 
   override def multiPartUpload(bucketName: String, key: String, totalSize: Int): Future[ObjectInfo] = {
+    /*val inputFile = saveFile(1, totalSize, createObjectId(bucketName, key).toString, ".txt")
+    val pathAndPartitions = inputFile.map {
+      path =>
+        val size = Files.size(path)
+        createPartitions()(size)
+          .map {
+            case (partNumber, maybeRange) =>
+              RangeDownloadSource()
+              (path, partNumber, maybeRange)
+          }
+    }*/
+
     val initiateRequest = CreateMultipartUploadRequest.builder().bucket(bucketName).key(key).build()
     for {
       createResponse <- s3Client.createMultipartUpload(initiateRequest).asScala
