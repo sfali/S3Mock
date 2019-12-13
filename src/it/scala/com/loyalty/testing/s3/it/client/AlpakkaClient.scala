@@ -12,7 +12,7 @@ import akka.util.ByteString
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.it._
 import com.loyalty.testing.s3.repositories.model.Bucket
-import com.loyalty.testing.s3.response.CopyObjectResult
+import com.loyalty.testing.s3.response.{CopyObjectResult, CopyPartResult}
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{BucketVersioningStatus, NoSuchKeyException}
@@ -120,6 +120,16 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
                           targetKey: String,
                           maybeSourceVersionId: Option[String]): Future[CopyObjectResult] =
     awsClient.copyObject(sourceBucketName, sourceKey, targetBucketName, targetKey, maybeSourceVersionId)
+
+  override def multiPartCopy(sourceBucketName: String,
+                             sourceKey: String,
+                             targetBucketName: String,
+                             targetKey: String,
+                             maybeSourceVersionId: Option[String]): Future[CopyPartResult] =
+    S3
+      .multipartCopy(sourceBucketName, sourceKey, targetBucketName, targetKey, maybeSourceVersionId)
+      .mapMaterializedValue(_.map(result => CopyPartResult(result.etag, result.versionId)))
+      .run()
 
   /*private def getHeader(headers: Seq[HttpHeader], headerName: String): Option[HttpHeader] =
     headers.find(_.lowercaseName() == headerName.toLowerCase)*/

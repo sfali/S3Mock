@@ -373,7 +373,13 @@ abstract class S3IntegrationSpec(rootPath: Path,
   it should "multipart upload an object" in {
     val key = "big-sample.txt"
     val objectInfo = s3Client.multiPartUpload(defaultBucketName, key, 205000).futureValue
-    println(objectInfo)
+    println(objectInfo) // TODO: validate
+  }
+
+  it should "multi part copy an object" in {
+    val key = "big-sample.txt"
+    val actualResult = s3Client.multiPartCopy(defaultBucketName, key, otherBucket1, key, None).futureValue
+    println(actualResult) // TODO: validate
   }
 
   it should "set delete marker on an object" in {

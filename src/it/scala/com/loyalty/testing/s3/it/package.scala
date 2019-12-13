@@ -32,7 +32,7 @@ package object it {
       .take(totalSize)
       .zipWithIndex
       .map {
-        case (s, index) => s"${index + start}. $s\r\n"
+        case (s, index) => s"${"%06d".format(index + start)}. $s\r\n"
       }
       .map(ByteString(_))
 

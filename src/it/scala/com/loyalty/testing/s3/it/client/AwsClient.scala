@@ -10,7 +10,7 @@ import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.it._
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.BucketVersioning
-import com.loyalty.testing.s3.response.CopyObjectResult
+import com.loyalty.testing.s3.response.{CopyObjectResult, CopyPartResult}
 import software.amazon.awssdk.core.async.AsyncRequestBody
 import software.amazon.awssdk.core.internal.async.ByteArrayAsyncResponseTransformer
 import software.amazon.awssdk.regions.Region
@@ -25,6 +25,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
   extends S3Client {
 
   import system.executionContext
+  import AwsClient.MinChunkSize
 
   private val s3Client = S3AsyncClient
     .builder()
@@ -86,14 +87,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
                          key: String,
                          maybeVersionId: Option[String],
                          maybeRange: Option[ByteRange]): Future[(String, ObjectInfo)] = {
-    val range =
-      maybeRange match {
-        case Some(range: Slice) => s"${range.first}-${range.last}"
-        case Some(range: FromOffset) => s"${range.offset}-"
-        case Some(range: Suffix) => s"-${range.length}"
-        case None => null
-      }
-    val request = GetObjectRequest.builder().bucket(bucketName).key(key).range(s"bytes=$range")
+    val request = GetObjectRequest.builder().bucket(bucketName).key(key).range(getRange(maybeRange))
       .versionId(maybeVersionId.orNull).build()
     s3Client.getObject(request, new ByteArrayAsyncResponseTransformer[GetObjectResponse]()).asScala
       .map {
@@ -109,6 +103,37 @@ class AwsClient(override protected val awsSettings: AwsSettings)
           )
           (bytesResponse.asUtf8String(), objectInfo)
       }
+  }
+
+  def getObjectMeta(bucketName: String,
+                    key: String,
+                    maybeVersionId: Option[String],
+                    maybeRange: Option[ByteRange]): Future[ObjectInfo] = {
+    val request = HeadObjectRequest.builder().bucket(bucketName).key(key).versionId(maybeVersionId.orNull)
+      .range(getRange(maybeRange)).build()
+    s3Client.headObject(request).asScala
+      .map {
+        response =>
+          ObjectInfo(
+            bucketName,
+            key,
+            response.eTag().drop(1).dropRight(1),
+            "",
+            response.contentLength(),
+            Option(response.versionId())
+          )
+      }
+  }
+
+  private def getRange(maybeRange: Option[ByteRange]): String = {
+    val rangeString =
+      maybeRange match {
+        case Some(range: Slice) => Option(s"${range.first}-${range.last}")
+        case Some(range: FromOffset) => Option(s"${range.offset}-")
+        case Some(range: Suffix) => Option(s"-${range.length}")
+        case None => None
+      }
+    rangeString.map(range => s"bytes=$range").orNull
   }
 
   override def deleteObject(bucketName: String,
@@ -173,8 +198,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
                           targetBucketName: String,
                           targetKey: String,
                           maybeSourceVersionId: Option[String]): Future[CopyObjectResult] = {
-    var source = s"/$sourceBucketName/$sourceKey"
-    source = maybeSourceVersionId.map(versionId => s"$source?versionId=$versionId").getOrElse(source)
+    val source = createCopySource(sourceBucketName, sourceKey, maybeSourceVersionId)
     val request = CopyObjectRequest.builder().bucket(targetBucketName).key(targetKey).copySource(source).build()
     s3Client.copyObject(request).asScala
       .map {
@@ -187,9 +211,98 @@ class AwsClient(override protected val awsSettings: AwsSettings)
       }
   }
 
+  private def createCopySource(sourceBucketName: String,
+                               sourceKey: String,
+                               maybeSourceVersionId: Option[String]) = {
+    val source = s"/$sourceBucketName/$sourceKey"
+    maybeSourceVersionId.map(versionId => s"$source?versionId=$versionId").getOrElse(source)
+  }
+
+  override def multiPartCopy(sourceBucketName: String,
+                             sourceKey: String,
+                             targetBucketName: String,
+                             targetKey: String,
+                             maybeSourceVersionId: Option[String]): Future[CopyPartResult] = {
+    val initiateRequest = CreateMultipartUploadRequest.builder().bucket(targetBucketName).key(targetKey).build()
+    val eventualInitiateResponse = s3Client.createMultipartUpload(initiateRequest).asScala
+    val eventualPartitions = getObjectMeta(sourceBucketName, sourceKey, maybeSourceVersionId, None).map(_.contentLength)
+      .map(createPartitions())
+    (for {
+      partitions <- eventualPartitions
+      initiateResponse <- eventualInitiateResponse
+      uploadId = initiateResponse.uploadId()
+      completedParts <- copyParts(sourceBucketName, sourceKey, targetBucketName, targetKey, uploadId,
+        maybeSourceVersionId, partitions)
+      objectInfo <- completedMultipartUpload(targetBucketName, targetKey, uploadId, completedParts)
+    } yield objectInfo)
+      .map {
+        objectInfo => CopyPartResult(objectInfo.eTag, objectInfo.versionId)
+      }
+  }
+
+  private def copyParts(sourceBucketName: String,
+                        sourceKey: String,
+                        targetBucketName: String,
+                        targetKey: String,
+                        uploadId: String,
+                        maybeSourceVersionId: Option[String],
+                        partitions: List[(Int, Option[ByteRange])]): Future[List[CompletedPart]] = {
+    val eventualCopyParts =
+      partitions
+        .map {
+          case (partNumber, maybeRange) =>
+            copyPart(
+              sourceBucketName,
+              sourceKey,
+              targetBucketName,
+              targetKey,
+              partNumber,
+              uploadId,
+              maybeSourceVersionId,
+              maybeRange
+            )
+        }
+    Future.sequence(eventualCopyParts)
+  }
+
+  private def copyPart(sourceBucketName: String,
+                       sourceKey: String,
+                       targetBucketName: String,
+                       targetKey: String,
+                       partNumber: Int,
+                       uploadId: String,
+                       maybeSourceVersionId: Option[String],
+                       maybeRange: Option[ByteRange]) = {
+    val source = createCopySource(sourceBucketName, sourceKey, maybeSourceVersionId)
+    val range = getRange(maybeRange)
+    val request = UploadPartCopyRequest.builder().bucket(targetBucketName).key(targetKey).uploadId(uploadId)
+      .partNumber(partNumber).copySource(source).copySourceRange(range).build()
+    s3Client.uploadPartCopy(request).asScala
+      .map {
+        response =>
+          CompletedPart.builder().partNumber(partNumber).eTag(response.copyPartResult().eTag()).build()
+      }
+  }
+
+  private def createPartitions(chunkSize: Int = MinChunkSize)
+                              (objectSize: Long): List[(Int, Option[ByteRange])] =
+    if (objectSize <= 0 || objectSize < chunkSize) (1, None) :: Nil
+    else {
+      ((0L until objectSize by chunkSize).toList :+ objectSize)
+        .sliding(2)
+        .toList
+        .zipWithIndex
+        .map {
+          case (ls, index) =>
+            (index + 1, Some(ByteRange(ls.head, ls.last)))
+        }
+    }
+
 }
 
 object AwsClient {
+  private val MinChunkSize = 5 * 1024 * 1024
+
   def apply(awsSettings: AwsSettings)
            (implicit system: ActorSystem[Nothing]): AwsClient = new AwsClient(awsSettings)
 
