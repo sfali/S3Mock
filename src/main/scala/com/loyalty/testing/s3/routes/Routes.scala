@@ -8,7 +8,7 @@ import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.routes.s3.`object`.{CompleteUploadRoute, CopyObjectRoute, CopyPartRoute, DeleteObjectRoute, GetObjectRoute, InitiateMultipartUploadRoute, PutObjectRoute, UploadPartRoute}
-import com.loyalty.testing.s3.routes.s3.bucket.{CreateBucketRoute, SetBucketVersioningRoute}
+import com.loyalty.testing.s3.routes.s3.bucket.{CreateBucketRoute, ListBucketRoute, SetBucketVersioningRoute}
 
 trait Routes {
 
@@ -23,7 +23,8 @@ trait Routes {
         val bucketRoutes =
           concat(
             SetBucketVersioningRoute(bucketName, objectIO, database),
-            CreateBucketRoute(bucketName, objectIO, database)
+            CreateBucketRoute(bucketName, objectIO, database),
+            ListBucketRoute(bucketName, objectIO, database)
           )
         pathSingleSlash {
           bucketRoutes

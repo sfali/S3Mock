@@ -306,6 +306,13 @@ class RoutesSpec
     }
   }
 
+  it should "list bucket contents" in {
+    Get(s"/$defaultBucketName?list-type=2") ~> routes ~> check {
+      status mustEqual OK
+      println(getContent(response))
+    }
+  }
+
   it should "set delete marker on an object" in {
     val key: String = "sample.txt"
     Delete(s"/$defaultBucketName/$key") ~> routes ~> check {

@@ -59,9 +59,7 @@ case class ListBucketResult(bucketName: String,
       case Some(prefix) => <Prefix>{prefix}</Prefix>
       case None => <Prefix/>
     }
-
-    <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-      <Name>{bucketName}</Name>{prefixElem}<KeyCount>{keyCount}</KeyCount><MaxKeys>{maxKeys}</MaxKeys><EncodingType>url</EncodingType> <IsTruncated>{isTruncated}</IsTruncated>{contents.map(_.toXml)}</ListBucketResult>
+    <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>{bucketName}</Name>{prefixElem}<KeyCount>{keyCount}</KeyCount><MaxKeys>{maxKeys}</MaxKeys><EncodingType>url</EncodingType> <IsTruncated>{isTruncated}</IsTruncated>{contents.map(_.toXml)}</ListBucketResult>
   }
 }
 

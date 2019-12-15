@@ -11,8 +11,8 @@ package object actor {
                  params: ListBucketParams)
                 (database: NitriteDatabase,
                  log: Logger): List[BucketContent] = {
-    val maybePrefix = params.maybePrefix.filterNot(_ == "")
-    val maybeDelimiter = params.maybeDelimiter.filterNot(_ == "")
+    val maybePrefix = params.maybePrefix
+    val maybeDelimiter = params.maybeDelimiter
     val objects = database.getAllObjects(bucketName, maybePrefix)
     val bucketContents =
       if (maybeDelimiter.isDefined) {
