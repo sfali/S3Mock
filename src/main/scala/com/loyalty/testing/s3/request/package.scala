@@ -76,7 +76,7 @@ package object request {
 
   }
 
-  case class ListBucketParams(maxKeys: Int,
+  case class ListBucketParams(maxKeys: Int = 1000,
                               maybePrefix: Option[String] = None,
                               maybeDelimiter: Option[String] = None)
 

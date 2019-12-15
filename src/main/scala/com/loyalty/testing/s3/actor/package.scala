@@ -37,6 +37,6 @@ package object actor {
               }
           }
       } else objects.map(BucketContent(_))
-    bucketContents.toSet.toList
+    bucketContents.toSet.toList.take(params.maxKeys)
   }
 }

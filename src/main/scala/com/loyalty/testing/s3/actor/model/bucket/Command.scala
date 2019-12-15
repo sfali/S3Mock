@@ -7,7 +7,7 @@ import akka.util.ByteString
 import com.loyalty.testing.s3.actor.model.Event
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.model.Bucket
-import com.loyalty.testing.s3.request.{PartInfo, VersioningConfiguration}
+import com.loyalty.testing.s3.request.{ListBucketParams, PartInfo, VersioningConfiguration}
 
 sealed trait Command
 
@@ -36,6 +36,9 @@ private[actor] final case class VersioningSet(updatedBucket: Bucket,
 final case class CreateBucket(bucket: Bucket, replyTo: ActorRef[Event]) extends CommandWithReply
 
 final case class GetBucket(replyTo: ActorRef[Event]) extends CommandWithReply
+
+final case class ListBucket(params: ListBucketParams = ListBucketParams(),
+                            replyTo: ActorRef[Event]) extends CommandWithReply
 
 final case class GetBucketNotifications(replyTo: ActorRef[Event]) extends CommandWithReply
 

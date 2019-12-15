@@ -9,6 +9,7 @@ import akka.stream.IOResult
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.repositories.model.ObjectKey
 import com.loyalty.testing.s3.request.BucketVersioning
 
 import scala.concurrent.Future
@@ -70,10 +71,35 @@ case class BucketContent(expand: Boolean,
                          eTag: String,
                          lastModifiedDate: Instant = Instant.now(),
                          storageClass: String = "STANDARD") extends XmlResponse {
+  def fileName(delimiter: String = "/"): String = key.substring(key.lastIndexOf(delimiter) + 1)
+
+  def prefix(delimiter: String = "/"): Option[String] = {
+    val index = key.lastIndexOf(delimiter)
+    if(index <= -1) None else Option(key.substring(0, index))
+  }
+
   override def toXml: Elem =
     if (expand || size > 0)
       <Contents><Key>{key}</Key><LastModified>{lastModifiedDate.toString}</LastModified><Size>{size}</Size><StorageClass>{storageClass}</StorageClass><ETag>"{eTag}"</ETag></Contents>
     else <CommonPrefixes><Prefix>{key}</Prefix></CommonPrefixes>
+}
+
+object BucketContent {
+  def apply(expand: Boolean,
+            key: String,
+            size: Long, eTag: String,
+            lastModifiedDate: Instant = Instant.now(),
+            storageClass: String = "STANDARD"): BucketContent =
+    new BucketContent(expand, key, size, eTag, lastModifiedDate, storageClass)
+
+  def apply(objectKey: ObjectKey): BucketContent =
+    BucketContent(
+      expand= true,
+      objectKey.key,
+      objectKey.contentLength,
+      objectKey.eTag,
+      objectKey.lastModifiedTime.toInstant
+    )
 }
 
 case class InitiateMultipartUploadResult(bucketName: String, key: String, uploadId: String) extends XmlResponse {

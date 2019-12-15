@@ -10,7 +10,7 @@ import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.{FileIO, Sink}
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.CopyBehavior.{Copy, CopyPart}
-import com.loyalty.testing.s3.actor.model.{BucketAlreadyExists, BucketInfo, CopyObjectInfo, CopyPartInfo, DeleteInfo, Event, MultiPartUploadedInitiated, NoSuchBucketExists, NoSuchKeyExists, NotificationsCreated, NotificationsInfo, ObjectContent, ObjectInfo, PartUploaded}
+import com.loyalty.testing.s3.actor.model.{BucketAlreadyExists, BucketInfo, CopyObjectInfo, CopyPartInfo, DeleteInfo, Event, ListBucketContent, MultiPartUploadedInitiated, NoSuchBucketExists, NoSuchKeyExists, NotificationsCreated, NotificationsInfo, ObjectContent, ObjectInfo, PartUploaded}
 import com.loyalty.testing.s3.actor.model.bucket._
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
@@ -647,6 +647,17 @@ class BucketOperationsBehaviorSpec
 
     testKit.stop(sourceActorRef)
     testKit.stop(targetActorRef)
+    testKit.stop(actorRef)
+  }
+
+  it should "list bucket contents with default params" in {
+    val probe = testKit.createTestProbe[Event]()
+    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+
+    actorRef ! ListBucket(replyTo = probe.ref)
+    val contents = probe.receiveMessage().asInstanceOf[ListBucketContent].contents
+    println(contents) // TODO: verify
+
     testKit.stop(actorRef)
   }
 
