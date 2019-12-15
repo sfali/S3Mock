@@ -554,7 +554,7 @@ class BucketOperationsBehaviorSpec
     val probe = testKit.createTestProbe[Event]()
     val sourceActorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
     val targetActorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), bucket2UUID)
-    val actorRef = testKit.spawn(CopyBehavior(sourceActorRef, targetActorRef, objectIO, database), UUID.randomUUID().toString)
+    val actorRef = testKit.spawn(CopyBehavior(sourceActorRef, targetActorRef), UUID.randomUUID().toString)
 
     actorRef ! Copy(defaultBucketName, key, bucket2, key, None, probe.ref)
     val copyObjectInfo = probe.receiveMessage().asInstanceOf[CopyObjectInfo]
@@ -607,7 +607,7 @@ class BucketOperationsBehaviorSpec
     val probe = testKit.createTestProbe[Event]()
     val sourceActorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
     val targetActorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), bucket2UUID)
-    val actorRef = testKit.spawn(CopyBehavior(sourceActorRef, targetActorRef, objectIO, database), UUID.randomUUID().toString)
+    val actorRef = testKit.spawn(CopyBehavior(sourceActorRef, targetActorRef), UUID.randomUUID().toString)
 
     targetActorRef ! InitiateMultiPartUploadWrapper(key, probe.ref)
     val event = probe.receiveMessage().asInstanceOf[MultiPartUploadedInitiated]

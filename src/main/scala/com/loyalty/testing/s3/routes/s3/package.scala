@@ -48,7 +48,7 @@ package object s3 {
     for {
       sourceActorRef <- eventualSourceActorRef
       targetActorRef <- eventualTargetActorRef
-      copyBehavior = CopyBehavior(sourceActorRef, targetActorRef, objectIO, database)
+      copyBehavior = CopyBehavior(sourceActorRef, targetActorRef)
       actorRef <- system.ask[ActorRef[CopyCommand]](Spawn(copyBehavior, UUID.randomUUID().toString, _))
     } yield actorRef
   }

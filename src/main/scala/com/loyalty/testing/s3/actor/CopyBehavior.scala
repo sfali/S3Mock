@@ -9,15 +9,12 @@ import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.CopyBehavior.Command
 import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.actor.model.bucket.{GetObjectWrapper, PutObjectWrapper, UploadPartWrapper, Command => BucketCommand}
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 
 import scala.concurrent.duration._
 
 class CopyBehavior(context: ActorContext[Command],
                    sourceActorRef: ActorRef[BucketCommand],
-                   targetActorRef: ActorRef[BucketCommand],
-                   objectIO: ObjectIO,
-                   database: NitriteDatabase)
+                   targetActorRef: ActorRef[BucketCommand])
   extends AbstractBehavior[Command](context) {
 
   import CopyBehavior._
@@ -33,8 +30,6 @@ class CopyBehavior(context: ActorContext[Command],
         val behavior = copyOperationBehavior(
           sourceActorRef,
           targetActorRef,
-          objectIO,
-          database,
           S3Location(sourceBucketName, sourceKey),
           S3Location(targetBucketName, targetKey),
           None,
@@ -54,8 +49,6 @@ class CopyBehavior(context: ActorContext[Command],
         val behavior = copyOperationBehavior(
           sourceActorRef,
           targetActorRef,
-          objectIO,
-          database,
           S3Location(sourceBucketName, sourceKey),
           S3Location(targetBucketName, targetKey),
           Some(PartInfo(uploadId, partNumber)),
@@ -78,10 +71,8 @@ class CopyBehavior(context: ActorContext[Command],
 object CopyBehavior {
 
   def apply(sourceActorRef: ActorRef[BucketCommand],
-            targetActorRef: ActorRef[BucketCommand],
-            objectIO: ObjectIO,
-            database: NitriteDatabase): Behavior[Command] =
-    Behaviors.setup[Command](context => new CopyBehavior(context, sourceActorRef, targetActorRef, objectIO, database))
+            targetActorRef: ActorRef[BucketCommand]): Behavior[Command] =
+    Behaviors.setup[Command](context => new CopyBehavior(context, sourceActorRef, targetActorRef))
 
   sealed trait Command
 
@@ -116,8 +107,6 @@ object CopyBehavior {
 
   private def copyOperationBehavior(sourceActorRef: ActorRef[BucketCommand],
                                     targetActorRef: ActorRef[BucketCommand],
-                                    objectIO: ObjectIO,
-                                    database: NitriteDatabase,
                                     source: S3Location,
                                     target: S3Location,
                                     partInfo: Option[PartInfo],
