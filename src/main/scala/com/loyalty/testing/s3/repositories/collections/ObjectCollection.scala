@@ -23,7 +23,7 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
 
   private[repositories] val collection = db.getCollection("objects")
   if (!collection.hasIndex(BucketNameField)) {
-    collection.createIndex(BucketNameField, indexOptions(Fulltext))
+    collection.createIndex(BucketNameField, indexOptions(NonUnique))
     collection.createIndex(KeyField, indexOptions(Fulltext))
     collection.createIndex(VersionIdField, indexOptions(Fulltext))
   }
@@ -45,6 +45,7 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
         .put(VersionField, version.entryName)
         .put(VersionIdField, objectKey.versionId)
         .put(DeleteMarkerField, null)
+        .put(PrefixField, createPrefixes(key))
     )
 
     val updatedDocument = doc
@@ -81,7 +82,17 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
       case _ => throw new IllegalStateException(s"Multiple documents found for $objectId")
     }
 
-  def findAll(objectId: UUID): List[ObjectKey] = findAllById(objectId).map(ObjectKey(_))
+  private[repositories] def findAll(objectId: UUID): List[ObjectKey] = findAllById(objectId).map(ObjectKey(_))
+
+  private[repositories] def findAll(bucketName: String, prefix: Option[String] = None): List[ObjectKey] = {
+    val bucketNameFilter = feq(BucketNameField, bucketName)
+    val filter =
+      prefix match {
+        case Some(prefix) => and(bucketNameFilter, elemMatch(PrefixField, feq("$", prefix)))
+        case None => bucketNameFilter
+      }
+    collection.find(filter).toScalaList.map(ObjectKey(_))
+  }
 
   def findObject(objectId: UUID, maybeVersionId: Option[String] = None): ObjectKey =
     findById(objectId, maybeVersionId) match {

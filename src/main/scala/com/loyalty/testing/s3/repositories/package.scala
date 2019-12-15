@@ -41,7 +41,7 @@ package object repositories {
   val UploadIdField = "upload-id"
   val PartNumberField = "part-number"
   val NonVersionId: String = 0.toVersionId
-  val ContentFileName: String = "content"
+  val ContentFileName = "content"
 
   implicit class LongOps(src: Long) {
     def toOffsetDateTime: OffsetDateTime = Instant.ofEpochMilli(src).atZone(ZoneId.systemDefault()).toOffsetDateTime
@@ -74,6 +74,8 @@ package object repositories {
 
     def getOptionalForeignField(key: String): Option[List[Document]] =
       Option(src.get(key, classOf[util.HashSet[Document]])).map(_.asScala.toList)
+
+    def getListField(key: String): List[String] = src.get(key, classOf[util.ArrayList[String]]).asScala.toList
 
     def toNotification: Notification =
       Notification(
@@ -149,6 +151,21 @@ package object repositories {
       .getOrElse(objectPath)
     if (Files.notExists(_objectPath)) Failure(NoSuchKeyException(bucketName, key))
     else Success(_objectPath)
+  }
+
+  def createPrefixes(key: String): util.ArrayList[String] = {
+    val delimiterIndex = key.lastIndexOf('/')
+    val paths = if (delimiterIndex >= 0) key.substring(0, delimiterIndex).split("/").toList else Nil
+    val ls = new util.ArrayList[String]()
+    if (paths.nonEmpty) {
+      ls.add(s"${paths.head}/")
+      paths.tail.foreach {
+        path =>
+          val last = ls.get(ls.size() - 1)
+          ls.add(s"$last$path/")
+      }
+    }
+    ls
   }
 
 

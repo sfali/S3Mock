@@ -46,6 +46,9 @@ class NitriteDatabase(rootPath: Path,
       case Success(bucket) => Future.successful(bucket)
     }
 
+  def getAllObjects(bucketName: String,
+                    prefix: Option[String] = None): List[ObjectKey] = objectCollection.findAll(bucketName, prefix)
+
   def createBucket(bucket: Bucket): Future[Bucket] =
     Try(bucketCollection.createBucket(bucket)) match {
       case Failure(ex) => Future.failed(ex)
