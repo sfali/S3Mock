@@ -40,9 +40,11 @@ object Dependencies {
     val Scalacheck = "scalacheck"
     val ScalaMock = "scalamock"
     val AlpakkaSqs = "akka-stream-alpakka-sqs"
+    val AlpakkaSns = "akka-stream-alpakka-sns"
     val AlpakkaS3 = "akka-stream-alpakka-s3"
     val Sts = "sts"
     val Sqs = "sqs"
+    val Sns = "sns"
     val S3 = "s3"
     val AkkaStreamsTestKit = "akka-stream-testkit"
     val ActorTestKit = "akka-actor-testkit-typed"
@@ -57,7 +59,7 @@ object Dependencies {
     val AkkaVersion = "2.6.1"
     val AkkaHttpVersion = "10.1.11"
     val LightbendVersion = "1.1.2"
-    val AwsSdk2Version = "2.10.31"
+    val AwsSdk2Version = "2.10.35"
     val LogbackVersion = "1.2.3"
     val CirceVersion = "0.12.1"
     val EnumeratumVersion = "1.5.13"
@@ -119,7 +121,15 @@ object Dependencies {
     LightbendAkka   %% AlpakkaSqs                   % LightbendVersion
       excludeAll (ExclusionRule(organization = Akka),
       ExclusionRule(organization = Aws)),
+    LightbendAkka   %% AlpakkaSns                   % LightbendVersion
+      excludeAll (ExclusionRule(organization = Akka),
+      ExclusionRule(organization = Aws)),
     Aws             %  Sqs                          % AwsSdk2Version
+      excludeAll(
+      ExclusionRule(organization = Aws, name = "netty-nio-client"),
+      ExclusionRule(organization = "io.netty")
+    ),
+    Aws             %  Sns                          % AwsSdk2Version
       excludeAll(
       ExclusionRule(organization = Aws, name = "netty-nio-client"),
       ExclusionRule(organization = "io.netty")

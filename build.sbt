@@ -35,8 +35,8 @@ lazy val root = project
     name := "s3mock",
     fork in Test := true,
     parallelExecution in IntegrationTest := false,
-    libraryDependencies ++= AkkaCommon ++ AkkaHttps ++ AwsCommonV1 ++ JsonAndEnum ++ Misc ++ CommonTest ++ AkkaTest ++
-      S3IntegrationTesting
+    libraryDependencies ++= AkkaCommon ++ AkkaHttps ++ AwsCommonV1 ++ AwsCommon ++ JsonAndEnum ++ Misc ++ CommonTest ++
+      AkkaTest ++ S3IntegrationTesting
   )
   .enablePlugins(JavaAppPackaging)
 
