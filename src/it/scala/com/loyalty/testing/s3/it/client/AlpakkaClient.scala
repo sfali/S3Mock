@@ -2,12 +2,12 @@ package com.loyalty.testing.s3.it.client
 
 import java.nio.file.{Files, Path}
 
-import akka.Done
+import akka.{Done, NotUsed}
 import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.headers.ByteRange
-import akka.stream.alpakka.s3.S3Headers
+import akka.stream.alpakka.s3.{ListBucketResultContents, S3Headers}
 import akka.stream.alpakka.s3.scaladsl.S3
-import akka.stream.scaladsl.{FileIO, Framing, Sink}
+import akka.stream.scaladsl.{FileIO, Framing, Sink, Source}
 import akka.util.ByteString
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.it._
@@ -34,6 +34,13 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
 
   override def setBucketVersioning(bucketName: String, status: BucketVersioningStatus): Future[Done] =
     awsClient.setBucketVersioning(bucketName, status)
+
+  def listObjects(bucketName: String,
+                  delimiter: Option[String],
+                  prefix: Option[String],
+                  maxKeys: Int = 1000): Source[ListBucketResultContents, NotUsed] = {
+    S3.listBucket(bucketName, prefix)
+  }
 
   override def putObject(bucketName: String, key: String, filePath: Path): Future[ObjectInfo] = {
     val contentLength = Files.size(filePath)
@@ -101,7 +108,7 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
 
   override def multiPartUpload(bucketName: String,
                                key: String,
-                               totalSize: Int): Future[ObjectInfo] = {
+                               totalSize: Int): Future[ObjectInfo] =
     createContentSource(1, totalSize)
       .runWith(S3.multipartUpload(bucketName, key))
       .map(result => ObjectInfo(
@@ -112,7 +119,6 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
         contentLength = 0,
         versionId = result.versionId
       ))
-  }
 
   override def copyObject(sourceBucketName: String,
                           sourceKey: String,

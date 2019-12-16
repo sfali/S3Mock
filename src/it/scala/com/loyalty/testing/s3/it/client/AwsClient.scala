@@ -59,6 +59,15 @@ class AwsClient(override protected val awsSettings: AwsSettings)
     s3Client.putBucketVersioning(request).asScala.map(_ => Done)
   }
 
+  def listObjects(bucketName: String,
+                  delimiter: Option[String],
+                  prefix: Option[String],
+                  maxKeys: Int = 1000): Future[ListObjectsV2Response] = {
+    val request = ListObjectsV2Request.builder().bucket(bucketName).delimiter(delimiter.orNull).prefix(prefix.orNull)
+      .maxKeys(maxKeys).build()
+    s3Client.listObjectsV2(request).asScala
+  }
+
   override def putObject(bucketName: String,
                          key: String,
                          filePath: Path): Future[ObjectInfo] = {
