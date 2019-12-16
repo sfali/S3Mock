@@ -129,10 +129,12 @@ package object s3 {
   }
 
   trait SqsSettings {
+    @deprecated
     val sqsClient: AmazonSQSAsync
   }
 
   trait SnsSettings {
+    @deprecated
     val snsClient: AmazonSNSAsync
   }
 

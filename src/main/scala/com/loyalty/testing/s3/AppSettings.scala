@@ -12,7 +12,7 @@ class AppSettings(override protected val config: Config) extends Settings {
   def this(system: ActorSystem) = this(system.settings.config)
 
   @deprecated
-  object aws {
+  object awsOld {
     val region: String = config.getString("app.aws.region")
     val credentialsProvider: AWSCredentialsProvider = {
       val credProviderPath = "app.aws.credentials.provider"
@@ -39,7 +39,7 @@ class AppSettings(override protected val config: Config) extends Settings {
     private val builder =
       AmazonSQSAsyncClientBuilder
         .standard()
-        .withCredentials(aws.credentialsProvider)
+        .withCredentials(awsOld.credentialsProvider)
 
     val sqsClient: AmazonSQSAsync =
       getOptionalEndpointConfiguration("app.sqs.end-point")
@@ -53,7 +53,7 @@ class AppSettings(override protected val config: Config) extends Settings {
     private val builder =
       AmazonSNSAsyncClientBuilder
         .standard()
-        .withCredentials(aws.credentialsProvider)
+        .withCredentials(awsOld.credentialsProvider)
 
     override val snsClient: AmazonSNSAsync =
       getOptionalEndpointConfiguration("app.sns.end-point")
@@ -64,7 +64,7 @@ class AppSettings(override protected val config: Config) extends Settings {
 
   private def getOptionalEndpointConfiguration(keyPath: String): Option[EndpointConfiguration] = {
     val endPoint = config.getString(keyPath)
-    if (endPoint.isEmpty) None else Some(new EndpointConfiguration(endPoint, aws.region))
+    if (endPoint.isEmpty) None else Some(new EndpointConfiguration(endPoint, awsOld.region))
   }
 
 
