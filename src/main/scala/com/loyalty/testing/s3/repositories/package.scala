@@ -101,13 +101,6 @@ package object repositories {
       }
       .runWith(Sink.head)
 
-  def toBucketNotification(bucketName: String, contentSource: Source[ByteString, _])
-                          (implicit mat: Materializer): Future[List[Notification]] =
-    contentSource
-      .map(_.utf8String)
-      .map(s => parseNotificationConfiguration(bucketName, s))
-      .runWith(Sink.head)
-
   def getDestinationPathWithVersionId(key: String,
                                       bucketPath: Path,
                                       maybeBucketVersioning: Option[BucketVersioning]): (Option[String], Path) = {

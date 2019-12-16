@@ -11,6 +11,9 @@ import java.util.concurrent.CompletableFuture
 
 import akka.http.scaladsl.model.headers.ByteRange.{FromOffset, Slice, Suffix}
 import akka.http.scaladsl.model.headers.{ByteRange, RawHeader}
+import akka.stream.Materializer
+import akka.stream.scaladsl.{Sink, Source}
+import akka.util.ByteString
 import com.amazonaws.services.sns.AmazonSNSAsync
 import com.amazonaws.services.sqs.AmazonSQSAsync
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
@@ -162,6 +165,13 @@ package object s3 {
     def +(key: String, maybeValue: Option[String]): List[RawHeader] =
       maybeValue.map(value => headers :+ RawHeader(key, value)).getOrElse(headers)
   }
+
+  def toBucketNotification(bucketName: String, contentSource: Source[ByteString, _])
+                          (implicit mat: Materializer): Future[List[Notification]] =
+    contentSource
+      .map(_.utf8String)
+      .map(s => parseNotificationConfiguration(bucketName, s))
+      .runWith(Sink.head)
 
   def parseNotificationConfiguration(bucketName: String, xml: String): List[Notification] = {
     val node = scala.xml.XML.loadString(xml)
