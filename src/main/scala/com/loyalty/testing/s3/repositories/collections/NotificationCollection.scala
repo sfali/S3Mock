@@ -2,9 +2,8 @@ package com.loyalty.testing.s3.repositories.collections
 
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories._
-import com.loyalty.testing.s3.response.InvalidRequestException
+import org.dizitart.no2._
 import org.dizitart.no2.filters.Filters.{eq => feq, _}
-import org.dizitart.no2.{Document, IndexOptions, IndexType, Nitrite}
 
 class NotificationCollection(db: Nitrite) {
 
@@ -12,30 +11,27 @@ class NotificationCollection(db: Nitrite) {
 
   private[repositories] val collection = db.getCollection("notification")
   if (!collection.hasIndex(NotificationNameField)) {
-    collection.createIndex(NotificationNameField, IndexOptions.indexOptions(IndexType.Unique))
+    collection.createIndex(NotificationNameField, IndexOptions.indexOptions(IndexType.NonUnique))
   }
 
-  def createNotification(notification: Notification): Notification = {
-    val bucketName = notification.bucketName
-    val notificationName = notification.name
-    findByBucketNameAndNotificationName(bucketName, notificationName) match {
-      case Nil =>
-        val document =
-          createDocument(BucketNameField, bucketName)
-            .put(NotificationNameField, notificationName)
-            .put(NotificationTypeField, notification.notificationType.entryName)
-            .put(OperationTypeField, notification.operationType.entryName)
-            .put(DestinationTypeField, notification.destinationType.entryName)
-            .put(DestinationNameField, notification.destinationName)
-            .put(PrefixField, notification.prefix.orNull)
-            .put(SuffixField, notification.suffix.orNull)
-        collection.insert(document)
-        notification
-      case document :: Nil =>
-        // should never happen
-        throw InvalidRequestException(bucketName, s"Notification $notificationName already exists with document id ${document.getId}")
-      case _ => throw new IllegalStateException(s"multiple bucket-notification pair found: $bucketName/$notificationName")
-    }
+  private[repositories] def createNotifications(notifications: List[Notification]): Int = {
+    if (notifications.nonEmpty) {
+      val bucketName = notifications.head.bucketName
+      deleteNotifications(bucketName) // delete current notifications
+      val documents =
+        notifications.map {
+          notification =>
+            createDocument(BucketNameField, notification.bucketName)
+              .put(NotificationNameField, notification.name)
+              .put(NotificationTypeField, notification.notificationType.entryName)
+              .put(OperationTypeField, notification.operationType.entryName)
+              .put(DestinationTypeField, notification.destinationType.entryName)
+              .put(DestinationNameField, notification.destinationName)
+              .put(PrefixField, notification.prefix.orNull)
+              .put(SuffixField, notification.suffix.orNull)
+        }
+      collection.insert(documents.toArray).getAffectedCount
+    } else 0
   }
 
   def findNotifications(bucketName: String): List[Notification] = findByBucketName(bucketName).map(_.toNotification)
@@ -48,13 +44,18 @@ class NotificationCollection(db: Nitrite) {
     }
   }
 
+  private def deleteNotifications(bucketName: String) =
+    collection.remove(bucketNameFilter(bucketName)).getAffectedCount
+
   private def findByBucketName(bucketName: String) =
-    collection.find(feq(BucketNameField, bucketName)).toScalaList
+    collection.find(bucketNameFilter(bucketName)).toScalaList
 
   private def findByBucketNameAndNotificationName(bucketName: String,
                                                   notificationName: String) =
-    collection.find(and(feq(BucketNameField, bucketName),
+    collection.find(and(bucketNameFilter(bucketName),
       feq(NotificationNameField, notificationName))).toScalaList
+
+  private lazy val bucketNameFilter: String => Filter = bucketName => feq(BucketNameField, bucketName)
 }
 
 object NotificationCollection {

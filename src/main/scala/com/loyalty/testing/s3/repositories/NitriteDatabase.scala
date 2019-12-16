@@ -14,7 +14,7 @@ import com.loyalty.testing.s3.{DBSettings, _}
 import org.dizitart.no2.Nitrite
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 class NitriteDatabase(rootPath: Path,
@@ -66,13 +66,8 @@ class NitriteDatabase(rootPath: Path,
     }
   }
 
-  def setBucketNotifications(notifications: List[Notification])
-                            (implicit ec: ExecutionContext): Future[Done] = {
-    def createNotification(notification: Notification) =
-      Future.successful(notificationCollection.createNotification(notification))
-
-    Future.sequence(notifications.map(createNotification)).map(_ => Done)
-  }
+  def setBucketNotifications(notifications: List[Notification]): Future[Int] =
+    Future.successful(notificationCollection.createNotifications(notifications))
 
   def getBucketNotifications(bucketName: String): Future[List[Notification]] =
     Future.successful(notificationCollection.findNotifications(bucketName))
