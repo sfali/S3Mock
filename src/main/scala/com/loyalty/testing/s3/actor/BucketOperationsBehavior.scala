@@ -109,6 +109,10 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         bucketOperation(updatedBucket)
 
       case CreateBucketNotifications(notifications, replyTo) =>
+        val maybeBucketName = notifications.headOption.map(_.bucketName)
+        if (maybeBucketName.nonEmpty)
+          context.log.info("Setting bucket notifications, notification={}, bucket_name={}", notifications,
+            maybeBucketName.get)
         context.pipeToSelf(database.setBucketNotifications(notifications)) {
           case Failure(ex) =>
             context.log.error(s"unable to create bucket notifications: $bucket", ex)

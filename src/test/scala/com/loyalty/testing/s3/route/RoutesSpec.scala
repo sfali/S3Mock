@@ -91,10 +91,42 @@ class RoutesSpec
         |<VersioningConfiguration xmlns="http:/.amazonaws.com/doc/2006-03-01/">
         |<Status>Enabled</Status>
         |</VersioningConfiguration>
-      """.stripMargin.replaceAll(System.lineSeparator(), "")
+      """.stripMargin.replaceNewLine
     val entity = HttpEntity(xmlContentType, xml)
     Put(s"/$versionedBucketName?versioning", entity) ~> routes ~> check {
       headers.head mustBe Location(s"/$versionedBucketName")
+      status mustBe OK
+    }
+  }
+
+  it should "set bucket notifications" in {
+    val xml =
+     """<NotificationConfiguration>
+        |<QueueConfiguration>
+        |<Id>queue-notification</Id>
+        |<Filter>
+        |<S3Key>
+        |<FilterRule>
+        |<Name>prefix</Name>
+        |<Value>input/</Value>
+        |</FilterRule>
+        |<FilterRule>
+        |<Name>suffix</Name>
+        |<Value>.T/</Value>
+        |</FilterRule>
+        |</S3Key>
+        |</Filter>
+        |<Queue>queue-destination</Queue>
+        |<Event>s3:ObjectCreated:Put</Event>
+        |</QueueConfiguration>
+        |<TopicConfiguration>
+        |<Id>topic-notification</Id>
+        |<Topic>sns-destination</Topic>
+        |<Event>s3:ObjectRemoved:DeleteMarkerCreated</Event>
+        |</TopicConfiguration>
+        |</NotificationConfiguration>""".stripMargin.replaceNewLine
+    val entity = HttpEntity(xmlContentType, xml)
+    Put(s"/$defaultBucketName?notification", entity) ~> routes ~> check {
       status mustBe OK
     }
   }
