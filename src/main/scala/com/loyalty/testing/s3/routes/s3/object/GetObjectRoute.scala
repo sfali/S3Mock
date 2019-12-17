@@ -1,15 +1,17 @@
 package com.loyalty.testing.s3.routes.s3.`object`
 
-import akka.actor.typed.ActorSystem
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.StatusCodes.{NotFound, OK}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.typed.scaladsl.ActorFlow
 import akka.util.Timeout
-import com.loyalty.testing.s3.actor.SpawnBehavior.Command
-import com.loyalty.testing.s3.actor.model.bucket.GetObjectWrapper
+import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model._
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
+import com.loyalty.testing.s3.actor.model.bucket.{Command, GetObjectWrapper}
 import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException, NoSuchKeyException}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
@@ -20,18 +22,20 @@ object GetObjectRoute extends CustomMarshallers {
 
   def apply(bucketName: String,
             key: String,
-            objectIO: ObjectIO,
-            database: NitriteDatabase)
-           (implicit system: ActorSystem[Command],
+            bucketOperationsActorRef: ActorRef[ShardingEnvelope[Command]])
+           (implicit system: ActorSystem[_],
             timeout: Timeout): Route =
     (parameter("versionId".?) & optionalHeaderValue(extractRange)) {
       (maybeVersionId, maybeRange) =>
-        import system.executionContext
         val eventualEvent =
-          for {
-            actorRef <- spawnBucketBehavior(bucketName, objectIO, database)
-            event <- askBucketBehavior(actorRef, replyTo => GetObjectWrapper(key, maybeVersionId, maybeRange, replyTo))
-          } yield event
+          Source
+            .single("")
+            .via(
+              ActorFlow.ask(bucketOperationsActorRef)(
+                (_, replyTo: ActorRef[Event]) =>
+                  ShardingEnvelope(bucketName.toUUID.toString, GetObjectWrapper(key, maybeVersionId, maybeRange, replyTo))
+              )
+            ).runWith(Sink.head)
         onComplete(eventualEvent) {
           case Success(ObjectContent(objectKey, content)) =>
             complete(HttpResponse(OK)

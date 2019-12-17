@@ -1,16 +1,17 @@
 package com.loyalty.testing.s3.routes.s3.`object`
 
-import akka.actor.typed.ActorSystem
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes.NotFound
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.typed.scaladsl.ActorFlow
 import akka.util.Timeout
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.CopyBehavior.Copy
-import com.loyalty.testing.s3.actor.SpawnBehavior.Command
-import com.loyalty.testing.s3.actor.model.{CopyObjectInfo, InvalidAccess, NoSuchBucketExists, NoSuchKeyExists, ObjectInfo}
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
+import com.loyalty.testing.s3.actor.CopyBehavior.{Command, Copy}
+import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.response.{CopyObjectResult, InternalServiceException, NoSuchBucketException, NoSuchKeyException}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
@@ -23,25 +24,25 @@ object CopyObjectRoute extends CustomMarshallers {
 
   def apply(bucketName: String,
             key: String,
-            objectIO: ObjectIO,
-            database: NitriteDatabase)
-           (implicit system: ActorSystem[Command],
+            copyActorRef: ActorRef[ShardingEnvelope[Command]])
+           (implicit system: ActorSystem[_],
             timeout: Timeout): Route =
     headerValueByType[`x-amz-copy-source`](()) { source =>
-      import system.executionContext
-
       val sourceBucketName = source.bucketName
       val sourceKey = source.key
       val maybeSourceVersionId = source.maybeVersionId
       val sourceBucketId = sourceBucketName.toUUID
       val targetBucketId = bucketName.toUUID
-
       val eventualEvent =
-        for {
-          actorRef <- spawnCopyBehavior(sourceBucketName, bucketName, objectIO, database)
-          event <- askCopyActor(actorRef, replyTo => Copy(sourceBucketName, sourceKey, bucketName, key,
-            maybeSourceVersionId, replyTo))
-        } yield event
+        Source
+          .single("")
+          .via(
+            ActorFlow.ask(copyActorRef)(
+              (_, replyTo: ActorRef[Event]) =>
+                ShardingEnvelope(sourceBucketId.toString, Copy(sourceBucketName, sourceKey, bucketName, key,
+                  maybeSourceVersionId, replyTo))
+            )
+          ).runWith(Sink.head)
       onComplete(eventualEvent) {
         case Success(ObjectInfo(objectKey)) if objectKey.deleteMarker.contains(true) =>
           complete(HttpResponse(NotFound).withHeaders(createResponseHeaders(objectKey)))

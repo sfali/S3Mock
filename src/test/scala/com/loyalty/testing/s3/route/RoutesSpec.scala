@@ -3,7 +3,9 @@ package com.loyalty.testing.s3.route
 import java.nio.file.Files
 import java.time.{Instant, OffsetDateTime}
 
-import akka.actor.typed.ActorSystem
+import akka.actor.testkit.typed.scaladsl.ActorTestKit
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.ContentTypes._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
@@ -12,14 +14,15 @@ import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.stream.scaladsl.{FileIO, Sink}
 import akka.util.Timeout
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.SpawnBehavior
-import com.loyalty.testing.s3.actor.SpawnBehavior.Command
+import com.loyalty.testing.s3.actor.model.bucket
+import com.loyalty.testing.s3.actor.{BucketOperationsBehavior, CopyBehavior, NotificationBehavior, ObjectOperationsBehavior}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.response._
 import com.loyalty.testing.s3.routes.{CustomMarshallers, Routes}
 import com.loyalty.testing.s3.service.NotificationService
 import com.loyalty.testing.s3.streams.FileStream
 import com.loyalty.testing.s3.test._
+import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
@@ -37,14 +40,23 @@ class RoutesSpec
     with BeforeAndAfterAll
     with ScalaFutures {
 
-  protected implicit val spawnSystem: ActorSystem[Command] = ActorSystem(SpawnBehavior(), "s3mock")
+  private val testKit = ActorTestKit("test", ConfigFactory.load("test"))
+  protected implicit val spawnSystem: ActorSystem[_] = testKit.system
   protected override implicit val timeout: Timeout = Timeout(10.seconds)
   private implicit val defaultPatience: PatienceConfig = PatienceConfig(timeout = Span(15, Seconds),
     interval = Span(500, Millis))
   private val settings = AppSettings(spawnSystem.settings.config)
-  protected override val objectIO: ObjectIO = ObjectIO(rootPath, FileStream())
-  protected override val database: NitriteDatabase = NitriteDatabase(rootPath, settings.dbSettings)
-  override protected val notificationService: NotificationService = NotificationService(settings.awsSettings)
+  private val objectIO: ObjectIO = ObjectIO(rootPath, FileStream())
+  private val database: NitriteDatabase = NitriteDatabase(rootPath, settings.dbSettings)
+  private val notificationService: NotificationService = NotificationService(settings.awsSettings)
+
+  private val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+  override protected val bucketOperationsActorRef: ActorRef[ShardingEnvelope[bucket.Command]] =
+    testKit.spawn(shardingEnvelopeWrapper(BucketOperationsBehavior(database, objectActorRef)))
+  override protected val copyActorRef: ActorRef[ShardingEnvelope[CopyBehavior.Command]] =
+    testKit.spawn(shardingEnvelopeWrapper(CopyBehavior(bucketOperationsActorRef)))
+  override protected val notificationActorRef: ActorRef[ShardingEnvelope[NotificationBehavior.Command]] =
+    testKit.spawn(shardingEnvelopeWrapper(NotificationBehavior(database, notificationService)))
   private val xmlContentType = ContentType(MediaTypes.`application/xml`, HttpCharsets.`UTF-8`)
 
   override protected def beforeAll(): Unit = {

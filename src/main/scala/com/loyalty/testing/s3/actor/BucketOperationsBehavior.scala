@@ -4,21 +4,22 @@ import java.util.UUID
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
 import akka.actor.typed.{ActorRef, Behavior}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.actor.model.`object`.{CompleteUpload, DeleteObject, GetObject, GetObjectMeta, InitiateMultiPartUpload, PutObject, UploadPart, Command => ObjectCommand}
 import com.loyalty.testing.s3.actor.model.bucket._
+import com.loyalty.testing.s3.repositories.NitriteDatabase
 import com.loyalty.testing.s3.repositories.collections.NoSuckBucketException
 import com.loyalty.testing.s3.repositories.model.Bucket
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 class BucketOperationsBehavior private(context: ActorContext[Command],
                                        buffer: StashBuffer[Command],
-                                       objectIO: ObjectIO,
-                                       database: NitriteDatabase)
+                                       database: NitriteDatabase,
+                                       objectOperationsActorRef: ActorRef[ShardingEnvelope[ObjectCommand]])
   extends AbstractBehavior[Command](context) {
 
   private val bucketId = UUID.fromString(context.self.path.name)
@@ -123,31 +124,31 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         Behaviors.same
 
       case PutObjectWrapper(key, contentSource, replyTo) =>
-        objectActor(bucket, key) ! PutObject(bucket, key, contentSource, replyTo)
+        objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), PutObject(bucket, key, contentSource, replyTo))
         Behaviors.same
 
       case GetObjectMetaWrapper(key, replyTo) =>
-        objectActor(bucket, key) ! GetObjectMeta(bucket, key, replyTo)
+        objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), GetObjectMeta(bucket, key, replyTo))
         Behaviors.same
 
       case GetObjectWrapper(key, maybeVersionId, maybeRange, replyTo) =>
-        objectActor(bucket, key) ! GetObject(bucket, key, maybeVersionId, maybeRange, replyTo)
+        objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), GetObject(bucket, key, maybeVersionId, maybeRange, replyTo))
         Behaviors.same
 
       case DeleteObjectWrapper(key, maybeVersionId, replyTo) =>
-        objectActor(bucket, key) ! DeleteObject(bucket, key, maybeVersionId, replyTo)
+        objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), DeleteObject(bucket, key, maybeVersionId, replyTo))
         Behaviors.same
 
       case InitiateMultiPartUploadWrapper(key, replyTo) =>
-        objectActor(bucket, key) ! InitiateMultiPartUpload(bucket, key, replyTo)
+        objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), InitiateMultiPartUpload(bucket, key, replyTo))
         Behaviors.same
 
       case UploadPartWrapper(key, uploadId, partNumber, contentSource, replyTo) =>
-        objectActor(bucket, key) ! UploadPart(bucket, key, uploadId, partNumber, contentSource, replyTo)
+        objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), UploadPart(bucket, key, uploadId, partNumber, contentSource, replyTo))
         Behaviors.same
 
       case CompleteUploadWrapper(key, uploadId, parts, replyTo) =>
-        objectActor(bucket, key) ! CompleteUpload(bucket, key, uploadId, parts, replyTo)
+        objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), CompleteUpload(bucket, key, uploadId, parts, replyTo))
         Behaviors.same
 
       case ReplyToSender(reply, replyTo) =>
@@ -161,20 +162,14 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         Behaviors.unhandled
     }
 
-  private def objectActor(bucket: Bucket, key: String): ActorRef[ObjectCommand] = {
-    val id = createObjectId(bucket.bucketName, key).toString
-    context.child(id) match {
-      case Some(behavior) => behavior.unsafeUpcast[ObjectCommand]
-      case None => context.spawn(ObjectOperationsBehavior(objectIO, database), id)
-    }
-  }
-
+  private def entityId(bucket: Bucket, key: String) = createObjectId(bucket.bucketName, key).toString
 }
 
 object BucketOperationsBehavior {
 
-  def apply(objectIO: ObjectIO, database: NitriteDatabase): Behavior[Command] =
+  def apply(database: NitriteDatabase,
+            objectOperationsActorRef: ActorRef[ShardingEnvelope[ObjectCommand]]): Behavior[Command] =
     Behaviors.setup { context =>
-      Behaviors.withStash(1000)(buffer => new BucketOperationsBehavior(context, buffer, objectIO, database))
+      Behaviors.withStash(1000)(buffer => new BucketOperationsBehavior(context, buffer, database, objectOperationsActorRef))
     }
 }

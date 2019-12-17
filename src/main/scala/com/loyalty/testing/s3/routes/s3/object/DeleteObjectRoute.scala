@@ -3,17 +3,19 @@ package com.loyalty.testing.s3.routes.s3.`object`
 import java.time.OffsetDateTime
 import java.util.UUID
 
-import akka.actor.typed.ActorSystem
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes.NoContent
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.typed.scaladsl.ActorFlow
 import akka.util.Timeout
-import com.loyalty.testing.s3.actor.SpawnBehavior.Command
-import com.loyalty.testing.s3.actor.model.bucket.DeleteObjectWrapper
-import com.loyalty.testing.s3.actor.model.{DeleteInfo, InvalidAccess, NoSuchBucketExists, NoSuchKeyExists}
+import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.actor.model.bucket.{Command, DeleteObjectWrapper}
+import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.repositories.model.ObjectKey
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException, NoSuchKeyException}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
@@ -24,18 +26,20 @@ object DeleteObjectRoute extends CustomMarshallers {
 
   def apply(bucketName: String,
             key: String,
-            objectIO: ObjectIO,
-            database: NitriteDatabase)
-           (implicit system: ActorSystem[Command],
+            bucketOperationsActorRef: ActorRef[ShardingEnvelope[Command]])
+           (implicit system: ActorSystem[_],
             timeout: Timeout): Route =
     parameter("versionId".?) {
       maybeVersionId =>
-        import system.executionContext
         val eventualEvent =
-          for {
-            actorRef <- spawnBucketBehavior(bucketName, objectIO, database)
-            event <- askBucketBehavior(actorRef, replyTo => DeleteObjectWrapper(key, maybeVersionId, replyTo))
-          } yield event
+          Source
+            .single("")
+            .via(
+              ActorFlow.ask(bucketOperationsActorRef)(
+                (_, replyTo: ActorRef[Event]) =>
+                  ShardingEnvelope(bucketName.toUUID.toString, DeleteObjectWrapper(key, maybeVersionId, replyTo))
+              )
+            ).runWith(Sink.head)
         onComplete(eventualEvent) {
           case Success(DeleteInfo(deleteMarker, version, maybeVersionId)) =>
             val objectKey = ObjectKey(

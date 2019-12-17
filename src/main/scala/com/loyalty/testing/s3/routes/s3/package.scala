@@ -1,78 +1,16 @@
 package com.loyalty.testing.s3.routes
 
-import java.util.UUID
-
-import akka.actor.typed.scaladsl.AskPattern._
-import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest}
 import akka.stream.Materializer
-import akka.stream.scaladsl.Sink
-import akka.util.Timeout
+import akka.stream.scaladsl.{Sink, Source}
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.SpawnBehavior.{Spawn, Command => SpawnCommand}
-import com.loyalty.testing.s3.actor.model.bucket.{Command => BucketCommand}
-import com.loyalty.testing.s3.actor.{BucketOperationsBehavior, CopyBehavior, NotificationBehavior}
-import com.loyalty.testing.s3.actor.NotificationBehavior.{Command => NotificationCommand}
-import com.loyalty.testing.s3.actor.CopyBehavior.{Command => CopyCommand}
-import com.loyalty.testing.s3.actor.model.Event
 import com.loyalty.testing.s3.repositories.model.ObjectKey
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
-import com.loyalty.testing.s3.service.NotificationService
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 
 package object s3 {
-
-  def spawnBucketBehavior(bucketName: String,
-                          objectIO: ObjectIO,
-                          database: NitriteDatabase)
-                         (implicit system: ActorSystem[SpawnCommand],
-                          timeout: Timeout): Future[ActorRef[BucketCommand]] =
-    system.ask[ActorRef[BucketCommand]](Spawn(BucketOperationsBehavior(objectIO, database),
-      bucketName.toUUID.toString, _))
-
-  def askBucketBehavior(actorRef: ActorRef[BucketCommand],
-                        toProtocol: ActorRef[Event] => BucketCommand)
-                       (implicit system: ActorSystem[SpawnCommand],
-                        timeout: Timeout): Future[Event] = actorRef.ask[Event](toProtocol)
-
-  def spawnCopyBehavior(sourceBucketName: String,
-                        targetBucketName: String,
-                        objectIO: ObjectIO,
-                        database: NitriteDatabase)
-                       (implicit system: ActorSystem[SpawnCommand],
-                        timeout: Timeout): Future[ActorRef[CopyCommand]] = {
-    import system.executionContext
-    val eventualSourceActorRef = spawnBucketBehavior(sourceBucketName, objectIO, database)
-    val eventualTargetActorRef = spawnBucketBehavior(targetBucketName, objectIO, database)
-    for {
-      sourceActorRef <- eventualSourceActorRef
-      targetActorRef <- eventualTargetActorRef
-      copyBehavior = CopyBehavior(sourceActorRef, targetActorRef)
-      actorRef <- system.ask[ActorRef[CopyCommand]](Spawn(copyBehavior, UUID.randomUUID().toString, _))
-    } yield actorRef
-  }
-
-  def askCopyActor(actorRef: ActorRef[CopyCommand],
-                   toProtocol: ActorRef[Event] => CopyCommand)
-                  (implicit system: ActorSystem[SpawnCommand],
-                   timeout: Timeout): Future[Event] = actorRef.ask[Event](toProtocol)
-
-  def spawnNotificationBehavior(bucketName: String,
-                                database: NitriteDatabase,
-                                notificationService: NotificationService)
-                               (implicit system: ActorSystem[SpawnCommand],
-                                timeout: Timeout): Future[ActorRef[NotificationCommand]] =
-    system.ask[ActorRef[NotificationCommand]](Spawn(NotificationBehavior(database, notificationService),
-      bucketName.toUUID.toString, _))
-
-  def askNotificationBehavior(actorRef: ActorRef[NotificationCommand],
-                              toProtocol: ActorRef[Event] => NotificationCommand)
-                             (implicit system: ActorSystem[SpawnCommand],
-                              timeout: Timeout): Future[Event] = actorRef.ask[Event](toProtocol)
-
   def createResponseHeaders(objectKey: ObjectKey): List[RawHeader] = {
     val headers = ListBuffer[RawHeader]()
     if (objectKey.contentMd5.nonEmpty) headers.addOne(RawHeader(CONTENT_MD5, objectKey.contentMd5))
@@ -89,8 +27,8 @@ package object s3 {
     case _ => None
   }
 
-  def extractRequestTo(request: HttpRequest)
-                      (implicit mat: Materializer): Future[Option[String]] = {
+  def extractRequestToOld(request: HttpRequest)
+                         (implicit mat: Materializer): Future[Option[String]] = {
     import mat.executionContext
     request
       .entity
@@ -99,5 +37,11 @@ package object s3 {
       .runWith(Sink.head)
       .map(s => if (s.isEmpty) None else Some(s))
   }
+
+  def extractRequestTo(request: HttpRequest): Source[String, Any] =
+    request
+      .entity
+      .dataBytes
+      .map(_.utf8String)
 
 }

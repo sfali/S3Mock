@@ -3,8 +3,11 @@ package com.loyalty.testing.s3
 import java.nio.file.{Files, Path, Paths}
 
 import akka.NotUsed
+import akka.actor.typed.Behavior
+import akka.actor.typed.scaladsl.Behaviors
+import akka.cluster.sharding.typed.ShardingEnvelope
+import akka.stream.Materializer
 import akka.stream.scaladsl.{FileIO, Sink, Source}
-import akka.stream.{IOResult, Materializer}
 import akka.util.ByteString
 import com.loyalty.testing.s3.streams.{DigestCalculator, DigestInfo}
 import com.loyalty.testing.s3.utils.StaticDateTimeProvider
@@ -52,6 +55,19 @@ package object it {
   def calculateDigest(start: Int, totalSize: Int)(implicit mat: Materializer): Future[DigestInfo] =
     createContentSource(start, totalSize)
       .via(DigestCalculator()).runWith(Sink.head)
+
+  def shardingEnvelopeWrapper[T](behavior: => Behavior[T]): Behavior[ShardingEnvelope[T]] =
+    Behaviors.receive {
+      case (ctx, envelope) =>
+        val id = envelope.entityId
+        val actorRef =
+          ctx.child(id) match {
+            case Some(value) => value.unsafeUpcast[T]
+            case None => ctx.spawn(behavior, id)
+          }
+        actorRef ! envelope.message
+        Behaviors.same
+    }
 
   val resourcePath: Path = Paths.get("src", "it", "resources")
   val defaultBucketName: String = "non-versioned-bucket"

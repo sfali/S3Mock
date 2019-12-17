@@ -8,6 +8,7 @@ import java.util.UUID
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe}
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.{FileIO, Sink}
 import com.loyalty.testing.s3._
@@ -66,42 +67,50 @@ class BucketOperationsBehaviorSpec
 
   it should "create a bucket" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
 
     actorRef ! CreateBucket(Bucket(defaultBucketName, defaultRegion, NotExists), probe.ref)
     probe.expectMessage(BucketInfo(Bucket(defaultBucketName, defaultRegion, NotExists)))
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
   it should "raise BucketAlreadyExistsException when attempt to create bucket which is already exists" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
 
     actorRef ! CreateBucket(Bucket(defaultBucketName, defaultRegion, NotExists), probe.ref)
     probe.expectMessage(BucketAlreadyExists(Bucket(defaultBucketName, defaultRegion, NotExists)))
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
   it should "create a bucket in region other than default region" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), versionedBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
 
     actorRef ! CreateBucket(Bucket(versionedBucketName, "us-west-1", NotExists), probe.ref)
     probe.expectMessage(BucketInfo(Bucket(versionedBucketName, "us-west-1", NotExists)))
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
   it should "set versioning on a bucket" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), versionedBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
 
     val configuration = VersioningConfiguration(Enabled)
     actorRef ! SetBucketVersioning(configuration, probe.ref)
     probe.expectMessage(BucketInfo(Bucket(versionedBucketName, "us-west-1", configuration.bucketVersioning)))
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -159,8 +168,9 @@ class BucketOperationsBehaviorSpec
 
   it should "create different buckets" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef1 = testKit.spawn(BucketOperationsBehavior(objectIO, database), bucket2UUID)
-    val actorRef2 = testKit.spawn(BucketOperationsBehavior(objectIO, database), bucket3UUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef1 = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), bucket2UUID)
+    val actorRef2 = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), bucket3UUID)
 
     actorRef1 ! CreateBucket(Bucket(bucket2, defaultRegion, NotExists), probe.ref)
     probe.expectMessage(BucketInfo(Bucket(bucket2, defaultRegion, NotExists)))
@@ -168,6 +178,7 @@ class BucketOperationsBehaviorSpec
     actorRef2 ! CreateBucket(Bucket(bucket3, defaultRegion, Enabled), probe.ref)
     probe.expectMessage(BucketInfo(Bucket(bucket3, defaultRegion, Enabled)))
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef1)
     testKit.stop(actorRef2)
   }
@@ -178,7 +189,8 @@ class BucketOperationsBehaviorSpec
     val contentSource = FileIO.fromPath(path)
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
 
     val objectKey = ObjectKey(
@@ -195,6 +207,7 @@ class BucketOperationsBehaviorSpec
     )
     probe.expectMessage(ObjectInfo(objectKey))
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -203,7 +216,8 @@ class BucketOperationsBehaviorSpec
     val path = resourcePath -> key
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectMetaWrapper(key, probe.ref)
 
     val expectedObjectKey = ObjectKey(
@@ -231,7 +245,8 @@ class BucketOperationsBehaviorSpec
     val contentSource = FileIO.fromPath(path)
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
 
     val objectKey = ObjectKey(
@@ -248,6 +263,7 @@ class BucketOperationsBehaviorSpec
     )
     probe.expectMessage(ObjectInfo(objectKey))
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -258,7 +274,8 @@ class BucketOperationsBehaviorSpec
     val contentSource = FileIO.fromPath(path)
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
 
     val objectKey = ObjectKey(
@@ -276,6 +293,7 @@ class BucketOperationsBehaviorSpec
     probe.expectMessage(ObjectInfo(objectKey))
 
     testKit.stop(actorRef)
+    testKit.stop(actorRef)
   }
 
   it should "put an object in the specified bucket with bucket versioning on" in {
@@ -284,7 +302,8 @@ class BucketOperationsBehaviorSpec
     val contentSource = FileIO.fromPath(path)
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), versionedBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
     actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
 
     val index = 1
@@ -311,7 +330,8 @@ class BucketOperationsBehaviorSpec
     val contentSource = FileIO.fromPath(path)
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), versionedBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
     actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
 
     val index = 2
@@ -329,6 +349,7 @@ class BucketOperationsBehaviorSpec
     )
     probe.expectMessage(ObjectInfo(objectKey))
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -350,7 +371,8 @@ class BucketOperationsBehaviorSpec
     )
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectWrapper(key, replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
@@ -359,6 +381,7 @@ class BucketOperationsBehaviorSpec
     expectedObjectKey mustEqual actualObjectKey
     expectedContent mustEqual actualContent
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -379,7 +402,8 @@ class BucketOperationsBehaviorSpec
     )
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange(0, 53)), replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
@@ -388,6 +412,7 @@ class BucketOperationsBehaviorSpec
     expectedObjectKey mustEqual actualObjectKey
     expectedContent mustEqual actualContent
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -408,7 +433,8 @@ class BucketOperationsBehaviorSpec
     )
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange(265, 318)), replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
@@ -417,6 +443,7 @@ class BucketOperationsBehaviorSpec
     expectedObjectKey mustEqual actualObjectKey
     expectedContent mustEqual actualContent
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -437,7 +464,8 @@ class BucketOperationsBehaviorSpec
     )
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange.suffix(53)), replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
@@ -446,6 +474,7 @@ class BucketOperationsBehaviorSpec
     expectedObjectKey mustEqual actualObjectKey
     expectedContent mustEqual actualContent
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -466,7 +495,8 @@ class BucketOperationsBehaviorSpec
     )
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange.fromOffset(371)), replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
@@ -475,6 +505,7 @@ class BucketOperationsBehaviorSpec
     expectedObjectKey mustEqual actualObjectKey
     expectedContent mustEqual actualContent
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -497,7 +528,8 @@ class BucketOperationsBehaviorSpec
     )
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), versionedBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
     actorRef ! GetObjectWrapper(key, replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
@@ -506,6 +538,7 @@ class BucketOperationsBehaviorSpec
     expectedObjectKey mustEqual actualObjectKey
     expectedContent mustEqual actualContent
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -528,7 +561,8 @@ class BucketOperationsBehaviorSpec
     )
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), versionedBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
     actorRef ! GetObjectWrapper(key, maybeVersionId = Some(index.toVersionId.toString), replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
@@ -537,6 +571,7 @@ class BucketOperationsBehaviorSpec
     expectedObjectKey mustEqual actualObjectKey
     expectedContent mustEqual actualContent
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -548,10 +583,12 @@ class BucketOperationsBehaviorSpec
     val key = "sample.txt"
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectWrapper(key, maybeVersionId = Some(UUID.randomUUID().toString), replyTo = probe.ref)
     probe.expectMessage(NoSuchKeyExists(defaultBucketName, key))
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -559,17 +596,17 @@ class BucketOperationsBehaviorSpec
     val key = "sample.txt"
 
     val probe = testKit.createTestProbe[Event]()
-    val sourceActorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
-    val targetActorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), bucket2UUID)
-    val actorRef = testKit.spawn(CopyBehavior(sourceActorRef, targetActorRef), UUID.randomUUID().toString)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val bucketOperationsActorRef = testKit.spawn(shardingEnvelopeWrapper(BucketOperationsBehavior(database, objectActorRef)))
+    val actorRef = testKit.spawn(CopyBehavior(bucketOperationsActorRef), UUID.randomUUID().toString)
 
     actorRef ! Copy(defaultBucketName, key, bucket2, key, None, probe.ref)
     val copyObjectInfo = probe.receiveMessage().asInstanceOf[CopyObjectInfo]
     copyObjectInfo.objectKey.eTag mustEqual etagDigest1
     copyObjectInfo.sourceVersionId mustBe empty
 
-    testKit.stop(sourceActorRef)
-    testKit.stop(targetActorRef)
+    testKit.stop(objectActorRef)
+    testKit.stop(bucketOperationsActorRef)
     testKit.stop(actorRef)
   }
 
@@ -577,7 +614,8 @@ class BucketOperationsBehaviorSpec
     val key = "big-sample.txt"
 
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
 
     actorRef ! InitiateMultiPartUploadWrapper(key, probe.ref)
     val event = probe.receiveMessage().asInstanceOf[MultiPartUploadedInitiated]
@@ -605,6 +643,7 @@ class BucketOperationsBehaviorSpec
     )
     actualObjectKey mustEqual expectedObjectKey
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -612,11 +651,11 @@ class BucketOperationsBehaviorSpec
     val key = "big-sample.txt"
 
     val probe = testKit.createTestProbe[Event]()
-    val sourceActorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
-    val targetActorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), bucket2UUID)
-    val actorRef = testKit.spawn(CopyBehavior(sourceActorRef, targetActorRef), UUID.randomUUID().toString)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val bucketOperationsActorRef = testKit.spawn(shardingEnvelopeWrapper(BucketOperationsBehavior(database, objectActorRef)))
+    val actorRef = testKit.spawn(CopyBehavior(bucketOperationsActorRef), UUID.randomUUID().toString)
 
-    targetActorRef ! InitiateMultiPartUploadWrapper(key, probe.ref)
+    bucketOperationsActorRef ! ShardingEnvelope(bucket2UUID, InitiateMultiPartUploadWrapper(key, probe.ref))
     val event = probe.receiveMessage().asInstanceOf[MultiPartUploadedInitiated]
     val uploadId = event.uploadId
     createUploadId(bucket2, NotExists, key, 0) mustEqual uploadId
@@ -644,27 +683,29 @@ class BucketOperationsBehaviorSpec
 
     val parts = PartInfo(1, partInfo1.uploadInfo.eTag) :: PartInfo(2, partInfo2.uploadInfo.eTag) ::
       PartInfo(3, partInfo3.uploadInfo.eTag) :: Nil
-    targetActorRef ! CompleteUploadWrapper(key, uploadId, parts, probe.ref)
+    bucketOperationsActorRef ! ShardingEnvelope(bucket2UUID, CompleteUploadWrapper(key, uploadId, parts, probe.ref))
     val actualObjectKey = probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey.copy(contentMd5 = "")
 
-    sourceActorRef ! GetObjectWrapper(key, replyTo = probe.ref)
+    bucketOperationsActorRef ! ShardingEnvelope(defaultBucketNameUUID, GetObjectWrapper(key, replyTo = probe.ref))
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
 
     actualObjectKey.contentLength mustEqual objectContent.objectKey.contentLength
 
-    testKit.stop(sourceActorRef)
-    testKit.stop(targetActorRef)
+    testKit.stop(objectActorRef)
+    testKit.stop(bucketOperationsActorRef)
     testKit.stop(actorRef)
   }
 
   it should "list bucket contents with default params" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
 
     actorRef ! ListBucket(replyTo = probe.ref)
     val contents = probe.receiveMessage().asInstanceOf[ListBucketContent].contents
     println(contents) // TODO: verify
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -673,11 +714,13 @@ class BucketOperationsBehaviorSpec
 
     val expected = DeleteInfo(deleteMarker = false, NotExists)
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! DeleteObjectWrapper(key, replyTo = probe.ref)
     val actual = probe.receiveMessage().asInstanceOf[DeleteInfo]
     expected mustEqual actual
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
@@ -686,11 +729,13 @@ class BucketOperationsBehaviorSpec
 
     val expected = DeleteInfo(deleteMarker = true, NotExists)
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! DeleteObjectWrapper(key, replyTo = probe.ref)
     val actual = probe.receiveMessage().asInstanceOf[DeleteInfo]
     actual mustEqual expected
 
+    testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 

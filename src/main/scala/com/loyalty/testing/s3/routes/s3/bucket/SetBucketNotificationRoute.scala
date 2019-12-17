@@ -1,37 +1,41 @@
 package com.loyalty.testing.s3.routes.s3.bucket
 
-import akka.actor.typed.ActorSystem
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes.OK
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.Sink
+import akka.stream.typed.scaladsl.ActorFlow
 import akka.util.Timeout
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.NotificationBehavior.CreateBucketNotifications
-import com.loyalty.testing.s3.actor.SpawnBehavior.Command
+import com.loyalty.testing.s3.actor.NotificationBehavior.{Command, CreateBucketNotifications}
 import com.loyalty.testing.s3.actor.model.{Event, NoSuchBucketExists, NotificationsCreated}
-import com.loyalty.testing.s3.notification.Notification
-import com.loyalty.testing.s3.repositories.NitriteDatabase
 import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
-import com.loyalty.testing.s3.service.NotificationService
 
 import scala.util.{Failure, Success}
 
 object SetBucketNotificationRoute extends CustomMarshallers {
   def apply(bucketName: String,
-            database: NitriteDatabase,
-            notificationService: NotificationService)
-           (implicit system: ActorSystem[Command],
+            notificationActorRef: ActorRef[ShardingEnvelope[Command]])
+           (implicit system: ActorSystem[_],
             timeout: Timeout): Route =
     (put & extractRequest & parameter("notification")) {
       (request, _) =>
-        import system.executionContext
-
         val eventualEvent =
-          toBucketNotification(bucketName, request.entity.dataBytes)
-            .flatMap(execute(bucketName, database, notificationService))
+          extractRequestTo(request)
+            .map(s => parseNotificationConfiguration(bucketName, s))
+            .via(
+              ActorFlow.ask(notificationActorRef)(
+                (notifications, replyTo: ActorRef[Event]) =>
+                  ShardingEnvelope(
+                    bucketName.toUUID.toString, CreateBucketNotifications(notifications, replyTo)
+                  )
+              )
+            ).runWith(Sink.head)
         onComplete(eventualEvent) {
           case Success(NotificationsCreated) => complete(HttpResponse(OK))
           case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
@@ -43,17 +47,4 @@ object SetBucketNotificationRoute extends CustomMarshallers {
             complete(InternalServiceException(bucketName))
         }
     }
-
-  private def execute(bucketName: String,
-                      database: NitriteDatabase,
-                      notificationService: NotificationService)
-                     (notifications: List[Notification])
-                     (implicit system: ActorSystem[Command],
-                      timeout: Timeout) = {
-    import system.executionContext
-    for {
-      actorRef <- spawnNotificationBehavior(bucketName, database, notificationService)
-      event <- askNotificationBehavior(actorRef, replyTo => CreateBucketNotifications(notifications, replyTo))
-    } yield event
-  }
 }

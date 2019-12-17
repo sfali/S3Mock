@@ -1,15 +1,17 @@
 package com.loyalty.testing.s3.routes.s3.`object`
 
-import akka.actor.typed.ActorSystem
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes.OK
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.typed.scaladsl.ActorFlow
 import akka.util.Timeout
-import com.loyalty.testing.s3.actor.SpawnBehavior.Command
-import com.loyalty.testing.s3.actor.model.{InvalidAccess, NoSuchBucketExists, ObjectInfo}
-import com.loyalty.testing.s3.actor.model.bucket.PutObjectWrapper
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
+import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.actor.model.bucket.{Command, PutObjectWrapper}
+import com.loyalty.testing.s3.actor.model.{Event, InvalidAccess, NoSuchBucketExists, ObjectInfo}
 import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
@@ -20,19 +22,19 @@ object PutObjectRoute extends CustomMarshallers {
 
   def apply(bucketName: String,
             key: String,
-            objectIO: ObjectIO,
-            database: NitriteDatabase)
-           (implicit system: ActorSystem[Command],
+            bucketOperationsActorRef: ActorRef[ShardingEnvelope[Command]])
+           (implicit system: ActorSystem[_],
             timeout: Timeout): Route =
     extractRequest { request =>
-      import system.executionContext
-
       val eventualEvent =
-        for {
-          actorRef <- spawnBucketBehavior(bucketName, objectIO, database)
-          event <- askBucketBehavior(actorRef, replyTo => PutObjectWrapper(key, request.entity.dataBytes, replyTo))
-        } yield event
-
+        Source
+          .single("")
+          .via(
+            ActorFlow.ask(bucketOperationsActorRef)(
+              (_, replyTo: ActorRef[Event]) =>
+                ShardingEnvelope(bucketName.toUUID.toString, PutObjectWrapper(key, request.entity.dataBytes, replyTo))
+            )
+          ).runWith(Sink.head)
       onComplete(eventualEvent) {
         case Success(ObjectInfo(objectKey)) => complete(HttpResponse(OK).withHeaders(createResponseHeaders(objectKey)))
         case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))

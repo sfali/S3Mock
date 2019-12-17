@@ -1,13 +1,15 @@
 package com.loyalty.testing.s3.routes.s3.`object`
 
-import akka.actor.typed.ActorSystem
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.Sink
+import akka.stream.typed.scaladsl.ActorFlow
 import akka.util.Timeout
-import com.loyalty.testing.s3.actor.SpawnBehavior.Command
-import com.loyalty.testing.s3.actor.model.bucket.CompleteUploadWrapper
+import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model._
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
+import com.loyalty.testing.s3.actor.model.bucket.{Command, CompleteUploadWrapper}
 import com.loyalty.testing.s3.request.CompleteMultipartUpload
 import com.loyalty.testing.s3.response._
 import com.loyalty.testing.s3.routes.CustomMarshallers
@@ -19,16 +21,22 @@ object CompleteUploadRoute extends CustomMarshallers {
 
   def apply(bucketName: String,
             key: String,
-            objectIO: ObjectIO,
-            database: NitriteDatabase)
-           (implicit system: ActorSystem[Command],
+            bucketOperationsActorRef: ActorRef[ShardingEnvelope[Command]])
+           (implicit system: ActorSystem[_],
             timeout: Timeout): Route =
     (extractRequest & parameter("uploadId")) { (request, uploadId) =>
-      import system.executionContext
       val eventualEvent =
         extractRequestTo(request)
+          .map(Option.apply)
           .map(CompleteMultipartUpload.apply)
-          .flatMap(execute(bucketName, key, uploadId, objectIO, database))
+          .via(
+            ActorFlow.ask(bucketOperationsActorRef)(
+              (maybeCompleteMultipartUpload, replyTo: ActorRef[Event]) => {
+                val parts = maybeCompleteMultipartUpload.map(_.parts).getOrElse(Nil)
+                ShardingEnvelope(bucketName.toUUID.toString, CompleteUploadWrapper(key, uploadId, parts, replyTo))
+              }
+            )
+          ).runWith(Sink.head)
       onComplete(eventualEvent) {
         case Success(ObjectInfo(objectKey)) =>
           val result = CompleteMultipartUploadResult(bucketName, key, objectKey.eTag, objectKey.contentLength,
@@ -49,21 +57,4 @@ object CompleteUploadRoute extends CustomMarshallers {
           complete(InternalServiceException(s"$bucketName/$key"))
       }
     }
-
-  private def execute(bucketName: String,
-                      key: String,
-                      uploadId: String,
-                      objectIO: ObjectIO,
-                      database: NitriteDatabase)
-                     (maybeCompleteMultipartUpload: Option[CompleteMultipartUpload])
-                     (implicit system: ActorSystem[Command],
-                      timeout: Timeout) = {
-    import system.executionContext
-    val parts = maybeCompleteMultipartUpload.map(_.parts).getOrElse(Nil)
-    // system.log.info("Setting bucket versioning: {} on bucket: {}", maybeVersioningConfiguration, bucketName)
-    for {
-      actorRef <- spawnBucketBehavior(bucketName, objectIO, database)
-      event <- askBucketBehavior(actorRef, replyTo => CompleteUploadWrapper(key, uploadId, parts, replyTo))
-    } yield event
-  }
 }

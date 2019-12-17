@@ -23,6 +23,8 @@ object Dependencies {
     val AkkaActorTyped = "akka-actor-typed"
     val AkkaStreams = "akka-stream"
     val AkkaStreamsTyped = "akka-stream-typed"
+    val AkkaClusterShardingTyed = "akka-cluster-sharding-typed"
+    val AkkaRemote = "akka-remote"
     val AkkaHttp = "akka-http"
     val AkkaHttpXml = "akka-http-xml"
     val AkkaHttpTestKit = "akka-http-testkit"
@@ -81,15 +83,17 @@ object Dependencies {
     Akka            %% AkkaActorTyped               % AkkaVersion,
     Akka            %% AkkaStreams                  % AkkaVersion,
     Akka            %% AkkaStreamsTyped             % AkkaVersion,
+    Akka            %% AkkaClusterShardingTyed      % AkkaVersion,
+    Akka            %% AkkaRemote                   % AkkaVersion,
     Akka            %% AkkaSl4j                     % AkkaVersion,
     Logback         %  LogbackClassic               % LogbackVersion,
     CodehausGroovy  %  Groovy                       % GroovyVersion
   )
 
   val AkkaTest: Seq[ModuleID] = Seq(
-    Akka            %% ActorTestKit                 % AkkaVersion                 % Test,
-    Akka            %% ActorTypedTestKit            % AkkaVersion                 % Test,
-    Akka            %% AkkaStreamsTestKit           % AkkaVersion                 % Test
+    Akka            %% ActorTestKit                 % AkkaVersion                 % "test, it",
+    Akka            %% ActorTypedTestKit            % AkkaVersion                 % "test, it",
+    Akka            %% AkkaStreamsTestKit           % AkkaVersion                 % "test, it"
   )
 
   val AkkaHttps: Seq[ModuleID] = Seq(

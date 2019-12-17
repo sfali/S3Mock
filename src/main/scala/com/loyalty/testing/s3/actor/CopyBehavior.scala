@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.headers.ByteRange
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.CopyBehavior.Command
@@ -13,8 +14,7 @@ import com.loyalty.testing.s3.actor.model.bucket.{GetObjectWrapper, PutObjectWra
 import scala.concurrent.duration._
 
 class CopyBehavior(context: ActorContext[Command],
-                   sourceActorRef: ActorRef[BucketCommand],
-                   targetActorRef: ActorRef[BucketCommand])
+                   bucketOperationsActorRef: ActorRef[ShardingEnvelope[BucketCommand]])
   extends AbstractBehavior[Command](context) {
 
   import CopyBehavior._
@@ -28,8 +28,7 @@ class CopyBehavior(context: ActorContext[Command],
           "Copy object: source_bucket_name={}, source_key={},  target_bucket_name={}, target_key={}",
           sourceBucketName, sourceKey, targetBucketName, targetKey)
         val behavior = copyOperationBehavior(
-          sourceActorRef,
-          targetActorRef,
+          bucketOperationsActorRef,
           S3Location(sourceBucketName, sourceKey),
           S3Location(targetBucketName, targetKey),
           None,
@@ -47,8 +46,7 @@ class CopyBehavior(context: ActorContext[Command],
           "Copy part: source_bucket_name={}, source_key={},  target_bucket_name={}, target_key={}",
           sourceBucketName, sourceKey, targetBucketName, targetKey)
         val behavior = copyOperationBehavior(
-          sourceActorRef,
-          targetActorRef,
+          bucketOperationsActorRef,
           S3Location(sourceBucketName, sourceKey),
           S3Location(targetBucketName, targetKey),
           Some(PartInfo(uploadId, partNumber)),
@@ -70,9 +68,8 @@ class CopyBehavior(context: ActorContext[Command],
 
 object CopyBehavior {
 
-  def apply(sourceActorRef: ActorRef[BucketCommand],
-            targetActorRef: ActorRef[BucketCommand]): Behavior[Command] =
-    Behaviors.setup[Command](context => new CopyBehavior(context, sourceActorRef, targetActorRef))
+  def apply(bucketOperationsActorRef: ActorRef[ShardingEnvelope[BucketCommand]]): Behavior[Command] =
+    Behaviors.setup[Command](context => new CopyBehavior(context, bucketOperationsActorRef))
 
   sealed trait Command
 
@@ -105,8 +102,7 @@ object CopyBehavior {
 
   private case class PartInfo(uploadId: String, partNumber: Int)
 
-  private def copyOperationBehavior(sourceActorRef: ActorRef[BucketCommand],
-                                    targetActorRef: ActorRef[BucketCommand],
+  private def copyOperationBehavior(bucketOperationsActorRef: ActorRef[ShardingEnvelope[BucketCommand]],
                                     source: S3Location,
                                     target: S3Location,
                                     partInfo: Option[PartInfo],
@@ -121,7 +117,8 @@ object CopyBehavior {
 
       Behaviors.receiveMessagePartial {
         case GetObject =>
-          sourceActorRef ! GetObjectWrapper(source.key, maybeSourceVersionId, maybeRange, eventResponseWrapper)
+          bucketOperationsActorRef ! ShardingEnvelope(source.bucketName.toUUID.toString,
+            GetObjectWrapper(source.key, maybeSourceVersionId, maybeRange, eventResponseWrapper))
           Behaviors.same
 
         case EventWrapper(ObjectContent(objectKey, content)) if partInfo.isDefined =>
@@ -132,7 +129,8 @@ object CopyBehavior {
             """Copy part: Got source content: source_bucket_name={}, source_key={},  target_bucket_name={},
               | target_key={}, source_version_id={}, upload_id={}, part_number={}""".stripMargin.replaceNewLine,
             source.bucketName, source.key, target.bucketName, target.key, sourceVersionId, uploadId, partNumber)
-          targetActorRef ! UploadPartWrapper(target.key, uploadId, partNumber, content, eventResponseWrapper)
+          bucketOperationsActorRef ! ShardingEnvelope(target.bucketName.toUUID.toString,
+            UploadPartWrapper(target.key, uploadId, partNumber, content, eventResponseWrapper))
           Behaviors.same
 
         case EventWrapper(ObjectContent(objectKey, content)) =>
@@ -141,7 +139,8 @@ object CopyBehavior {
             """Copy object: Got source content: source_bucket_name={}, source_key={},  target_bucket_name={},
               | target_key={}, source_version_id={}, range={}""".stripMargin.replaceNewLine, source.bucketName, source.key,
             target.bucketName, target.key, sourceVersionId, maybeRange)
-          targetActorRef ! PutObjectWrapper(target.key, content, eventResponseWrapper)
+          bucketOperationsActorRef ! ShardingEnvelope(target.bucketName.toUUID.toString,
+            PutObjectWrapper(target.key, content, eventResponseWrapper))
           Behaviors.same
 
         case EventWrapper(PartUploaded(uploadInfo)) =>

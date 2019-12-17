@@ -1,17 +1,19 @@
 package com.loyalty.testing.s3.routes.s3.bucket
 
-import akka.actor.typed.ActorSystem
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes.OK
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.Sink
+import akka.stream.typed.scaladsl.ActorFlow
 import akka.util.Timeout
-import com.loyalty.testing.s3.actor.SpawnBehavior.Command
+import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.actor.model.bucket.{Command, CreateBucket}
 import com.loyalty.testing.s3.actor.model.{BucketAlreadyExists, BucketInfo, Event}
-import com.loyalty.testing.s3.actor.model.bucket.CreateBucket
 import com.loyalty.testing.s3.repositories.model.Bucket
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.{BucketVersioning, CreateBucketConfiguration}
 import com.loyalty.testing.s3.response.{BucketAlreadyExistsException, InternalServiceException}
 import com.loyalty.testing.s3.routes.CustomMarshallers
@@ -21,13 +23,10 @@ import scala.util.{Failure, Success}
 
 object CreateBucketRoute extends CustomMarshallers {
   def apply(bucketName: String,
-            objectIO: ObjectIO,
-            database: NitriteDatabase)
-           (implicit system: ActorSystem[Command],
+            bucketOperationsActorRef: ActorRef[ShardingEnvelope[Command]])
+           (implicit system: ActorSystem[_],
             timeout: Timeout): Route =
     (put & extractRequest) { request =>
-      import system.executionContext
-
       val eventualEvent =
         extractRequestTo(request)
           .map(CreateBucketConfiguration.apply)
@@ -36,7 +35,12 @@ object CreateBucketRoute extends CustomMarshallers {
               system.log.info("Got request to create bucket {} with bucket configuration {}", bucketName, bucketConfiguration)
               Bucket(bucketName, bucketConfiguration, BucketVersioning.NotExists)
           }
-          .flatMap(execute(objectIO, database))
+          .via(
+            ActorFlow.ask(bucketOperationsActorRef)(
+              (bucket, replyTo: ActorRef[Event]) =>
+                ShardingEnvelope(bucket.bucketName.toUUID.toString, CreateBucket(bucket, replyTo))
+            )
+          ).runWith(Sink.head)
 
       onComplete(eventualEvent) {
         case Success(BucketInfo(bucket)) =>
@@ -50,17 +54,4 @@ object CreateBucketRoute extends CustomMarshallers {
           complete(InternalServiceException(bucketName))
       }
     }
-
-  private def execute(objectIO: ObjectIO,
-                      database: NitriteDatabase)
-                     (bucket: Bucket)
-                     (implicit system: ActorSystem[Command],
-                      timeout: Timeout) = {
-    import system.executionContext
-    for {
-      actorRef <- spawnBucketBehavior(bucket.bucketName, objectIO, database)
-      event <- askBucketBehavior(actorRef, replyTo => CreateBucket(bucket, replyTo))
-    } yield event
-  }
-
 }

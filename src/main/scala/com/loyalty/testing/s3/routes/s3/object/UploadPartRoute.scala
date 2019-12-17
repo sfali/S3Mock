@@ -1,15 +1,17 @@
 package com.loyalty.testing.s3.routes.s3.`object`
 
-import akka.actor.typed.ActorSystem
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes.OK
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.typed.scaladsl.ActorFlow
 import akka.util.Timeout
-import com.loyalty.testing.s3.actor.SpawnBehavior.Command
-import com.loyalty.testing.s3.actor.model.bucket.UploadPartWrapper
-import com.loyalty.testing.s3.actor.model.{InvalidAccess, NoSuchBucketExists, NoSuchUpload, PartUploaded}
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
+import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.actor.model.bucket.{Command, UploadPartWrapper}
+import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException, NoSuchUploadException}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
@@ -20,19 +22,21 @@ object UploadPartRoute extends CustomMarshallers {
 
   def apply(bucketName: String,
             key: String,
-            objectIO: ObjectIO,
-            database: NitriteDatabase)
-           (implicit system: ActorSystem[Command],
+            bucketOperationsActorRef: ActorRef[ShardingEnvelope[Command]])
+           (implicit system: ActorSystem[_],
             timeout: Timeout): Route =
     (extractRequest & parameter("partNumber".as[Int]) & parameter("uploadId")) {
       (request, partNumber, uploadId) =>
-        import system.executionContext
         val eventualEvent =
-          for {
-            actorRef <- spawnBucketBehavior(bucketName, objectIO, database)
-            event <- askBucketBehavior(actorRef, replyTo => UploadPartWrapper(key, uploadId, partNumber,
-              request.entity.dataBytes, replyTo))
-          } yield event
+          Source
+            .single("")
+            .via(
+              ActorFlow.ask(bucketOperationsActorRef)(
+                (_, replyTo: ActorRef[Event]) =>
+                  ShardingEnvelope(bucketName.toUUID.toString, UploadPartWrapper(key, uploadId, partNumber,
+                    request.entity.dataBytes, replyTo))
+              )
+            ).runWith(Sink.head)
         onComplete(eventualEvent) {
           case Success(PartUploaded(uploadInfo)) => complete(HttpResponse(OK)
             .withHeaders(createResponseHeaders(uploadInfo.toObjectKey)))

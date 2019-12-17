@@ -3,6 +3,9 @@ package com.loyalty.testing.s3
 import java.nio.file.{Path, Paths}
 
 import akka.NotUsed
+import akka.actor.typed.Behavior
+import akka.actor.typed.scaladsl.Behaviors
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Concat, Sink, Source}
 import akka.util.ByteString
@@ -39,6 +42,19 @@ package object test {
       case first :: second :: rest =>
         Source.combine(first, second, rest: _*)(Concat(_)).via(DigestCalculator()).runWith(Sink.head)
       case Nil => Future.failed(new RuntimeException("empty source"))
+    }
+
+  def shardingEnvelopeWrapper[T](behavior: => Behavior[T]): Behavior[ShardingEnvelope[T]] =
+    Behaviors.receive {
+      case (ctx, envelope) =>
+        val id = envelope.entityId
+        val actorRef =
+          ctx.child(id) match {
+            case Some(value) => value.unsafeUpcast[T]
+            case None => ctx.spawn(behavior, id)
+          }
+        actorRef ! envelope.message
+        Behaviors.same
     }
 
   val userDir: String = System.getProperty("user.dir")

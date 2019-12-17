@@ -1,16 +1,18 @@
 package com.loyalty.testing.s3.routes.s3.bucket
 
-import akka.actor.typed.ActorSystem
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.StatusCodes.OK
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.Sink
+import akka.stream.typed.scaladsl.ActorFlow
 import akka.util.Timeout
-import com.loyalty.testing.s3.actor.SpawnBehavior.Command
+import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.actor.model.bucket.{Command, SetBucketVersioning}
 import com.loyalty.testing.s3.actor.model.{BucketInfo, Event, NoSuchBucketExists}
-import com.loyalty.testing.s3.actor.model.bucket.SetBucketVersioning
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.VersioningConfiguration
 import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException}
 import com.loyalty.testing.s3.routes.CustomMarshallers
@@ -20,18 +22,22 @@ import scala.util.{Failure, Success}
 
 object SetBucketVersioningRoute extends CustomMarshallers {
   def apply(bucketName: String,
-            objectIO: ObjectIO,
-            database: NitriteDatabase)
-           (implicit system: ActorSystem[Command],
+            bucketOperationsActorRef: ActorRef[ShardingEnvelope[Command]])
+           (implicit system: ActorSystem[_],
             timeout: Timeout): Route =
     (put & extractRequest & parameter("versioning")) {
       (request, _) =>
-        import system.executionContext
-
         val eventualEvent =
           extractRequestTo(request)
+            .map(Option.apply)
             .map(VersioningConfiguration.apply)
-            .flatMap(execute(bucketName, objectIO, database))
+            .via(
+              ActorFlow.ask(bucketOperationsActorRef)(
+                (maybeVersioningConfiguration, replyTo: ActorRef[Event]) =>
+                  ShardingEnvelope(bucketName.toUUID.toString, SetBucketVersioning(maybeVersioningConfiguration.get,
+                    replyTo))
+              )
+            ).runWith(Sink.head)
         onComplete(eventualEvent) {
           case Success(BucketInfo(bucket)) =>
             complete(HttpResponse(OK).withHeaders(Location(s"/${bucket.bucketName}")))
@@ -44,21 +50,4 @@ object SetBucketVersioningRoute extends CustomMarshallers {
             complete(InternalServiceException(bucketName))
         }
     }
-
-  private def execute(bucketName: String,
-                      objectIO: ObjectIO,
-                      database: NitriteDatabase)
-                     (maybeVersioningConfiguration: Option[VersioningConfiguration])
-                     (implicit system: ActorSystem[Command],
-                      timeout: Timeout) = {
-    import system.executionContext
-
-    system.log.info("Setting bucket versioning: {} on bucket: {}", maybeVersioningConfiguration, bucketName)
-    for {
-      actorRef <- spawnBucketBehavior(bucketName, objectIO, database)
-      event <- askBucketBehavior(actorRef, replyTo => SetBucketVersioning(maybeVersioningConfiguration.get,
-        replyTo))
-    } yield event
-  }
-
 }

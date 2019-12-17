@@ -5,13 +5,16 @@ import java.time.{Instant, OffsetDateTime}
 import java.util.concurrent.CompletionException
 
 import akka.Done
+import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.scaladsl.adapter._
-import akka.actor.typed.ActorSystem
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.alpakka.s3.{S3Exception => AlpakkaS3Exception}
 import akka.stream.scaladsl.{FileIO, Sink}
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.SpawnBehavior
+import com.loyalty.testing.s3.actor.model.bucket
+import com.loyalty.testing.s3.actor.{BucketOperationsBehavior, CopyBehavior, NotificationBehavior, ObjectOperationsBehavior}
 import com.loyalty.testing.s3.it.client.S3Client
 import com.loyalty.testing.s3.repositories._
 import com.loyalty.testing.s3.repositories.model.Bucket
@@ -41,8 +44,8 @@ abstract class S3IntegrationSpec(rootPath: Path,
   import S3IntegrationSpec._
 
   private val config = ConfigFactory.load(resourceBasename)
-  protected implicit val system: ActorSystem[SpawnBehavior.Command] = ActorSystem(SpawnBehavior(),
-    config.getString("app.name"), config)
+  private val testKit = ActorTestKit("it-test", config)
+  protected implicit val system: ActorSystem[_] = testKit.system
   protected implicit val settings: ITSettings = ITSettings(system.settings.config)
   private implicit val ec: ExecutionContextExecutor = system.executionContext
   private implicit val defaultPatience: PatienceConfig = PatienceConfig(timeout = Span(15, Seconds),
@@ -50,7 +53,15 @@ abstract class S3IntegrationSpec(rootPath: Path,
   private val objectIO = ObjectIO(rootPath, FileStream())
   private lazy val database = NitriteDatabase(rootPath)
   private val notificationService: NotificationService = NotificationService(settings.awsSettings)(system.toClassic)
-  private val httpServer = HttpServer(objectIO, database, notificationService)
+
+  private val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+  private val bucketOperationsActorRef: ActorRef[ShardingEnvelope[bucket.Command]] =
+    testKit.spawn(shardingEnvelopeWrapper(BucketOperationsBehavior(database, objectActorRef)))
+  private val copyActorRef: ActorRef[ShardingEnvelope[CopyBehavior.Command]] =
+    testKit.spawn(shardingEnvelopeWrapper(CopyBehavior(bucketOperationsActorRef)))
+  private val notificationActorRef: ActorRef[ShardingEnvelope[NotificationBehavior.Command]] =
+    testKit.spawn(shardingEnvelopeWrapper(NotificationBehavior(database, notificationService)))
+  private val httpServer = HttpServer(database, bucketOperationsActorRef, copyActorRef, notificationActorRef)
   protected val s3Client: S3Client
 
   override protected def beforeAll(): Unit = {
