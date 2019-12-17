@@ -9,6 +9,7 @@ import com.loyalty.testing.s3.actor.SpawnBehavior.Command
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.routes.s3.`object`._
 import com.loyalty.testing.s3.routes.s3.bucket.{CreateBucketRoute, ListBucketRoute, SetBucketNotificationRoute, SetBucketVersioningRoute}
+import com.loyalty.testing.s3.service.NotificationService
 
 trait Routes {
 
@@ -16,6 +17,7 @@ trait Routes {
   protected implicit val spawnSystem: ActorSystem[Command]
   protected val objectIO: ObjectIO
   protected val database: NitriteDatabase
+  protected val notificationService: NotificationService
 
   lazy val routes: Route =
     pathPrefix(Segment) {
@@ -23,7 +25,7 @@ trait Routes {
         val bucketRoutes =
           concat(
             SetBucketVersioningRoute(bucketName, objectIO, database),
-            SetBucketNotificationRoute(bucketName, objectIO, database),
+            SetBucketNotificationRoute(bucketName, database, notificationService),
             CreateBucketRoute(bucketName, objectIO, database),
             ListBucketRoute(bucketName, objectIO, database)
           )

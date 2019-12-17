@@ -17,6 +17,7 @@ import com.loyalty.testing.s3.actor.SpawnBehavior.Command
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.response._
 import com.loyalty.testing.s3.routes.{CustomMarshallers, Routes}
+import com.loyalty.testing.s3.service.NotificationService
 import com.loyalty.testing.s3.streams.FileStream
 import com.loyalty.testing.s3.test._
 import org.scalatest.BeforeAndAfterAll
@@ -43,6 +44,7 @@ class RoutesSpec
   private val settings = AppSettings(spawnSystem.settings.config)
   protected override val objectIO: ObjectIO = ObjectIO(rootPath, FileStream())
   protected override val database: NitriteDatabase = NitriteDatabase(rootPath, settings.dbSettings)
+  override protected val notificationService: NotificationService = NotificationService(settings.awsSettings)
   private val xmlContentType = ContentType(MediaTypes.`application/xml`, HttpCharsets.`UTF-8`)
 
   override protected def beforeAll(): Unit = {
@@ -101,7 +103,7 @@ class RoutesSpec
 
   it should "set bucket notifications" in {
     val xml =
-     """<NotificationConfiguration>
+      """<NotificationConfiguration>
         |<QueueConfiguration>
         |<Id>queue-notification</Id>
         |<Filter>

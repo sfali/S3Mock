@@ -5,14 +5,13 @@ import java.util.UUID
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
 import akka.actor.typed.{ActorRef, Behavior}
 import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.actor.model.`object`.{CompleteUpload, DeleteObject, GetObject, GetObjectMeta, InitiateMultiPartUpload, PutObject, UploadPart, Command => ObjectCommand}
 import com.loyalty.testing.s3.actor.model.bucket._
-import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.repositories.collections.NoSuckBucketException
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
@@ -22,7 +21,6 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
                                        database: NitriteDatabase)
   extends AbstractBehavior[Command](context) {
 
-  private implicit val ec: ExecutionContext = context.system.executionContext
   private val bucketId = UUID.fromString(context.self.path.name)
   context.setReceiveTimeout(5.minutes, Shutdown)
   context.self ! InitializeSnapshot
@@ -108,32 +106,8 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         context.self ! ReplyToSender(BucketInfo(updatedBucket), replyTo)
         bucketOperation(updatedBucket)
 
-      case CreateBucketNotifications(notifications, replyTo) =>
-        val maybeBucketName = notifications.headOption.map(_.bucketName)
-        if (maybeBucketName.nonEmpty)
-          context.log.info("Setting bucket notifications, notification={}, bucket_name={}", notifications,
-            maybeBucketName.get)
-        context.pipeToSelf(database.setBucketNotifications(notifications)) {
-          case Failure(ex) =>
-            context.log.error(s"unable to create bucket notifications: $bucket", ex)
-            // TODO: reply properly
-            Shutdown
-          case Success(_) => ReplyToSender(NotificationsCreated, replyTo)
-        }
-        Behaviors.same
-
       case GetBucket(replyTo) =>
         context.self ! ReplyToSender(BucketInfo(bucket), replyTo)
-        Behaviors.same
-
-      case GetBucketNotifications(replyTo) =>
-        context.pipeToSelf(database.getBucketNotifications(bucket.bucketName)) {
-          case Failure(ex) =>
-            context.log.error(s"unable to create bucket notifications: $bucket", ex)
-            // TODO: reply properly
-            Shutdown
-          case Success(notifications) => ReplyToSender(NotificationsInfo(notifications), replyTo)
-        }
         Behaviors.same
 
       case ListBucket(params, replyTo) =>

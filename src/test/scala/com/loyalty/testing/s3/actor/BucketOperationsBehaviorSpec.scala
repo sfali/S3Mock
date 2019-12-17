@@ -1,21 +1,25 @@
 package com.loyalty.testing.s3.actor
 
+import java.net.URI
 import java.nio.file._
 import java.time.OffsetDateTime
 import java.util.UUID
 
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe}
+import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.{FileIO, Sink}
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.CopyBehavior.{Copy, CopyPart}
-import com.loyalty.testing.s3.actor.model.{BucketAlreadyExists, BucketInfo, CopyObjectInfo, CopyPartInfo, DeleteInfo, Event, ListBucketContent, MultiPartUploadedInitiated, NoSuchBucketExists, NoSuchKeyExists, NotificationsCreated, NotificationsInfo, ObjectContent, ObjectInfo, PartUploaded}
+import com.loyalty.testing.s3.actor.NotificationBehavior.{CreateBucketNotifications, GetBucketNotifications}
+import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.actor.model.bucket._
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, NonVersionId, ObjectIO}
 import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo, VersioningConfiguration}
+import com.loyalty.testing.s3.service.NotificationService
 import com.loyalty.testing.s3.streams.FileStream
 import com.loyalty.testing.s3.test._
 import org.scalatest.BeforeAndAfterAll
@@ -23,6 +27,8 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Millis, Seconds, Span}
+import software.amazon.awssdk.auth.credentials.{AnonymousCredentialsProvider, AwsCredentialsProvider}
+import software.amazon.awssdk.regions.Region
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -42,6 +48,7 @@ class BucketOperationsBehaviorSpec
   private implicit val defaultPatience: PatienceConfig = PatienceConfig(timeout = Span(15, Seconds),
     interval = Span(500, Millis))
 
+  private val notificationService = NotificationService(awsSettings)(system.toClassic)
   private val objectIO = ObjectIO(rootPath, FileStream())
   private val database = NitriteDatabase(rootPath, dBSettings)
 
@@ -101,7 +108,7 @@ class BucketOperationsBehaviorSpec
   it should "set bucket notifications" in {
     val probe = testKit.createTestProbe[Event]()
     val bucketName = defaultBucketName
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), defaultBucketNameUUID)
+    val actorRef = testKit.spawn(NotificationBehavior(database, notificationService), defaultBucketNameUUID)
 
     val notification1 = Notification(
       name = "queue-notification",
@@ -132,7 +139,7 @@ class BucketOperationsBehaviorSpec
 
   it should "fail set bucket notification for non-existing bucket" in {
     val probe = testKit.createTestProbe[Event]()
-    val actorRef = testKit.spawn(BucketOperationsBehavior(objectIO, database), nonExistentBucketUUID)
+    val actorRef = testKit.spawn(NotificationBehavior(database, notificationService), nonExistentBucketUUID)
 
     val notification = Notification(
       name = "queue-notification",
@@ -733,5 +740,12 @@ class BucketOperationsBehaviorSpec
 object BucketOperationsBehaviorSpec {
   private val dBSettings: DBSettings = new DBSettings {
     override val fileName: String = "s3mock.db"
+  }
+  private val awsSettings: AwsSettings = new AwsSettings {
+    override val region: Region = Region.US_EAST_1
+    override val credentialsProvider: AwsCredentialsProvider = AnonymousCredentialsProvider.create()
+    override val sqsEndPoint: Option[URI] = None
+    override val s3EndPoint: Option[URI] = None
+    override val snsEndPoint: Option[URI] = None
   }
 }

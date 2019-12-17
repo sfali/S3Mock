@@ -69,8 +69,8 @@ class NitriteDatabase(rootPath: Path,
   def setBucketNotifications(notifications: List[Notification]): Future[Int] =
     Future.successful(notificationCollection.createNotifications(notifications))
 
-  def getBucketNotifications(bucketName: String): Future[List[Notification]] =
-    Future.successful(notificationCollection.findNotifications(bucketName))
+  def getBucketNotifications(bucketName: String): List[Notification] =
+    notificationCollection.findNotifications(bucketName)
 
   def getAllObjects(objectId: UUID): Future[List[ObjectKey]] =
     Future.successful(objectCollection.findAll(objectId))
@@ -109,6 +109,10 @@ class NitriteDatabase(rootPath: Path,
       case Failure(ex) => Future.failed(ex)
       case Success(_) => Future.successful(Done)
     }
+
+  def findNotifications(bucketName: String): List[Notification] = notificationCollection.findNotifications(bucketName)
+
+  def deleteNotifications(bucketName: String): Int = notificationCollection.deleteNotifications(bucketName)
 
   def close(): Unit = db.close()
 

@@ -11,12 +11,14 @@ import akka.stream.scaladsl.Sink
 import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.SpawnBehavior.{Spawn, Command => SpawnCommand}
-import com.loyalty.testing.s3.actor.model.bucket.Command
-import com.loyalty.testing.s3.actor.{BucketOperationsBehavior, CopyBehavior}
+import com.loyalty.testing.s3.actor.model.bucket.{Command => BucketCommand}
+import com.loyalty.testing.s3.actor.{BucketOperationsBehavior, CopyBehavior, NotificationBehavior}
+import com.loyalty.testing.s3.actor.NotificationBehavior.{Command => NotificationCommand}
 import com.loyalty.testing.s3.actor.CopyBehavior.{Command => CopyCommand}
 import com.loyalty.testing.s3.actor.model.Event
 import com.loyalty.testing.s3.repositories.model.ObjectKey
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
+import com.loyalty.testing.s3.service.NotificationService
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
@@ -27,12 +29,12 @@ package object s3 {
                           objectIO: ObjectIO,
                           database: NitriteDatabase)
                          (implicit system: ActorSystem[SpawnCommand],
-                          timeout: Timeout): Future[ActorRef[Command]] =
-    system.ask[ActorRef[Command]](Spawn(BucketOperationsBehavior(objectIO, database),
+                          timeout: Timeout): Future[ActorRef[BucketCommand]] =
+    system.ask[ActorRef[BucketCommand]](Spawn(BucketOperationsBehavior(objectIO, database),
       bucketName.toUUID.toString, _))
 
-  def askBucketBehavior(actorRef: ActorRef[Command],
-                        toProtocol: ActorRef[Event] => Command)
+  def askBucketBehavior(actorRef: ActorRef[BucketCommand],
+                        toProtocol: ActorRef[Event] => BucketCommand)
                        (implicit system: ActorSystem[SpawnCommand],
                         timeout: Timeout): Future[Event] = actorRef.ask[Event](toProtocol)
 
@@ -53,11 +55,23 @@ package object s3 {
     } yield actorRef
   }
 
-
   def askCopyActor(actorRef: ActorRef[CopyCommand],
                    toProtocol: ActorRef[Event] => CopyCommand)
                   (implicit system: ActorSystem[SpawnCommand],
                    timeout: Timeout): Future[Event] = actorRef.ask[Event](toProtocol)
+
+  def spawnNotificationBehavior(bucketName: String,
+                                database: NitriteDatabase,
+                                notificationService: NotificationService)
+                               (implicit system: ActorSystem[SpawnCommand],
+                                timeout: Timeout): Future[ActorRef[NotificationCommand]] =
+    system.ask[ActorRef[NotificationCommand]](Spawn(NotificationBehavior(database, notificationService),
+      bucketName.toUUID.toString, _))
+
+  def askNotificationBehavior(actorRef: ActorRef[NotificationCommand],
+                              toProtocol: ActorRef[Event] => NotificationCommand)
+                             (implicit system: ActorSystem[SpawnCommand],
+                              timeout: Timeout): Future[Event] = actorRef.ask[Event](toProtocol)
 
   def createResponseHeaders(objectKey: ObjectKey): List[RawHeader] = {
     val headers = ListBuffer[RawHeader]()

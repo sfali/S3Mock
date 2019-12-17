@@ -3,7 +3,7 @@ package com.loyalty.testing.s3.repositories.collections
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories._
 import org.dizitart.no2._
-import org.dizitart.no2.filters.Filters.{eq => feq, _}
+import org.dizitart.no2.filters.Filters.{eq => feq}
 
 class NotificationCollection(db: Nitrite) {
 
@@ -34,26 +34,11 @@ class NotificationCollection(db: Nitrite) {
     } else 0
   }
 
-  def findNotifications(bucketName: String): List[Notification] = findByBucketName(bucketName).map(_.toNotification)
+  private[repositories] def findNotifications(bucketName: String): List[Notification] =
+    collection.find(bucketNameFilter(bucketName)).toScalaList.map(_.toNotification)
 
-  def findNotification(bucketName: String, notificationName: String): Option[Notification] = {
-    findByBucketNameAndNotificationName(bucketName, notificationName) match {
-      case Nil => None
-      case document :: Nil => Some(document.toNotification)
-      case _ => throw new IllegalStateException(s"multiple bucket-notification pair found: $bucketName/$notificationName")
-    }
-  }
-
-  private def deleteNotifications(bucketName: String) =
+  private[repositories] def deleteNotifications(bucketName: String): Int =
     collection.remove(bucketNameFilter(bucketName)).getAffectedCount
-
-  private def findByBucketName(bucketName: String) =
-    collection.find(bucketNameFilter(bucketName)).toScalaList
-
-  private def findByBucketNameAndNotificationName(bucketName: String,
-                                                  notificationName: String) =
-    collection.find(and(bucketNameFilter(bucketName),
-      feq(NotificationNameField, notificationName))).toScalaList
 
   private lazy val bucketNameFilter: String => Filter = bucketName => feq(BucketNameField, bucketName)
 }

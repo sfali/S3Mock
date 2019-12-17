@@ -9,6 +9,7 @@ import akka.util.Timeout
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.routes.Routes
+import com.loyalty.testing.s3.service.NotificationService
 import com.loyalty.testing.s3.settings.Settings
 
 import scala.concurrent.duration._
@@ -16,7 +17,8 @@ import scala.util.Try
 
 class HttpServer(settings: HttpSettings,
                  override protected val objectIO: ObjectIO,
-                 override protected val database: NitriteDatabase)
+                 override protected val database: NitriteDatabase,
+                 override protected val notificationService: NotificationService)
                 (override protected implicit val spawnSystem: ActorSystem[Command])
   extends HttpApp
     with Routes {
@@ -35,8 +37,9 @@ class HttpServer(settings: HttpSettings,
 
 object HttpServer {
   def apply(objectIO: ObjectIO,
-            database: NitriteDatabase)
+            database: NitriteDatabase,
+            notificationService: NotificationService)
            (implicit spawnSystem: ActorSystem[Command],
             settings: Settings): HttpServer =
-    new HttpServer(settings.http, objectIO, database)
+    new HttpServer(settings.http, objectIO, database, notificationService)
 }

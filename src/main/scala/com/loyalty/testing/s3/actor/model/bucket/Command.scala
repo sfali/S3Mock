@@ -5,7 +5,6 @@ import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3.actor.model.Event
-import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.{ListBucketParams, PartInfo, VersioningConfiguration}
 
@@ -40,13 +39,8 @@ final case class GetBucket(replyTo: ActorRef[Event]) extends CommandWithReply
 final case class ListBucket(params: ListBucketParams = ListBucketParams(),
                             replyTo: ActorRef[Event]) extends CommandWithReply
 
-final case class GetBucketNotifications(replyTo: ActorRef[Event]) extends CommandWithReply
-
 final case class SetBucketVersioning(versioningConfiguration: VersioningConfiguration,
                                      replyTo: ActorRef[Event]) extends CommandWithReply
-
-final case class CreateBucketNotifications(notifications: List[Notification],
-                                           replyTo: ActorRef[Event]) extends CommandWithReply
 
 final case class PutObjectWrapper(key: String,
                                   contentSource: Source[ByteString, _],

@@ -27,7 +27,6 @@ class NotificationService(awsSettings: AwsSettings)
       SqsAsyncClient
         .builder()
         .credentialsProvider(awsSettings.credentialsProvider)
-        .endpointOverride(awsSettings.sqsEndPoint.get)
         .region(awsSettings.region)
         .httpClient(httpClient)
     awsSettings.sqsEndPoint.map(builder.endpointOverride).getOrElse(builder).build()

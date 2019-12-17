@@ -7,29 +7,31 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.util.Timeout
 import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.actor.NotificationBehavior.CreateBucketNotifications
 import com.loyalty.testing.s3.actor.SpawnBehavior.Command
-import com.loyalty.testing.s3.actor.model.bucket.CreateBucketNotifications
 import com.loyalty.testing.s3.actor.model.{Event, NoSuchBucketExists, NotificationsCreated}
 import com.loyalty.testing.s3.notification.Notification
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
+import com.loyalty.testing.s3.repositories.NitriteDatabase
 import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException}
 import com.loyalty.testing.s3.routes.CustomMarshallers
-import com.loyalty.testing.s3.routes.s3.{askBucketBehavior, spawnBucketBehavior}
+import com.loyalty.testing.s3.routes.s3._
+import com.loyalty.testing.s3.service.NotificationService
 
 import scala.util.{Failure, Success}
 
 object SetBucketNotificationRoute extends CustomMarshallers {
   def apply(bucketName: String,
-            objectIO: ObjectIO,
-            database: NitriteDatabase)
+            database: NitriteDatabase,
+            notificationService: NotificationService)
            (implicit system: ActorSystem[Command],
             timeout: Timeout): Route =
     (put & extractRequest & parameter("notification")) {
       (request, _) =>
         import system.executionContext
+
         val eventualEvent =
           toBucketNotification(bucketName, request.entity.dataBytes)
-            .flatMap(execute(bucketName, objectIO, database))
+            .flatMap(execute(bucketName, database, notificationService))
         onComplete(eventualEvent) {
           case Success(NotificationsCreated) => complete(HttpResponse(OK))
           case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
@@ -43,15 +45,15 @@ object SetBucketNotificationRoute extends CustomMarshallers {
     }
 
   private def execute(bucketName: String,
-                      objectIO: ObjectIO,
-                      database: NitriteDatabase)
+                      database: NitriteDatabase,
+                      notificationService: NotificationService)
                      (notifications: List[Notification])
                      (implicit system: ActorSystem[Command],
                       timeout: Timeout) = {
     import system.executionContext
     for {
-      actorRef <- spawnBucketBehavior(bucketName, objectIO, database)
-      event <- askBucketBehavior(actorRef, replyTo => CreateBucketNotifications(notifications, replyTo))
+      actorRef <- spawnNotificationBehavior(bucketName, database, notificationService)
+      event <- askNotificationBehavior(actorRef, replyTo => CreateBucketNotifications(notifications, replyTo))
     } yield event
   }
 }

@@ -5,6 +5,7 @@ import java.time.{Instant, OffsetDateTime}
 import java.util.concurrent.CompletionException
 
 import akka.Done
+import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.alpakka.s3.{S3Exception => AlpakkaS3Exception}
@@ -16,6 +17,7 @@ import com.loyalty.testing.s3.repositories._
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.BucketVersioning
 import com.loyalty.testing.s3.response.CopyObjectResult
+import com.loyalty.testing.s3.service.NotificationService
 import com.loyalty.testing.s3.streams.FileStream
 import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterAll
@@ -47,7 +49,8 @@ abstract class S3IntegrationSpec(rootPath: Path,
     interval = Span(500, Millis))
   private val objectIO = ObjectIO(rootPath, FileStream())
   private lazy val database = NitriteDatabase(rootPath)
-  private val httpServer = HttpServer(objectIO, database)
+  private val notificationService: NotificationService = NotificationService(settings.awsSettings)(system.toClassic)
+  private val httpServer = HttpServer(objectIO, database, notificationService)
   protected val s3Client: S3Client
 
   override protected def beforeAll(): Unit = {
