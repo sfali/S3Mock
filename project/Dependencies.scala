@@ -105,9 +105,7 @@ object Dependencies {
 
   val AwsCommonV1: Seq[ModuleID] = Seq(
     "com.amazonaws"  % "aws-java-sdk-sqs"  % "1.11.502",
-    "com.amazonaws"  % "aws-java-sdk-sns"  % "1.11.502",
-    "com.amazonaws"  % "aws-java-sdk-s3"   % "1.11.502"   % "it, test",
-    "com.amazonaws"  % "aws-java-sdk-sts"  % "1.11.502"   % IntegrationTest
+    "com.amazonaws"  % "aws-java-sdk-sns"  % "1.11.502"
   )
 
   val S3IntegrationTesting: Seq[ModuleID] = Seq(
