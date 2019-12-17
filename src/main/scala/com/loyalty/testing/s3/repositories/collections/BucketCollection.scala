@@ -33,28 +33,27 @@ class BucketCollection(db: Nitrite) {
     }
 
   private[repositories] def setBucketVersioning(bucketId: UUID,
-                                                bucketName: String,
-                                                bucketVersioning: BucketVersioning): Bucket =
+                                                bucketVersioning: BucketVersioning): Option[Bucket] =
     findById(bucketId) match {
-      case Nil => throw NoSuckBucketException(bucketName)
+      case Nil => None
       case document :: Nil =>
         val updatedDocument = document.put(VersionField, bucketVersioning.entryName)
         collection.update(updatedDocument)
-        Bucket(updatedDocument)
+        Some(Bucket(updatedDocument))
       case _ => throw new IllegalStateException(s"More than one document found: $bucketId")
     }
 
-  private[repositories] def findBucket(id: UUID): Bucket =
+  private[repositories] def findBucket(id: UUID): Option[Bucket] =
     findById(id) match {
-      case Nil => throw NoSuckBucketException(id.toString)
-      case document :: Nil => Bucket(document)
+      case Nil => None
+      case document :: Nil => Some(Bucket(document))
       case _ => throw new IllegalStateException(s"More than one document found: $id")
     }
 
-  private[repositories] def findBucket(bucketName: String): Bucket =
+  private[repositories] def findBucket(bucketName: String): Option[Bucket] =
     findByName(bucketName) match {
-      case Nil => throw NoSuckBucketException(bucketName)
-      case document :: Nil => Bucket(document)
+      case Nil => None
+      case document :: Nil => Some(Bucket(document))
       case _ => throw new IllegalStateException(s"More than one document found: $bucketName")
     }
 

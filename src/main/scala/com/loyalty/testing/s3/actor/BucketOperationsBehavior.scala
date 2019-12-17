@@ -10,7 +10,6 @@ import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.actor.model.`object`.{CompleteUpload, DeleteObject, GetObject, GetObjectMeta, InitiateMultiPartUpload, PutObject, UploadPart, Command => ObjectCommand}
 import com.loyalty.testing.s3.actor.model.bucket._
 import com.loyalty.testing.s3.repositories.NitriteDatabase
-import com.loyalty.testing.s3.repositories.collections.NoSuckBucketException
 import com.loyalty.testing.s3.repositories.model.Bucket
 
 import scala.concurrent.duration._
@@ -30,14 +29,17 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
     msg match {
       case InitializeSnapshot =>
         val command =
-          Try(database.getBucket(bucketId)) match {
-            case Failure(_: NoSuckBucketException) =>
-              context.log.error(s"No such bucket: {}", bucketId)
-              NoSuchBucket
+          Try(database.findBucket(bucketId)) match {
             case Failure(ex: Throwable) =>
               context.log.error("database error", ex)
               DatabaseError
-            case Success(bucket) => BucketResult(bucket)
+            case Success(maybeBucket) =>
+              maybeBucket match {
+                case Some(bucket) => BucketResult(bucket)
+                case None =>
+                  context.log.error(s"No such bucket: {}", bucketId)
+                  NoSuchBucket
+              }
           }
         context.self ! command
         Behaviors.same
@@ -66,7 +68,7 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
               context.log.error(s"unable to create bucket: $bucket", ex)
               // TODO: reply properly
               Shutdown
-            case Success(value) => NewBucketCreated(bucket, replyTo)
+            case Success(_) => NewBucketCreated(bucket, replyTo)
           }
         context.self ! command
         Behaviors.same
@@ -98,12 +100,16 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
 
       case SetBucketVersioning(versioningConfiguration, replyTo) =>
         val command =
-          Try(database.setBucketVersioning(bucketId, bucket.bucketName, versioningConfiguration)) match {
+          Try(database.setBucketVersioning(bucketId, versioningConfiguration)) match {
             case Failure(ex) =>
               context.log.error(s"unable to set bucket versioning: $bucket", ex)
               // TODO: reply properly
               Shutdown
-            case Success(bucket) => VersioningSet(bucket, replyTo)
+            case Success(maybeBucket) =>
+              maybeBucket match {
+                case Some(bucket) => VersioningSet(bucket, replyTo)
+                case None => ReplyToSender(NoSuchBucketExists(bucketId), replyTo)
+              }
           }
         context.self ! command
         Behaviors.same

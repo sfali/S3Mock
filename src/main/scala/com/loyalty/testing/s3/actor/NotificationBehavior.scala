@@ -6,13 +6,11 @@ import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, Sta
 import akka.actor.typed.{ActorRef, Behavior}
 import com.loyalty.testing.s3.actor.NotificationBehavior.Command
 import com.loyalty.testing.s3.actor.model.{Event, NoSuchBucketExists, NotificationsCreated, NotificationsInfo}
-import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationData}
+import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationData, _}
 import com.loyalty.testing.s3.repositories.NitriteDatabase
-import com.loyalty.testing.s3.repositories.collections.NoSuckBucketException
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.service.NotificationService
 import org.slf4j.Logger
-import com.loyalty.testing.s3.notification._
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
@@ -34,12 +32,15 @@ class NotificationBehavior(context: ActorContext[Command],
     msg match {
       case Initialize =>
         val command =
-          Try(database.getBucket(bucketId)) match {
-            case Failure(_: NoSuckBucketException) => NoSuchBucket
+          Try(database.findBucket(bucketId)) match {
             case Failure(ex) =>
               context.log.error("Unable to get bucket", ex)
               NoSuchBucket // TODO: retry
-            case Success(bucket) => BucketResult(bucket)
+            case Success(maybeBucket) =>
+              maybeBucket match {
+                case Some(bucket) => BucketResult(bucket)
+                case None => NoSuchBucket
+              }
           }
         context.self ! command
         Behaviors.same

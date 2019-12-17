@@ -11,8 +11,6 @@ package object collections {
 
   case class DatabaseAccessException(message: String) extends Exception(message)
 
-  case class NoSuckBucketException(bucketName: String) extends Exception(s"No such bucket: $bucketName")
-
   case class BucketAlreadyExistsException(bucketName: String) extends Exception(s"Bucket $bucketName already exists")
 
   case class NoSuchId(id: UUID) extends Exception(s"Specified id `$id` does not exists")

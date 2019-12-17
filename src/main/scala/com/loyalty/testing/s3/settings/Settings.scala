@@ -13,6 +13,8 @@ trait Settings {
 
   val http: HttpSettings = HttpSettings(config)
 
+  val dataPathName: String = config.getString("app.data-path-name")
+
   val awsSettings: AwsSettings = new AwsSettings {
     override val region: Region = Region.of(config.getString("app.aws.region"))
     override val credentialsProvider: AwsCredentialsProvider = {

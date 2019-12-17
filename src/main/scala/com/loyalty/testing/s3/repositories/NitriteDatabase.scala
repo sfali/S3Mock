@@ -40,7 +40,7 @@ class NitriteDatabase(rootPath: Path,
   private[repositories] val uploadStagingCollection = UploadCollection(db, staging = true)
   private[repositories] val uploadCollection = UploadCollection(db, staging = false)
 
-  def getBucket(id: UUID): Bucket = bucketCollection.findBucket(id)
+  def findBucket(id: UUID): Option[Bucket] = bucketCollection.findBucket(id)
 
   def getAllObjects(bucketName: String,
                     prefix: Option[String] = None): List[ObjectKey] = objectCollection.findAll(bucketName, prefix)
@@ -48,10 +48,9 @@ class NitriteDatabase(rootPath: Path,
   def createBucket(bucket: Bucket): Bucket = bucketCollection.createBucket(bucket)
 
   def setBucketVersioning(bucketId: UUID,
-                          bucketName: String,
-                          versioningConfiguration: VersioningConfiguration): Bucket = {
+                          versioningConfiguration: VersioningConfiguration): Option[Bucket] = {
     log.info("Setting bucket versioning on bucket_id={}, config={}", bucketId, versioningConfiguration)
-    bucketCollection.setBucketVersioning(bucketId, bucketName, versioningConfiguration.bucketVersioning)
+    bucketCollection.setBucketVersioning(bucketId, versioningConfiguration.bucketVersioning)
   }
 
   def setBucketNotifications(notifications: List[Notification]): Int =

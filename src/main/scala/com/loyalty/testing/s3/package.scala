@@ -16,16 +16,24 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import com.amazonaws.services.sns.AmazonSNSAsync
 import com.amazonaws.services.sqs.AmazonSQSAsync
+import com.loyalty.testing.s3.data.{BootstrapConfiguration, InitialBucket}
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
+import com.loyalty.testing.s3.repositories.NitriteDatabase
+import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo}
 import com.loyalty.testing.s3.response.{CompleteMultipartUploadResult, InvalidNotificationConfigurationException, PutObjectResult}
 import com.typesafe.config.Config
 import javax.xml.bind.DatatypeConverter
+import org.slf4j.Logger
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
 import software.amazon.awssdk.regions.Region
+import io.circe.generic.auto._
+import io.circe.parser._
 
+import scala.jdk.CollectionConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
+import scala.util.{Failure, Success, Try}
 import scala.xml.{Node, NodeSeq}
 
 package object s3 {
@@ -35,7 +43,7 @@ package object s3 {
   type JavaFuture[V] = java.util.concurrent.Future[V]
 
   val defaultRegion: String = "us-east-1"
-
+  val UserDir: Path = System.getProperty("user.dir").toPath
   val ETAG = "ETag"
   val CONTENT_MD5 = "Content-MD5"
   val VersionIdHeader = "x-amz-version-id"
@@ -372,5 +380,53 @@ package object s3 {
     ls match {
       case Nil | _ :: Nil => true
       case item1 :: item2 :: xs => item1 + 1 == item2 && isSortedInternal(item2 :: xs)
+    }
+
+  private def readInitialData(log: Logger): Option[BootstrapConfiguration] = {
+    val initialDataPath = UserDir -> ("s3", "initial.json")
+    if (Files.exists(initialDataPath)) {
+      log.info("Initial data found @ {}", initialDataPath)
+      val json = Files.readAllLines(initialDataPath).asScala.mkString(System.lineSeparator())
+      decode[BootstrapConfiguration](json) match {
+        case Left(error) =>
+          log.warn(s"Unable to parse json: $json", error)
+          None
+        case Right(bootstrapConfiguration) => Some(bootstrapConfiguration)
+      }
+    } else {
+      log.info("No initial data found @ {}", initialDataPath)
+      None
+    }
+  }
+
+
+  private def initializeBucket(log: Logger,
+                               database: NitriteDatabase)
+                              (initialBucket: InitialBucket): Unit =
+    Try(database.createBucket(Bucket(initialBucket))) match {
+      case Failure(ex) =>
+        log.warn("Unable to initialize bucket {}, error_message={}", initialBucket.bucketName, ex.getMessage)
+      case Success(_) => log.info("Bucket initialized {}", initialBucket.bucketName)
+    }
+
+  private def initializeNotification(log: Logger,
+                                     database: NitriteDatabase)
+                                    (bucketName: String, notifications: List[Notification]): Unit =
+    Try(database.setBucketNotifications(notifications)) match {
+      case Failure(ex) =>
+        log.warn("Unable to create notifications for bucket: {}, error_message={}", bucketName, ex.getMessage)
+      case Success(_) => log.info("Notifications created for bucket {}", bucketName)
+    }
+
+  def initializeInitialData(log: Logger, database: NitriteDatabase): Unit =
+    readInitialData(log) match {
+      case Some(bootstrapConfiguration) =>
+        val initialBuckets = bootstrapConfiguration.initialBuckets
+        if (initialBuckets.nonEmpty) {
+          initialBuckets.foreach(initializeBucket(log, database))
+          val notifications = bootstrapConfiguration.notifications.groupBy(_.bucketName)
+          notifications.foreach((initializeNotification(log, database) _).tupled)
+        } else log.warn("Initial buckets are not provided, skipping initialization")
+      case None =>
     }
 }

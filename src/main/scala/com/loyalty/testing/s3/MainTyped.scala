@@ -1,7 +1,5 @@
 package com.loyalty.testing.s3
 
-import java.nio.file.Paths
-
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.{ActorSystem, Behavior}
@@ -32,12 +30,14 @@ object MainTyped extends App {
 
         Behaviors.receiveMessage {
           case InitializeApp =>
-            val root = Paths.get(System.getProperty("user.dir"), ".s3mock")
-            system.log.info("Root path of S3: {}", root.toAbsolutePath)
+            val root = (UserDir -> settings.dataPathName).toAbsolutePath
+            system.log.info("Root path of S3: {}", root)
 
             val objectIO = ObjectIO(root, FileStream())
             val database = NitriteDatabase(root)
             val notificationService = NotificationService(settings.awsSettings)(classicSystem)
+
+            initializeInitialData(ctx.log, database)
 
             Behaviors.same
         }
