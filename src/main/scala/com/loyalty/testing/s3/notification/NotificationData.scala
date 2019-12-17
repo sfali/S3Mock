@@ -7,6 +7,7 @@ case class NotificationData(bucketName: String,
                             operation: String,
                             maybeVersionId: Option[String] = None)
 
+@deprecated
 case class NotificationMeta(configName: String,
                             notificationType: NotificationType,
                             operationType: OperationType,
@@ -14,6 +15,7 @@ case class NotificationMeta(configName: String,
                             destinationName: String)
 
 object NotificationMeta {
+  @deprecated
   def apply(notification: Notification): NotificationMeta =
     NotificationMeta(
       configName = notification.name,

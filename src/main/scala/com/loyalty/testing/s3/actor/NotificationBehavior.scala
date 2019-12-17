@@ -6,11 +6,13 @@ import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, Sta
 import akka.actor.typed.{ActorRef, Behavior}
 import com.loyalty.testing.s3.actor.NotificationBehavior.Command
 import com.loyalty.testing.s3.actor.model.{Event, NoSuchBucketExists, NotificationsCreated, NotificationsInfo}
-import com.loyalty.testing.s3.notification.Notification
+import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationData}
 import com.loyalty.testing.s3.repositories.NitriteDatabase
 import com.loyalty.testing.s3.repositories.collections.NoSuckBucketException
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.service.NotificationService
+import org.slf4j.Logger
+import com.loyalty.testing.s3.notification._
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
@@ -21,6 +23,7 @@ class NotificationBehavior(context: ActorContext[Command],
                            notificationService: NotificationService)
   extends AbstractBehavior[Command](context) {
 
+  import DestinationType._
   import NotificationBehavior._
 
   private val bucketId = UUID.fromString(context.self.path.name)
@@ -98,10 +101,50 @@ class NotificationBehavior(context: ActorContext[Command],
         replyTo ! NotificationsInfo(notifications)
         Behaviors.same
 
+      case SendNotification(notificationData) =>
+        val commands = notifications.map(parseNotification(notificationData, context.log))
+        commands.foreach(command => context.self ! command)
+        Behaviors.same
+
+      case SendNotificationToDestination(destinationType, destinationName, message) if destinationType == Sqs =>
+        context.pipeToSelf(notificationService.sendSqsMessage(message, destinationName)) {
+          case Failure(ex) =>
+            context.log.warn(s"Unable to send message, message=$message, queue_name=$destinationName", ex)
+            Standby // TODO: based on error retry or abort
+          case Success(_) => Standby
+        }
+        Behaviors.same
+
+      case SendNotificationToDestination(destinationType, destinationName, message) if destinationType == Sns =>
+        context.pipeToSelf(notificationService.sendSnsMessage(message, destinationName)) {
+          case Failure(ex) =>
+            context.log.warn(s"Unable to send message, message=$message, topic_arn=$destinationName", ex)
+            Standby // TODO: based on error retry or abort
+          case Success(_) => Standby
+        }
+        Behaviors.same
+
       case Standby => Behaviors.same
 
       case Shutdown => Behaviors.stopped
     }
+
+  private def parseNotification(notificationData: NotificationData,
+                                log: Logger)(notification: Notification) = {
+    val key = notificationData.key
+    val prefix = notification.prefix
+    val suffix = notification.suffix
+    val prefixMatch = prefix.exists(key.startsWith) || prefix.isEmpty
+    val suffixMatch = suffix.exists(key.endsWith) || suffix.isEmpty
+    if (prefixMatch && suffixMatch) {
+      val message = generateMessage(notificationData, notification)
+      SendNotificationToDestination(notification.destinationType, notification.destinationName, message)
+    }
+    else {
+      log.warn("Not sending notification, data={}, notification={}", notificationData, notification)
+      Standby
+    }
+  }
 }
 
 object NotificationBehavior {
@@ -134,7 +177,11 @@ object NotificationBehavior {
   private final case class UpdateNotifications(notifications: List[Notification],
                                                replyTo: ActorRef[Event]) extends CommandWithReply
 
-  // private final case class ReplyToSender(event: Event, replyTo: ActorRef[Event]) extends Command
+  final case class SendNotification(notificationData: NotificationData) extends Command
+
+  private final case class SendNotificationToDestination(destinationType: DestinationType,
+                                                         destinationName: String,
+                                                         message: String) extends Command
 
   private final case object Standby extends Command
 
