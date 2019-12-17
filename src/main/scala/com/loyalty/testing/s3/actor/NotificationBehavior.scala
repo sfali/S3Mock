@@ -33,13 +33,15 @@ class NotificationBehavior(context: ActorContext[Command],
   override def onMessage(msg: Command): Behavior[Command] =
     msg match {
       case Initialize =>
-        context.pipeToSelf(database.getBucket(bucketId)) {
-          case Failure(_: NoSuckBucketException) => NoSuchBucket
-          case Failure(ex) =>
-            context.log.error("Unable to get bucket", ex)
-            NoSuchBucket // TODO: retry
-          case Success(bucket) => BucketResult(bucket)
-        }
+        val command =
+          Try(database.getBucket(bucketId)) match {
+            case Failure(_: NoSuckBucketException) => NoSuchBucket
+            case Failure(ex) =>
+              context.log.error("Unable to get bucket", ex)
+              NoSuchBucket // TODO: retry
+            case Success(bucket) => BucketResult(bucket)
+          }
+        context.self ! command
         Behaviors.same
 
       case NoSuchBucket => buffer.unstashAll(noSuchBucket)

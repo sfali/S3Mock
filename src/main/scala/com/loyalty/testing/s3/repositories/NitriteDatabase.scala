@@ -40,34 +40,22 @@ class NitriteDatabase(rootPath: Path,
   private[repositories] val uploadStagingCollection = UploadCollection(db, staging = true)
   private[repositories] val uploadCollection = UploadCollection(db, staging = false)
 
-  def getBucket(id: UUID): Future[Bucket] =
-    Try(bucketCollection.findBucket(id)) match {
-      case Failure(ex) => Future.failed(ex)
-      case Success(bucket) => Future.successful(bucket)
-    }
+  def getBucket(id: UUID): Bucket = bucketCollection.findBucket(id)
 
   def getAllObjects(bucketName: String,
                     prefix: Option[String] = None): List[ObjectKey] = objectCollection.findAll(bucketName, prefix)
 
-  def createBucket(bucket: Bucket): Future[Bucket] =
-    Try(bucketCollection.createBucket(bucket)) match {
-      case Failure(ex) => Future.failed(ex)
-      case Success(bucket) => Future.successful(bucket)
-    }
+  def createBucket(bucket: Bucket): Bucket = bucketCollection.createBucket(bucket)
 
   def setBucketVersioning(bucketId: UUID,
                           bucketName: String,
-                          versioningConfiguration: VersioningConfiguration): Future[Bucket] = {
+                          versioningConfiguration: VersioningConfiguration): Bucket = {
     log.info("Setting bucket versioning on bucket_id={}, config={}", bucketId, versioningConfiguration)
-    val versioning = versioningConfiguration.bucketVersioning
-    Try(bucketCollection.setBucketVersioning(bucketId, bucketName, versioning)) match {
-      case Failure(ex) => Future.failed(ex)
-      case Success(bucket) => Future.successful(bucket)
-    }
+    bucketCollection.setBucketVersioning(bucketId, bucketName, versioningConfiguration.bucketVersioning)
   }
 
-  def setBucketNotifications(notifications: List[Notification]): Future[Int] =
-    Future.successful(notificationCollection.createNotifications(notifications))
+  def setBucketNotifications(notifications: List[Notification]): Int =
+    notificationCollection.createNotifications(notifications)
 
   def getBucketNotifications(bucketName: String): List[Notification] =
     notificationCollection.findNotifications(bucketName)

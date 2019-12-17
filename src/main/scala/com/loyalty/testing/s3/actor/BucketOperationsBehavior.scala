@@ -29,15 +29,17 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
   override def onMessage(msg: Command): Behavior[Command] =
     msg match {
       case InitializeSnapshot =>
-        context.pipeToSelf(database.getBucket(bucketId)) {
-          case Failure(_: NoSuckBucketException) =>
-            context.log.error(s"No such bucket: {}", bucketId)
-            NoSuchBucket
-          case Failure(ex: Throwable) =>
-            context.log.error("database error", ex)
-            DatabaseError
-          case Success(bucket) => BucketResult(bucket)
-        }
+        val command =
+          Try(database.getBucket(bucketId)) match {
+            case Failure(_: NoSuckBucketException) =>
+              context.log.error(s"No such bucket: {}", bucketId)
+              NoSuchBucket
+            case Failure(ex: Throwable) =>
+              context.log.error("database error", ex)
+              DatabaseError
+            case Success(bucket) => BucketResult(bucket)
+          }
+        context.self ! command
         Behaviors.same
 
       case NoSuchBucket => buffer.unstashAll(noSuchBucket)
@@ -58,14 +60,15 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
   private def noSuchBucket: Behavior[Command] =
     Behaviors.receiveMessagePartial {
       case CreateBucket(bucket, replyTo) =>
-        context.pipeToSelf(database.createBucket(bucket)) {
-          case Failure(ex) =>
-            context.log.error(s"unable to create bucket: $bucket", ex)
-            // TODO: reply properly
-            Shutdown
-
-          case Success(bucket) => NewBucketCreated(bucket, replyTo)
-        }
+        val command =
+          Try(database.createBucket(bucket)) match {
+            case Failure(ex) =>
+              context.log.error(s"unable to create bucket: $bucket", ex)
+              // TODO: reply properly
+              Shutdown
+            case Success(value) => NewBucketCreated(bucket, replyTo)
+          }
+        context.self ! command
         Behaviors.same
 
       case NewBucketCreated(bucket, replyTo) =>
@@ -94,13 +97,15 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         Behaviors.same
 
       case SetBucketVersioning(versioningConfiguration, replyTo) =>
-        context.pipeToSelf(database.setBucketVersioning(bucketId, bucket.bucketName, versioningConfiguration)) {
-          case Failure(ex) =>
-            context.log.error(s"unable to set bucket versioning: $bucket", ex)
-            // TODO: reply properly
-            Shutdown
-          case Success(bucket) => VersioningSet(bucket, replyTo)
-        }
+        val command =
+          Try(database.setBucketVersioning(bucketId, bucket.bucketName, versioningConfiguration)) match {
+            case Failure(ex) =>
+              context.log.error(s"unable to set bucket versioning: $bucket", ex)
+              // TODO: reply properly
+              Shutdown
+            case Success(bucket) => VersioningSet(bucket, replyTo)
+          }
+        context.self ! command
         Behaviors.same
 
       case VersioningSet(updatedBucket, replyTo) =>
