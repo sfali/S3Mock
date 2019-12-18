@@ -29,6 +29,7 @@ object CreateBucketRoute extends CustomMarshallers {
     (put & extractRequest) { request =>
       val eventualEvent =
         extractRequestTo(request)
+          .map(Option.apply)
           .map(CreateBucketConfiguration.apply)
           .map {
             bucketConfiguration =>
