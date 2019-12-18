@@ -8,6 +8,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3.actor.model.{CborSerializable, Event}
 import com.loyalty.testing.s3.createObjectId
+import com.loyalty.testing.s3.notification.OperationType
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
 import com.loyalty.testing.s3.request.PartInfo
 
@@ -33,7 +34,8 @@ private[actor] case object DatabaseError extends Command
 
 private[actor] final case class ReplyToSender(reply: Event,
                                               replyTo: ActorRef[Event],
-                                              maybeObjectKey: Option[ObjectKey] = None) extends Command
+                                              maybeObjectKey: Option[ObjectKey] = None,
+                                              maybeOperation: Option[OperationType] = None) extends Command
 
 private[actor] case object InitializeSnapshot extends Command
 

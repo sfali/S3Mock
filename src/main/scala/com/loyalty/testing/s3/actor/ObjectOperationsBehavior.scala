@@ -2,14 +2,15 @@ package com.loyalty.testing.s3.actor
 
 import java.util.UUID
 
-import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
+import akka.actor.typed.{ActorRef, Behavior}
 import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity, EntityTypeKey}
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.NotificationBehavior.{Command => NotificationCommand}
-import com.loyalty.testing.s3.actor.model.{DeleteInfo, InternalError, InvalidAccess, InvalidPart, InvalidPartOrder, MultiPartUploadedInitiated, NoSuchKeyExists, NoSuchUpload, ObjectContent, ObjectInfo, PartUploaded}
+import com.loyalty.testing.s3.actor.NotificationBehavior.{SendNotification, Command => NotificationCommand}
 import com.loyalty.testing.s3.actor.model.`object`._
+import com.loyalty.testing.s3.actor.model.{DeleteInfo, InternalError, InvalidAccess, InvalidPart, InvalidPartOrder, MultiPartUploadedInitiated, NoSuchKeyExists, NoSuchUpload, ObjectContent, ObjectInfo, PartUploaded}
+import com.loyalty.testing.s3.notification.{NotificationData, OperationType}
 import com.loyalty.testing.s3.repositories.collections.NoSuchId
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
@@ -27,6 +28,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
   extends AbstractBehavior(context) {
 
   import ObjectOperationsBehavior._
+  import OperationType._
 
   private implicit val ec: ExecutionContext = context.system.executionContext
   private var versionIndex = 0
@@ -87,8 +89,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
             context.log.error(s"unable to save object: ${bucket.bucketName}/$key", ex)
             DatabaseError
           case Success(objectKey) =>
-            // TODO: notify notification router
-            ReplyToSender(ObjectInfo(objectKey), replyTo, Some(objectKey))
+            ReplyToSender(ObjectInfo(objectKey), replyTo, Some(objectKey), Some(Put))
         }
         Behaviors.same
 
@@ -131,9 +132,15 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
                  | version_id=${maybeVersionId.getOrElse("None")}""".stripMargin.replaceNewLine, ex)
             DatabaseError // TODO: retry
           case Success(objectKey) =>
-            val deleteInfo = DeleteInfo(objectKey.deleteMarker.getOrElse(false), objectKey.version,
+            val deleteMarker = objectKey.deleteMarker
+            val deleteInfo = DeleteInfo(deleteMarker.getOrElse(false), objectKey.version,
               objectKey.actualVersionId)
-            ReplyToSender(deleteInfo, replyTo, Some(objectKey))
+            val operationType =
+              deleteMarker match {
+                case Some(value) => if (value) Some(Delete) else Some(DeleteMarkerCreated)
+                case None => None
+              }
+            ReplyToSender(deleteInfo, replyTo, Some(objectKey), operationType)
         }
         Behaviors.same
 
@@ -190,7 +197,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
 
       case ResetUploadInfo(objectKey, replyTo) =>
         uploadInfo = None
-        context.self ! ReplyToSender(ObjectInfo(objectKey), replyTo, Some(objectKey))
+        context.self ! ReplyToSender(ObjectInfo(objectKey), replyTo, Some(objectKey), Some(CompleteMultipartUpload))
         Behaviors.same
 
       case GetObjectMeta(bucket, key, replyTo) =>
@@ -199,9 +206,17 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
         context.self ! ReplyToSender(event, replyTo)
         Behaviors.same
 
-      case ReplyToSender(reply, replyTo, maybeObjectMeta) =>
+      case ReplyToSender(reply, replyTo, maybeObjectKey, maybeOperation) =>
+        // send notification if applicable
+        if (maybeOperation.isEmpty && maybeObjectKey.isDefined) {
+          val objectKey = maybeObjectKey.get
+          val bucketName = objectKey.bucketName
+          val notificationData = NotificationData(bucketName, objectKey.key,
+            objectKey.contentLength, objectKey.eTag, maybeOperation.get, objectKey.actualVersionId)
+          notificationActorRef ! ShardingEnvelope(bucketName.toUUID.toString, SendNotification(notificationData))
+        }
         objects =
-          maybeObjectMeta match {
+          maybeObjectKey match {
             case Some(objectKey) =>
               objectKey.version match {
                 case BucketVersioning.Enabled => objects :+ objectKey
