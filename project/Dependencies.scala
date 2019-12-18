@@ -10,6 +10,7 @@ object Dependencies {
     val Beachape = "com.beachape"
     val CodehausGroovy = "org.codehaus.groovy"
     val Heikoseeberger = "de.heikoseeberger"
+    val TanUkkii007 = "com.github.TanUkkii007"
     val OrgScalaTest = "org.scalatest"
     val OrgSalacheck = "org.scalacheck"
     val OrgScalamock = "org.scalamock"
@@ -30,6 +31,7 @@ object Dependencies {
     val AkkaHttpXml = "akka-http-xml"
     val AkkaHttpTestKit = "akka-http-testkit"
     val AkkaSl4j = "akka-slf4j"
+    val DowningProvider = "akka-cluster-custom-downing"
     val LogbackClassic  = "logback-classic"
     val CirceCore = "circe-core"
     val CirceGeneric = "circe-generic"
@@ -67,6 +69,7 @@ object Dependencies {
     val CirceVersion = "0.12.1"
     val EnumeratumVersion = "1.5.13"
     val EnumeratumCirceVersion = "1.5.21"
+    val DowningProviderVersion = "0.0.13"
     val GroovyVersion = "2.5.4"
     val AkkaHttpCirceVersion = "1.29.1"
     val ScalaTestVersion = "3.2.0-M1"
@@ -151,7 +154,8 @@ object Dependencies {
 
   val Misc: Seq[ModuleID] = Seq(
     ScalaLangModules  %% ScalaXml                   % ScalaXmlVersion,
-    Dizitart          %  Nitrite                    % NitriteVersion
+    Dizitart          %  Nitrite                    % NitriteVersion,
+    TanUkkii007       %% DowningProvider            % DowningProviderVersion
   )
 
   val CommonTest: Seq[ModuleID] = Seq(

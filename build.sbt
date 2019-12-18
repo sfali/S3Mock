@@ -22,6 +22,7 @@ resolvers ++= Seq(
   Resolver.bintrayRepo("hseeberger", "maven"),
   Resolver.sonatypeRepo("releases"),
   Resolver.sonatypeRepo("snapshots"),
+  Resolver.bintrayRepo("tanukkii007", "maven"),
   Resolver.mavenLocal,
   Resolver.jcenterRepo
 )
