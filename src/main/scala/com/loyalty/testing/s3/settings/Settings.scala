@@ -1,6 +1,7 @@
 package com.loyalty.testing.s3.settings
 
 import java.net.URI
+import java.nio.file.Path
 
 import com.loyalty.testing.s3._
 import com.typesafe.config.Config
@@ -13,7 +14,17 @@ trait Settings {
 
   val http: HttpSettings = HttpSettings(config)
 
-  val dataPathName: String = config.getString("app.data-path-name")
+  val initialDataPath: Option[Path] =
+    config.getOptionalString("app.bootstrap.initial-data-path") match {
+      case Some(path) => Some(path.toPath -> "initial.json")
+      case None => None
+    }
+
+  val dataDirectory: Path =
+    config.getOptionalString("app.bootstrap.data-directory") match {
+      case Some(path) => path.toPath
+      case None => UserDir -> ".s3mock"
+    }
 
   val awsSettings: AwsSettings = new AwsSettings {
     override val region: Region = Region.of(config.getString("app.aws.region"))

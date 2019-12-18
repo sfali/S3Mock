@@ -109,7 +109,6 @@ object NitriteDatabase {
   def apply(rootPath: Path, dbSettings: DBSettings)
            (implicit dateTimeProvider: DateTimeProvider): NitriteDatabase = new NitriteDatabase(rootPath, dbSettings)
 
-  def apply(rootPath: Path)
-           (implicit dateTimeProvider: DateTimeProvider,
-            settings: Settings): NitriteDatabase = NitriteDatabase(rootPath, settings.dbSettings)
+  def apply()(implicit dateTimeProvider: DateTimeProvider,
+              settings: Settings): NitriteDatabase = NitriteDatabase(settings.dataDirectory, settings.dbSettings)
 }

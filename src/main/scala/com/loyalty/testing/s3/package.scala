@@ -382,8 +382,7 @@ package object s3 {
       case item1 :: item2 :: xs => item1 + 1 == item2 && isSortedInternal(item2 :: xs)
     }
 
-  private def readInitialData(log: Logger): Option[BootstrapConfiguration] = {
-    val initialDataPath = UserDir -> ("s3", "initial.json")
+  private def readInitialData(initialDataPath: Path, log: Logger): Option[BootstrapConfiguration] = {
     if (Files.exists(initialDataPath)) {
       log.info("Initial data found @ {}", initialDataPath)
       val json = Files.readAllLines(initialDataPath).asScala.mkString(System.lineSeparator())
@@ -418,8 +417,8 @@ package object s3 {
       case Success(_) => log.info("Notifications created for bucket {}", bucketName)
     }
 
-  def initializeInitialData(log: Logger, database: NitriteDatabase): Unit =
-    readInitialData(log) match {
+  def initializeInitialData(initialDataPath: Path, log: Logger, database: NitriteDatabase): Unit =
+    readInitialData(initialDataPath, log) match {
       case Some(bootstrapConfiguration) =>
         val initialBuckets = bootstrapConfiguration.initialBuckets
         if (initialBuckets.nonEmpty) {

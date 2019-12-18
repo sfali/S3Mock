@@ -32,14 +32,13 @@ object MainTyped extends App {
 
         Behaviors.receiveMessage {
           case InitializeApp =>
-            val root = (UserDir -> settings.dataPathName).toAbsolutePath
-            system.log.info("Root path of S3: {}", root)
+            system.log.info("Root path of S3: {}", settings.dataDirectory)
 
-            val objectIO = ObjectIO(root, FileStream())
-            val database = NitriteDatabase(root)
+            val objectIO = ObjectIO(FileStream())
+            val database = NitriteDatabase()
             val notificationService = NotificationService(settings.awsSettings)(classicSystem)
 
-            initializeInitialData(ctx.log, database)
+            settings.initialDataPath.foreach(path => initializeInitialData(path, ctx.log, database))
 
             val sharding = ClusterSharding(system)
             val objectOperationsActorRef = sharding

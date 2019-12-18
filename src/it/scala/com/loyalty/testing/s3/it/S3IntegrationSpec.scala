@@ -34,8 +34,7 @@ import software.amazon.awssdk.services.s3.model.{BucketVersioningStatus, S3Excep
 import scala.concurrent.ExecutionContextExecutor
 import scala.util.{Failure, Success, Try}
 
-abstract class S3IntegrationSpec(rootPath: Path,
-                                 resourceBasename: String)
+abstract class S3IntegrationSpec(resourceBasename: String)
   extends AnyFlatSpec
     with BeforeAndAfterAll
     with Matchers
@@ -50,8 +49,8 @@ abstract class S3IntegrationSpec(rootPath: Path,
   private implicit val ec: ExecutionContextExecutor = system.executionContext
   private implicit val defaultPatience: PatienceConfig = PatienceConfig(timeout = Span(15, Seconds),
     interval = Span(500, Millis))
-  private val objectIO = ObjectIO(rootPath, FileStream())
-  private lazy val database = NitriteDatabase(rootPath)
+  private val objectIO = ObjectIO(FileStream())
+  private lazy val database = NitriteDatabase()
   private val notificationService: NotificationService = NotificationService(settings.awsSettings)(system.toClassic)
 
   private val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))

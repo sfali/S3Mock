@@ -13,6 +13,7 @@ import akka.util.ByteString
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
 import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo}
+import com.loyalty.testing.s3.settings.Settings
 import com.loyalty.testing.s3.streams.FileStream
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -160,4 +161,7 @@ class ObjectIO(root: Path, fileStream: FileStream) {
 
 object ObjectIO {
   def apply(root: Path, fileStream: FileStream): ObjectIO = new ObjectIO(root, fileStream)
+
+  def apply(fileStream: FileStream)(implicit settings: Settings): ObjectIO =
+    ObjectIO(settings.dataDirectory, fileStream)
 }

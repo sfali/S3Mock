@@ -35,10 +35,10 @@ object ListBucketRoute extends CustomMarshallers {
           val params = ListBucketParams(maxKeys, maybePrefix, maybeDelimiter)
           val eventualEvent =
             Source
-              .single(params)
+              .single("")
               .via(
                 ActorFlow.ask(bucketOperationsActorRef)(
-                  (params, replyTo: ActorRef[Event]) =>
+                  (_, replyTo: ActorRef[Event]) =>
                     ShardingEnvelope(bucketName.toUUID.toString, ListBucket(params, replyTo))
                 )
               ).runWith(Sink.head)
