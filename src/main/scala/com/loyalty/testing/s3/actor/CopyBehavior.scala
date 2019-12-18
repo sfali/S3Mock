@@ -74,7 +74,7 @@ object CopyBehavior {
   def apply(bucketOperationsActorRef: ActorRef[ShardingEnvelope[BucketCommand]]): Behavior[Command] =
     Behaviors.setup[Command](context => new CopyBehavior(context, bucketOperationsActorRef))
 
-  sealed trait Command
+  sealed trait Command extends CborSerializable
 
   private sealed trait OperationCommand
 

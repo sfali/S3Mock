@@ -1,24 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
+    <!-- Silence initial setup logging from Logback -->
+    <statusListener class="ch.qos.logback.core.status.NopStatusListener" />
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <layout class="ch.qos.logback.classic.PatternLayout">
-            <Pattern>
-                %d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n
-            </Pattern>
+            <Pattern>[%date{ISO8601}] [%level] [%logger] [%thread] [%X{akkaSource}] - %msg%n</Pattern>
         </layout>
     </appender>
 
-    <root level="info">
-        <appender-ref ref="STDOUT"/>
+    <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>1024</queueSize>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="STDOUT" />
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="ASYNC"/>
     </root>
 
-    <logger name="com.loyalty.testing.s3" level="info" additivity="false">
-        <appender-ref ref="STDOUT"/>
-    </logger>
-
-    <logger name="com.loyalty.testing.s3.actor" level="info" additivity="false">
-        <appender-ref ref="STDOUT"/>
+    <logger name="com.loyalty.testing.s3" level="INFO">
+        <appender-ref ref="ASYNC"/>
     </logger>
 
 </configuration>

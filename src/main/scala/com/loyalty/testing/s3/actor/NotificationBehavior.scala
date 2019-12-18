@@ -6,7 +6,7 @@ import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, Sta
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
 import com.loyalty.testing.s3.actor.NotificationBehavior.Command
-import com.loyalty.testing.s3.actor.model.{Event, NoSuchBucketExists, NotificationsCreated, NotificationsInfo}
+import com.loyalty.testing.s3.actor.model.{CborSerializable, Event, NoSuchBucketExists, NotificationsCreated, NotificationsInfo}
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationData, _}
 import com.loyalty.testing.s3.repositories.NitriteDatabase
 import com.loyalty.testing.s3.repositories.model.Bucket
@@ -163,7 +163,7 @@ object NotificationBehavior {
       }
     }
 
-  sealed trait Command
+  sealed trait Command extends CborSerializable
 
   sealed trait CommandWithReply extends Command {
     val replyTo: ActorRef[Event]

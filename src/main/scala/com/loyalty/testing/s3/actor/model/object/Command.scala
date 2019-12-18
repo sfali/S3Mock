@@ -6,12 +6,12 @@ import akka.actor.typed.ActorRef
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import com.loyalty.testing.s3.actor.model.Event
+import com.loyalty.testing.s3.actor.model.{CborSerializable, Event}
 import com.loyalty.testing.s3.createObjectId
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
 import com.loyalty.testing.s3.request.PartInfo
 
-sealed trait Command
+sealed trait Command extends CborSerializable
 
 sealed trait CommandWithReply extends Command {
   val replyTo: ActorRef[Event]

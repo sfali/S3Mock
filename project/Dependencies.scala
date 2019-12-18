@@ -24,6 +24,7 @@ object Dependencies {
     val AkkaStreams = "akka-stream"
     val AkkaStreamsTyped = "akka-stream-typed"
     val AkkaClusterShardingTyed = "akka-cluster-sharding-typed"
+    val JacksonSerializer = "akka-serialization-jackson"
     val AkkaRemote = "akka-remote"
     val AkkaHttp = "akka-http"
     val AkkaHttpXml = "akka-http-xml"
@@ -85,6 +86,7 @@ object Dependencies {
     Akka            %% AkkaStreamsTyped             % AkkaVersion,
     Akka            %% AkkaClusterShardingTyed      % AkkaVersion,
     Akka            %% AkkaRemote                   % AkkaVersion,
+    Akka            %% JacksonSerializer            % AkkaVersion,
     Akka            %% AkkaSl4j                     % AkkaVersion,
     Logback         %  LogbackClassic               % LogbackVersion,
     CodehausGroovy  %  Groovy                       % GroovyVersion
