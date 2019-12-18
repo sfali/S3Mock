@@ -9,12 +9,16 @@
         </layout>
     </appender>
 
-    <logger name="com.amazonaws" level="warn" additivity="false">
+    <root level="info">
+        <appender-ref ref="STDOUT"/>
+    </root>
+
+    <logger name="com.loyalty.testing.s3" level="info" additivity="false">
         <appender-ref ref="STDOUT"/>
     </logger>
 
-    <root level="error">
+    <logger name="com.loyalty.testing.s3.actor" level="info" additivity="false">
         <appender-ref ref="STDOUT"/>
-    </root>
+    </logger>
 
 </configuration>

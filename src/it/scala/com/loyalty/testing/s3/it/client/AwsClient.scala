@@ -2,10 +2,12 @@ package com.loyalty.testing.s3.it.client
 
 import java.nio.file.{Files, Path}
 
+import akka.actor.typed.scaladsl.adapter._
 import akka.Done
 import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.http.scaladsl.model.headers.ByteRange.{FromOffset, Slice, Suffix}
+import com.github.matsluni.akkahttpspi.AkkaHttpClient
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.it._
 import com.loyalty.testing.s3.repositories.model.Bucket
@@ -33,6 +35,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
     .credentialsProvider(awsSettings.credentialsProvider)
     .endpointOverride(awsSettings.s3EndPoint.get)
     .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+    .httpClient(AkkaHttpClient.builder().withActorSystem(system.toClassic).build())
     .build()
 
   override def createBucket(bucketName: String, region: Option[Region]): Future[Bucket] = {
