@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
 import akka.actor.typed.{ActorRef, Behavior}
+import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
 import com.loyalty.testing.s3.actor.NotificationBehavior.Command
 import com.loyalty.testing.s3.actor.model.{Event, NoSuchBucketExists, NotificationsCreated, NotificationsInfo}
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationData, _}
@@ -151,6 +152,8 @@ class NotificationBehavior(context: ActorContext[Command],
 }
 
 object NotificationBehavior {
+
+  val TypeKey: EntityTypeKey[Command] = EntityTypeKey[Command]("Notification")
 
   def apply(database: NitriteDatabase,
             notificationService: NotificationService): Behavior[Command] =

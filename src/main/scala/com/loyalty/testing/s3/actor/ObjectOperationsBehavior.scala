@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
+import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model.{DeleteInfo, InternalError, InvalidAccess, InvalidPart, InvalidPartOrder, MultiPartUploadedInitiated, NoSuchKeyExists, NoSuchUpload, ObjectContent, ObjectInfo, PartUploaded}
 import com.loyalty.testing.s3.actor.model.`object`._
@@ -226,6 +227,8 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
 }
 
 object ObjectOperationsBehavior {
+
+  val TypeKey: EntityTypeKey[Command] = EntityTypeKey[Command]("ObjectOperations")
 
   def apply(objectIO: ObjectIO,
             database: NitriteDatabase): Behavior[Command] =

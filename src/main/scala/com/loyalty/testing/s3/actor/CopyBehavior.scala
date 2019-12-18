@@ -5,6 +5,7 @@ import java.util.UUID
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.cluster.sharding.typed.ShardingEnvelope
+import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
 import akka.http.scaladsl.model.headers.ByteRange
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.CopyBehavior.Command
@@ -67,6 +68,8 @@ class CopyBehavior(context: ActorContext[Command],
 }
 
 object CopyBehavior {
+
+  val TypeKey: EntityTypeKey[Command] = EntityTypeKey[Command]("CopyOperations")
 
   def apply(bucketOperationsActorRef: ActorRef[ShardingEnvelope[BucketCommand]]): Behavior[Command] =
     Behaviors.setup[Command](context => new CopyBehavior(context, bucketOperationsActorRef))

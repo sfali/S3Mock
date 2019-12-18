@@ -4,6 +4,8 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.{ActorSystem, Behavior}
 import akka.actor.{ActorSystem => ClassicActorSystem}
+import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity}
+import com.loyalty.testing.s3.actor.{BucketOperationsBehavior, CopyBehavior, NotificationBehavior, ObjectOperationsBehavior}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.service.NotificationService
 import com.loyalty.testing.s3.streams.FileStream
@@ -38,6 +40,27 @@ object MainTyped extends App {
             val notificationService = NotificationService(settings.awsSettings)(classicSystem)
 
             initializeInitialData(ctx.log, database)
+
+            val sharding = ClusterSharding(system)
+            val objectOperationsActorRef = sharding
+              .init(
+                Entity(ObjectOperationsBehavior.TypeKey)(_ => ObjectOperationsBehavior(objectIO, database))
+              )
+            val bucketOperationsActorRef = sharding
+              .init(
+                Entity(BucketOperationsBehavior.TypeKey)(_ => BucketOperationsBehavior(database, objectOperationsActorRef))
+              )
+            val copyActorRef = sharding
+              .init(
+                Entity(CopyBehavior.TypeKey)(_ => CopyBehavior(bucketOperationsActorRef))
+              )
+            val notificationActorRef = sharding
+              .init(
+                Entity(NotificationBehavior.TypeKey)(_ => NotificationBehavior(database, notificationService))
+              )
+
+            val httpServer = HttpServer(database, bucketOperationsActorRef, copyActorRef, notificationActorRef)
+            httpServer.start()
 
             Behaviors.same
         }
