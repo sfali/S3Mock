@@ -7,7 +7,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.notification.NotificationData
+import com.loyalty.testing.s3.notification.{NotificationData, OperationType}
 import com.loyalty.testing.s3.notification.actor.NotificationRouter
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.response.{CopyObjectResult, NoSuchBucketException, ObjectMeta}
@@ -52,7 +52,7 @@ class CopyObjectRoute private(notificationRouterRef: ActorRef,
     val maybeVersionId = putObjectResult.maybeVersionId
     // send notification, if applicable
     val notificationData = NotificationData(bucketName, key,
-      putObjectResult.contentLength, putObjectResult.etag, "Copy", maybeVersionId)
+      putObjectResult.contentLength, putObjectResult.etag, OperationType.Copy, maybeVersionId)
     notificationRouterRef ! NotificationRouter.SendNotification(notificationData)
 
     val headers = Nil +

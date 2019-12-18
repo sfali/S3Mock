@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.notification.NotificationData
+import com.loyalty.testing.s3.notification.{NotificationData, OperationType}
 import com.loyalty.testing.s3.notification.actor.NotificationRouter
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.response.NoSuchBucketException
@@ -30,7 +30,7 @@ class PutObjectRoute private(notificationRouterRef: ActorRef,
             val putObjectResult = objectMeta.result
             val maybeVersionId = putObjectResult.maybeVersionId
             val notificationData = NotificationData(bucketName, key,
-              putObjectResult.contentLength, putObjectResult.etag, "Put", maybeVersionId)
+              putObjectResult.contentLength, putObjectResult.etag, OperationType.Put, maybeVersionId)
             notificationRouterRef ! NotificationRouter.SendNotification(notificationData)
 
             var response = HttpResponse(OK)

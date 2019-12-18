@@ -7,7 +7,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.Directives.{entity, _}
 import akka.http.scaladsl.server.Route
-import com.loyalty.testing.s3.notification.NotificationData
+import com.loyalty.testing.s3.notification.{NotificationData, OperationType}
 import com.loyalty.testing.s3.notification.actor.NotificationRouter
 import com.loyalty.testing.s3.repositories.Repository
 import com.loyalty.testing.s3.request.CompleteMultipartUpload
@@ -23,7 +23,7 @@ class CompleteMultipartUploadRoute private(notificationRouterRef: ActorRef, log:
       onComplete(repository.completeMultipart(bucketName, key, uploadId, parts)) {
         case Success(response) =>
           val notificationData = NotificationData(response.bucketName, response.key, response.contentLength,
-            response.eTag, "CompleteMultipartUpload", response.versionId)
+            response.eTag, OperationType.CompleteMultipartUpload, response.versionId)
           notificationRouterRef ! NotificationRouter.SendNotification(notificationData)
 
           val headers: List[HttpHeader] =
