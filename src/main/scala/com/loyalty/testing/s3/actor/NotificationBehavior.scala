@@ -4,9 +4,10 @@ import java.util.UUID
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
 import akka.actor.typed.{ActorRef, Behavior}
-import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
+import akka.cluster.sharding.typed.ShardingEnvelope
+import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity, EntityTypeKey}
 import com.loyalty.testing.s3.actor.NotificationBehavior.Command
-import com.loyalty.testing.s3.actor.model.{CborSerializable, Event, NoSuchBucketExists, NotificationsCreated, NotificationsInfo}
+import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationData, _}
 import com.loyalty.testing.s3.repositories.NitriteDatabase
 import com.loyalty.testing.s3.repositories.model.Bucket
@@ -134,17 +135,16 @@ class NotificationBehavior(context: ActorContext[Command],
     }
 
   private def parseNotification(notificationData: NotificationData,
-                                log: Logger)(notification: Notification) = {
+                                log: Logger)(notification: Notification): Command = {
     val key = notificationData.key
     val prefix = notification.prefix
     val suffix = notification.suffix
     val prefixMatch = prefix.exists(key.startsWith) || prefix.isEmpty
     val suffixMatch = suffix.exists(key.endsWith) || suffix.isEmpty
-    if (prefixMatch && suffixMatch) {
+    if (notification.notificationType.isValidOperation(notificationData.operation) || (prefixMatch && suffixMatch)) {
       val message = generateMessage(notificationData, notification)
       SendNotificationToDestination(notification.destinationType, notification.destinationName, message)
-    }
-    else {
+    } else {
       log.warn("Not sending notification, data={}, notification={}", notificationData, notification)
       Standby
     }
@@ -153,7 +153,7 @@ class NotificationBehavior(context: ActorContext[Command],
 
 object NotificationBehavior {
 
-  val TypeKey: EntityTypeKey[Command] = EntityTypeKey[Command]("Notification")
+  val TypeKey: EntityTypeKey[Command] = EntityTypeKey[Command]("NotificationActor")
 
   def apply(database: NitriteDatabase,
             notificationService: NotificationService): Behavior[Command] =
@@ -162,6 +162,11 @@ object NotificationBehavior {
         new NotificationBehavior(context, buffer, database, notificationService)
       }
     }
+
+  def init(sharding: ClusterSharding,
+           database: NitriteDatabase,
+           notificationService: NotificationService): ActorRef[ShardingEnvelope[Command]] =
+    sharding.init(Entity(TypeKey)(_ => NotificationBehavior(database, notificationService)))
 
   sealed trait Command extends CborSerializable
 

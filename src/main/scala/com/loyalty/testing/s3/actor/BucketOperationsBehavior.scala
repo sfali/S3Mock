@@ -5,7 +5,7 @@ import java.util.UUID
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.cluster.sharding.typed.ShardingEnvelope
-import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
+import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity, EntityTypeKey}
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.actor.model.`object`.{CompleteUpload, DeleteObject, GetObject, GetObjectMeta, InitiateMultiPartUpload, PutObject, UploadPart, Command => ObjectCommand}
@@ -179,11 +179,16 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
 
 object BucketOperationsBehavior {
 
-  val TypeKey: EntityTypeKey[Command] = EntityTypeKey[Command]("BucketOperations")
+  val TypeKey: EntityTypeKey[Command] = EntityTypeKey[Command]("BucketOperationsActor")
 
   def apply(database: NitriteDatabase,
             objectOperationsActorRef: ActorRef[ShardingEnvelope[ObjectCommand]]): Behavior[Command] =
     Behaviors.setup { context =>
       Behaviors.withStash(1000)(buffer => new BucketOperationsBehavior(context, buffer, database, objectOperationsActorRef))
     }
+
+  def init(sharding: ClusterSharding,
+           database: NitriteDatabase,
+           objectOperationsActorRef: ActorRef[ShardingEnvelope[ObjectCommand]]): ActorRef[ShardingEnvelope[Command]] =
+    sharding.init(Entity(TypeKey)(_ => BucketOperationsBehavior(database, objectOperationsActorRef)))
 }

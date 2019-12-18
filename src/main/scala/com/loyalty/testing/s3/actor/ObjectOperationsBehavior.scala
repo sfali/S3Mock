@@ -2,10 +2,12 @@ package com.loyalty.testing.s3.actor
 
 import java.util.UUID
 
-import akka.actor.typed.Behavior
+import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, StashBuffer}
-import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
+import akka.cluster.sharding.typed.ShardingEnvelope
+import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity, EntityTypeKey}
 import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.actor.NotificationBehavior.{Command => NotificationCommand}
 import com.loyalty.testing.s3.actor.model.{DeleteInfo, InternalError, InvalidAccess, InvalidPart, InvalidPartOrder, MultiPartUploadedInitiated, NoSuchKeyExists, NoSuchUpload, ObjectContent, ObjectInfo, PartUploaded}
 import com.loyalty.testing.s3.actor.model.`object`._
 import com.loyalty.testing.s3.repositories.collections.NoSuchId
@@ -20,7 +22,8 @@ import scala.util.{Failure, Success, Try}
 
 class ObjectOperationsBehavior(context: ActorContext[Command],
                                buffer: StashBuffer[Command],
-                               objectService: ObjectService)
+                               objectService: ObjectService,
+                               notificationActorRef: ActorRef[ShardingEnvelope[NotificationCommand]])
   extends AbstractBehavior(context) {
 
   import ObjectOperationsBehavior._
@@ -228,15 +231,22 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
 
 object ObjectOperationsBehavior {
 
-  val TypeKey: EntityTypeKey[Command] = EntityTypeKey[Command]("ObjectOperations")
+  val TypeKey: EntityTypeKey[Command] = EntityTypeKey[Command]("ObjectOperationsActor")
 
   def apply(objectIO: ObjectIO,
-            database: NitriteDatabase): Behavior[Command] =
+            database: NitriteDatabase,
+            notificationActorRef: ActorRef[ShardingEnvelope[NotificationCommand]]): Behavior[Command] =
     Behaviors.setup[Command] { context =>
       Behaviors.withStash[Command](1000) { buffer =>
-        new ObjectOperationsBehavior(context, buffer, ObjectService(objectIO, database))
+        new ObjectOperationsBehavior(context, buffer, ObjectService(objectIO, database), notificationActorRef)
       }
     }
+
+  def init(sharding: ClusterSharding,
+           objectIO: ObjectIO,
+           database: NitriteDatabase,
+           notificationActorRef: ActorRef[ShardingEnvelope[NotificationCommand]]): ActorRef[ShardingEnvelope[Command]] =
+    sharding.init(Entity(TypeKey)(_ => ObjectOperationsBehavior(objectIO, database, notificationActorRef)))
 
   private def sanitizeVersionId(bucket: Bucket, maybeVersionId: Option[String]): Option[String] =
     if (BucketVersioning.NotExists == bucket.version && maybeVersionId.isDefined) {

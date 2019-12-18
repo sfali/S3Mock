@@ -4,7 +4,7 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.{ActorSystem, Behavior}
 import akka.actor.{ActorSystem => ClassicActorSystem}
-import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity}
+import akka.cluster.sharding.typed.scaladsl.ClusterSharding
 import com.loyalty.testing.s3.actor.{BucketOperationsBehavior, CopyBehavior, NotificationBehavior, ObjectOperationsBehavior}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.service.NotificationService
@@ -40,23 +40,11 @@ object MainTyped extends App {
 
             settings.initialDataPath.foreach(path => initializeInitialData(path, ctx.log, database))
 
-            val sharding = ClusterSharding(system)
-            val objectOperationsActorRef = sharding
-              .init(
-                Entity(ObjectOperationsBehavior.TypeKey)(_ => ObjectOperationsBehavior(objectIO, database))
-              )
-            val bucketOperationsActorRef = sharding
-              .init(
-                Entity(BucketOperationsBehavior.TypeKey)(_ => BucketOperationsBehavior(database, objectOperationsActorRef))
-              )
-            val copyActorRef = sharding
-              .init(
-                Entity(CopyBehavior.TypeKey)(_ => CopyBehavior(bucketOperationsActorRef))
-              )
-            val notificationActorRef = sharding
-              .init(
-                Entity(NotificationBehavior.TypeKey)(_ => NotificationBehavior(database, notificationService))
-              )
+            val sharding: ClusterSharding = ClusterSharding(system)
+            val notificationActorRef = NotificationBehavior.init(sharding, database, notificationService)
+            val objectOperationsActorRef = ObjectOperationsBehavior.init(sharding, objectIO, database, notificationActorRef)
+            val bucketOperationsActorRef = BucketOperationsBehavior.init(sharding, database, objectOperationsActorRef)
+            val copyActorRef = CopyBehavior.init(sharding, bucketOperationsActorRef)
 
             val httpServer = HttpServer(database, bucketOperationsActorRef, copyActorRef, notificationActorRef)
             httpServer.start()

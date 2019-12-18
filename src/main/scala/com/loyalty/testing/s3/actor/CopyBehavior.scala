@@ -5,7 +5,7 @@ import java.util.UUID
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.cluster.sharding.typed.ShardingEnvelope
-import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
+import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity, EntityTypeKey}
 import akka.http.scaladsl.model.headers.ByteRange
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.CopyBehavior.Command
@@ -69,10 +69,14 @@ class CopyBehavior(context: ActorContext[Command],
 
 object CopyBehavior {
 
-  val TypeKey: EntityTypeKey[Command] = EntityTypeKey[Command]("CopyOperations")
+  val TypeKey: EntityTypeKey[Command] = EntityTypeKey[Command]("CopyOperationsActor")
 
   def apply(bucketOperationsActorRef: ActorRef[ShardingEnvelope[BucketCommand]]): Behavior[Command] =
     Behaviors.setup[Command](context => new CopyBehavior(context, bucketOperationsActorRef))
+
+  def init(sharding: ClusterSharding,
+           bucketOperationsActorRef: ActorRef[ShardingEnvelope[BucketCommand]]): ActorRef[ShardingEnvelope[Command]] =
+    sharding.init(Entity(TypeKey)(_ => CopyBehavior(bucketOperationsActorRef)))
 
   sealed trait Command extends CborSerializable
 
