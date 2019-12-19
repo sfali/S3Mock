@@ -1,5 +1,6 @@
 package com.loyalty.testing.s3.repositories.model
 
+import java.nio.file.Path
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -16,6 +17,7 @@ case class ObjectKey(id: UUID,
                      eTag: String,
                      contentMd5: String,
                      contentLength: Long,
+                     objectPath: Path,
                      lastModifiedTime: OffsetDateTime,
                      deleteMarker: Option[Boolean],
                      uploadId: Option[String],
@@ -37,6 +39,7 @@ object ObjectKey {
             eTag: String,
             contentMd5: String,
             contentLength: Long,
+            objectPath: Path,
             lastModifiedTime: OffsetDateTime = OffsetDateTime.now,
             deleteMarker: Option[Boolean] = None,
             uploadId: Option[String] = None,
@@ -51,6 +54,7 @@ object ObjectKey {
       eTag,
       contentMd5,
       contentLength,
+      objectPath,
       lastModifiedTime,
       deleteMarker,
       uploadId,
@@ -68,6 +72,7 @@ object ObjectKey {
       eTag = doc.getString(ETagField),
       contentMd5 = doc.getString(ContentMd5Field),
       contentLength = doc.getLong(ContentLengthField),
+      objectPath = doc.getPath(PathField),
       lastModifiedTime = doc.getLastModifiedTime.toOffsetDateTime,
       deleteMarker = doc.getOptionalBoolean(DeleteMarkerField),
       uploadId = doc.getOptionalString(UploadIdField),

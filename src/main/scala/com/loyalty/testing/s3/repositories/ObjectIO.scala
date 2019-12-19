@@ -3,7 +3,6 @@ package com.loyalty.testing.s3.repositories
 import java.nio.file.{Files, Path}
 import java.time.OffsetDateTime
 import java.util.UUID
-import java.util.stream.Collectors
 
 import akka.Done
 import akka.http.scaladsl.model.headers.ByteRange
@@ -49,6 +48,7 @@ class ObjectIO(root: Path, fileStream: FileStream) {
               eTag = digestInfo.etag,
               contentMd5 = digestInfo.md5,
               contentLength = digestInfo.length,
+              objectPath = objectPath.getParent,
               lastModifiedTime = OffsetDateTime.now()
             ))
       }
@@ -101,6 +101,7 @@ class ObjectIO(root: Path, fileStream: FileStream) {
               eTag = finalETag,
               contentMd5 = digestInfo.md5,
               contentLength = digestInfo.length,
+              objectPath = objectPath.getParent,
               lastModifiedTime = OffsetDateTime.now(),
               uploadId = Some(uploadInfo.uploadId)
             ))
@@ -128,12 +129,8 @@ class ObjectIO(root: Path, fileStream: FileStream) {
   }
 
   def delete(objectKey: ObjectKey): Unit = {
-    val objectPath = getObjectPath(objectKey.bucketName, objectKey.key, objectKey.version, objectKey.versionId)
-    val path = objectPath.getParent.getParent
-    val parent = path.getParent
-    clean(path)
-    val empty = Files.list(parent).collect(Collectors.toList()).isEmpty
-    if (empty) clean(parent)
+    val parent = getObjectPath(objectKey.bucketName, objectKey.key, objectKey.version, objectKey.versionId).getParent
+    clean(parent)
   }
 
   def initiateMultipartUpload(uploadInfo: UploadInfo): Path = getUploadPath(uploadInfo, staging = true)
@@ -141,20 +138,14 @@ class ObjectIO(root: Path, fileStream: FileStream) {
   private def getObjectPath(bucketName: String,
                             key: String,
                             bucketVersioning: BucketVersioning,
-                            versionId: String) = {
-    val objectParentPath = dataDir + (bucketName, key, toBase16(bucketVersioning.entryName), versionId)
-    objectParentPath -> ContentFileName
-  }
+                            versionId: String) =
+    (dataDir + toObjectDir(bucketName, key, bucketVersioning, versionId)) -> ContentFileName
 
   private def getUploadPath(uploadInfo: UploadInfo, staging: Boolean) = {
     val path = if (staging) uploadsStagingDir else uploadsDir
-    val uploadPath = path + (uploadInfo.bucketName, uploadInfo.key, uploadInfo.uploadId,
-      toBase16(uploadInfo.version.entryName), uploadInfo.versionIndex.toVersionId)
-    if (uploadInfo.partNumber > 0) {
-      val partPath = uploadPath + uploadInfo.partNumber.toString
-      partPath -> ContentFileName
-    } else uploadPath
-
+    val uploadPath = path + toUploadDir(uploadInfo)
+    if (uploadInfo.partNumber > 0) (uploadPath + uploadInfo.partNumber.toString) -> ContentFileName
+    else uploadPath
   }
 
 }

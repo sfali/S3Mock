@@ -11,14 +11,14 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.scaladsl.{FileIO, Sink}
-import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.CopyBehavior.{Copy, CopyPart}
 import com.loyalty.testing.s3.actor.NotificationBehavior.{CreateBucketNotifications, GetBucketNotifications}
 import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.actor.model.bucket._
+import com.loyalty.testing.s3.{data, _}
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
-import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey}
-import com.loyalty.testing.s3.repositories.{NitriteDatabase, NonVersionId, ObjectIO}
+import com.loyalty.testing.s3.repositories.model.Bucket
+import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo, VersioningConfiguration}
 import com.loyalty.testing.s3.service.NotificationService
 import com.loyalty.testing.s3.streams.FileStream
@@ -193,19 +193,9 @@ class BucketOperationsBehaviorSpec
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
-    val objectKey = ObjectKey(
-      id = createObjectId(defaultBucketName, key),
-      bucketName = defaultBucketName,
-      key = key,
-      index = 0,
-      version = NotExists,
-      versionId = NonVersionId,
-      eTag = etagDigest,
-      contentMd5 = md5Digest,
-      contentLength = Files.size(path),
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
-    )
-    probe.expectMessage(ObjectInfo(objectKey))
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest, Files.size(path))
+    val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
+    actualObjectInfo mustEqual expectedObjectInfo
 
     testKit.stop(objectActorRef)
     testKit.stop(actorRef)
@@ -220,21 +210,9 @@ class BucketOperationsBehaviorSpec
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectMetaWrapper(key, probe.ref)
 
-    val expectedObjectKey = ObjectKey(
-      id = createObjectId(defaultBucketName, key),
-      bucketName = defaultBucketName,
-      key = key,
-      index = 0,
-      version = NotExists,
-      versionId = NonVersionId,
-      eTag = etagDigest,
-      contentMd5 = md5Digest,
-      contentLength = Files.size(path),
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
-    )
-    val event: ObjectInfo = probe.receiveMessage().asInstanceOf[ObjectInfo]
-    val actualObjectKey = event.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
-    expectedObjectKey mustEqual actualObjectKey
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest, Files.size(path))
+    val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
+    actualObjectInfo mustEqual expectedObjectInfo
 
     testKit.stop(actorRef)
   }
@@ -249,19 +227,9 @@ class BucketOperationsBehaviorSpec
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
-    val objectKey = ObjectKey(
-      id = createObjectId(defaultBucketName, key),
-      bucketName = defaultBucketName,
-      key = key,
-      index = 0,
-      version = NotExists,
-      versionId = NonVersionId,
-      eTag = etagDigest1,
-      contentMd5 = md5Digest1,
-      contentLength = Files.size(path),
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
-    )
-    probe.expectMessage(ObjectInfo(objectKey))
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, Files.size(path))
+    val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
+    actualObjectInfo mustEqual expectedObjectInfo
 
     testKit.stop(objectActorRef)
     testKit.stop(actorRef)
@@ -278,19 +246,9 @@ class BucketOperationsBehaviorSpec
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
-    val objectKey = ObjectKey(
-      id = createObjectId(defaultBucketName, key),
-      bucketName = defaultBucketName,
-      key = key,
-      index = 0,
-      version = NotExists,
-      versionId = NonVersionId,
-      eTag = etagDigest,
-      contentMd5 = md5Digest,
-      contentLength = Files.size(path),
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
-    )
-    probe.expectMessage(ObjectInfo(objectKey))
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest, Files.size(path))
+    val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
+    actualObjectInfo mustEqual expectedObjectInfo
 
     testKit.stop(actorRef)
     testKit.stop(actorRef)
@@ -307,19 +265,9 @@ class BucketOperationsBehaviorSpec
     actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
     val index = 1
-    val objectKey = ObjectKey(
-      id = createObjectId(versionedBucketName, key),
-      bucketName = versionedBucketName,
-      key = key,
-      index = index,
-      version = Enabled,
-      versionId = index.toVersionId,
-      eTag = etagDigest,
-      contentMd5 = md5Digest,
-      contentLength = Files.size(path),
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
-    )
-    probe.expectMessage(ObjectInfo(objectKey))
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, Files.size(path), Some(index.toVersionId))
+    val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
+    actualObjectInfo mustEqual expectedObjectInfo
 
     testKit.stop(actorRef)
   }
@@ -335,19 +283,9 @@ class BucketOperationsBehaviorSpec
     actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
     val index = 2
-    val objectKey = ObjectKey(
-      id = createObjectId(versionedBucketName, key),
-      bucketName = versionedBucketName,
-      key = key,
-      index = index,
-      version = Enabled,
-      versionId = index.toVersionId,
-      eTag = etagDigest1,
-      contentMd5 = md5Digest1,
-      contentLength = Files.size(path),
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
-    )
-    probe.expectMessage(ObjectInfo(objectKey))
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest1, Files.size(path), Some(index.toVersionId))
+    val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
+    actualObjectInfo mustEqual expectedObjectInfo
 
     testKit.stop(objectActorRef)
     testKit.stop(actorRef)
@@ -357,18 +295,7 @@ class BucketOperationsBehaviorSpec
     val key = "sample.txt"
     val path = resourcePath -> "sample1.txt"
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
-    val expectedObjectKey = ObjectKey(
-      id = createObjectId(defaultBucketName, key),
-      bucketName = defaultBucketName,
-      key = key,
-      index = 0,
-      version = NotExists,
-      versionId = NonVersionId,
-      eTag = etagDigest1,
-      contentMd5 = md5Digest1,
-      contentLength = Files.size(path),
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
-    )
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -376,9 +303,9 @@ class BucketOperationsBehaviorSpec
     actorRef ! GetObjectWrapper(key, replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
-    val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    val actualObjectInfo = data.ObjectInfo(objectContent.objectKey)
     val actualContent = objectContent.content.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
-    expectedObjectKey mustEqual actualObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
     expectedContent mustEqual actualContent
 
     testKit.stop(objectActorRef)
@@ -388,18 +315,7 @@ class BucketOperationsBehaviorSpec
   it should "get object with range between two positions from the start of file" in {
     val key = "sample.txt"
     val expectedContent = "1. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectKey = ObjectKey(
-      id = createObjectId(defaultBucketName, key),
-      bucketName = defaultBucketName,
-      key = key,
-      index = 0,
-      version = NotExists,
-      versionId = NonVersionId,
-      eTag = etagDigest1,
-      contentMd5 = md5Digest1,
-      contentLength = expectedContent.length,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
-    )
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -407,9 +323,9 @@ class BucketOperationsBehaviorSpec
     actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange(0, 53)), replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
-    val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    val actualObjectInfo = data.ObjectInfo(objectContent.objectKey)
     val actualContent = objectContent.content.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
-    expectedObjectKey mustEqual actualObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
     expectedContent mustEqual actualContent
 
     testKit.stop(objectActorRef)
@@ -419,18 +335,7 @@ class BucketOperationsBehaviorSpec
   it should "get object with range between two positions from the middle of file" in {
     val key = "sample.txt"
     val expectedContent = "6. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectKey = ObjectKey(
-      id = createObjectId(defaultBucketName, key),
-      bucketName = defaultBucketName,
-      key = key,
-      index = 0,
-      version = NotExists,
-      versionId = NonVersionId,
-      eTag = etagDigest1,
-      contentMd5 = md5Digest1,
-      contentLength = expectedContent.length,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
-    )
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -438,9 +343,9 @@ class BucketOperationsBehaviorSpec
     actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange(265, 318)), replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
-    val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    val actualObjectInfo = data.ObjectInfo(objectContent.objectKey)
     val actualContent = objectContent.content.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
-    expectedObjectKey mustEqual actualObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
     expectedContent mustEqual actualContent
 
     testKit.stop(objectActorRef)
@@ -450,18 +355,7 @@ class BucketOperationsBehaviorSpec
   it should "get object with suffix range" in {
     val key = "sample.txt"
     val expectedContent = "8. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectKey = ObjectKey(
-      id = createObjectId(defaultBucketName, key),
-      bucketName = defaultBucketName,
-      key = key,
-      index = 0,
-      version = NotExists,
-      versionId = NonVersionId,
-      eTag = etagDigest1,
-      contentMd5 = md5Digest1,
-      contentLength = expectedContent.length,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
-    )
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -469,9 +363,9 @@ class BucketOperationsBehaviorSpec
     actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange.suffix(53)), replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
-    val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    val actualObjectInfo = data.ObjectInfo(objectContent.objectKey)
     val actualContent = objectContent.content.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
-    expectedObjectKey mustEqual actualObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
     expectedContent mustEqual actualContent
 
     testKit.stop(objectActorRef)
@@ -481,18 +375,7 @@ class BucketOperationsBehaviorSpec
   it should "get object with range with offset" in {
     val key = "sample.txt"
     val expectedContent = "8. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectKey = ObjectKey(
-      id = createObjectId(defaultBucketName, key),
-      bucketName = defaultBucketName,
-      key = key,
-      index = 0,
-      version = NotExists,
-      versionId = NonVersionId,
-      eTag = etagDigest1,
-      contentMd5 = md5Digest1,
-      contentLength = expectedContent.length,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
-    )
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -500,9 +383,9 @@ class BucketOperationsBehaviorSpec
     actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange.fromOffset(371)), replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
-    val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    val actualObjectInfo = data.ObjectInfo(objectContent.objectKey)
     val actualContent = objectContent.content.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
-    expectedObjectKey mustEqual actualObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
     expectedContent mustEqual actualContent
 
     testKit.stop(objectActorRef)
@@ -514,18 +397,7 @@ class BucketOperationsBehaviorSpec
     val path = resourcePath -> "sample1.txt"
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 2
-    val expectedObjectKey = ObjectKey(
-      id = createObjectId(versionedBucketName, key),
-      bucketName = versionedBucketName,
-      key = key,
-      index = index,
-      version = Enabled,
-      versionId = index.toVersionId,
-      eTag = etagDigest1,
-      contentMd5 = md5Digest1,
-      contentLength = Files.size(path),
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
-    )
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest1, expectedContent.length, Some(index.toVersionId))
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -533,9 +405,9 @@ class BucketOperationsBehaviorSpec
     actorRef ! GetObjectWrapper(key, replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
-    val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    val actualObjectInfo = data.ObjectInfo(objectContent.objectKey)
     val actualContent = objectContent.content.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
-    expectedObjectKey mustEqual actualObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
     expectedContent mustEqual actualContent
 
     testKit.stop(objectActorRef)
@@ -547,18 +419,7 @@ class BucketOperationsBehaviorSpec
     val path = resourcePath -> key
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 1
-    val expectedObjectKey = ObjectKey(
-      id = createObjectId(versionedBucketName, key),
-      bucketName = versionedBucketName,
-      key = key,
-      index = index,
-      version = Enabled,
-      versionId = index.toVersionId,
-      eTag = etagDigest,
-      contentMd5 = md5Digest,
-      contentLength = Files.size(path),
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime
-    )
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, expectedContent.length, Some(index.toVersionId))
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -566,9 +427,9 @@ class BucketOperationsBehaviorSpec
     actorRef ! GetObjectWrapper(key, maybeVersionId = Some(index.toVersionId.toString), replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
-    val actualObjectKey = objectContent.objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
+    val actualObjectInfo = data.ObjectInfo(objectContent.objectKey)
     val actualContent = objectContent.content.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
-    expectedObjectKey mustEqual actualObjectKey
+    actualObjectInfo mustEqual expectedObjectInfo
     expectedContent mustEqual actualContent
 
     testKit.stop(objectActorRef)
@@ -626,22 +487,10 @@ class BucketOperationsBehaviorSpec
     val partBoundaries = (1, 100000) :: (100001, 100000) :: (200001, 5000) :: Nil
     val parts = verifyUploads(key, uploadId, partNumbers, partBoundaries, actorRef, probe)
     actorRef ! CompleteUploadWrapper(key, uploadId, parts, probe.ref)
-    val actualObjectKey = probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey.copy(contentMd5 = "")
+    val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
     val (etag, contentLength) = calculateETagAndLength(partBoundaries)
-    val expectedObjectKey = ObjectKey(
-      id = createObjectId(defaultBucketName, key),
-      bucketName = defaultBucketName,
-      key = key,
-      index = 0,
-      version = NotExists,
-      versionId = NonVersionId,
-      eTag = etag,
-      contentMd5 = "",
-      contentLength = contentLength,
-      lastModifiedTime = dateTimeProvider.currentOffsetDateTime,
-      uploadId = Some(uploadId)
-    )
-    actualObjectKey mustEqual expectedObjectKey
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etag, contentLength)
+    actualObjectInfo mustEqual expectedObjectInfo
 
     testKit.stop(objectActorRef)
     testKit.stop(actorRef)

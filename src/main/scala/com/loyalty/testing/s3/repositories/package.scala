@@ -1,6 +1,6 @@
 package com.loyalty.testing.s3
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.Path
 import java.time.{Instant, OffsetDateTime, ZoneId}
 import java.util.UUID
 import java.{lang, util}
@@ -21,6 +21,7 @@ package object repositories {
   val OperationTypeField = "operation-type"
   val DestinationTypeField = "destination-type"
   val DestinationNameField = "destination-name"
+  val PathField = "path"
   val PrefixField = "prefix"
   val SuffixField = "suffix"
   val KeyField = "key"
@@ -62,7 +63,7 @@ package object repositories {
         case None => None
       }
 
-    def getPath(key: String): Path = Paths.get(getString(key))
+    def getPath(key: String): Path = getString(key).toPath
 
     def getOptionalForeignField(key: String): Option[List[Document]] =
       Option(src.get(key, classOf[util.HashSet[Document]])).map(_.asScala.toList)

@@ -23,7 +23,8 @@ case class UploadInfo(bucketName: String,
     versionId = NonVersionId,
     eTag = eTag,
     contentMd5 = contentMd5,
-    contentLength = contentLength
+    contentLength = contentLength,
+    objectPath = null // TODO
   )
 }
 

@@ -53,6 +53,7 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
       .put(ContentMd5Field, objectKey.contentMd5)
       .put(ContentLengthField, objectKey.contentLength)
       .put(UploadIdField, objectKey.uploadId.orNull)
+      .put(PathField, objectKey.objectPath.toString)
 
     Try(collection.update(updatedDocument, true)) match {
       case Failure(ex) =>
