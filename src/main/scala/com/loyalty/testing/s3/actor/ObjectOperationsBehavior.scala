@@ -211,7 +211,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
 
       case ReplyToSender(reply, replyTo, maybeObjectKey, maybeOperation) =>
         // send notification if applicable
-        if (enableNotification && maybeOperation.isEmpty && maybeObjectKey.isDefined) {
+        if (enableNotification && maybeOperation.isDefined && maybeObjectKey.isDefined) {
           val objectKey = maybeObjectKey.get
           val bucketName = objectKey.bucketName
           val notificationData = NotificationData(bucketName, objectKey.key,
