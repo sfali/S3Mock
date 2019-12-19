@@ -147,7 +147,7 @@ object CopyBehavior {
               | target_key={}, source_version_id={}, range={}""".stripMargin.replaceNewLine, source.bucketName, source.key,
             target.bucketName, target.key, sourceVersionId, maybeRange)
           bucketOperationsActorRef ! ShardingEnvelope(target.bucketName.toUUID.toString,
-            PutObjectWrapper(target.key, content, eventResponseWrapper))
+            PutObjectWrapper(target.key, content, copy = true, replyTo = eventResponseWrapper))
           Behaviors.same
 
         case EventWrapper(PartUploaded(uploadInfo)) =>

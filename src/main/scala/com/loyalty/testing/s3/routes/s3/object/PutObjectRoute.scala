@@ -32,7 +32,8 @@ object PutObjectRoute extends CustomMarshallers {
           .via(
             ActorFlow.ask(bucketOperationsActorRef)(
               (_, replyTo: ActorRef[Event]) =>
-                ShardingEnvelope(bucketName.toUUID.toString, PutObjectWrapper(key, request.entity.dataBytes, replyTo))
+                ShardingEnvelope(bucketName.toUUID.toString, PutObjectWrapper(key, request.entity.dataBytes,
+                  copy = false, replyTo))
             )
           ).runWith(Sink.head)
       onComplete(eventualEvent) {

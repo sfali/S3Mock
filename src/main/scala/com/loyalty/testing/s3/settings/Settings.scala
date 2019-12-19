@@ -14,6 +14,8 @@ trait Settings {
 
   val http: HttpSettings = HttpSettings(config)
 
+  val enableNotification: Boolean = config.getBoolean("app.enable-notification")
+
   val initialDataPath: Option[Path] =
     config.getOptionalString("app.bootstrap.initial-data-path") match {
       case Some(path) => Some(path.toPath -> "initial.json")

@@ -16,6 +16,7 @@ import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.BucketVersioning
 import com.loyalty.testing.s3.service._
+import com.loyalty.testing.s3.settings.Settings
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -23,6 +24,7 @@ import scala.util.{Failure, Success, Try}
 
 class ObjectOperationsBehavior(context: ActorContext[Command],
                                buffer: StashBuffer[Command],
+                               enableNotification: Boolean,
                                objectService: ObjectService,
                                notificationActorRef: ActorRef[ShardingEnvelope[NotificationCommand]])
   extends AbstractBehavior(context) {
@@ -82,14 +84,15 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
         context.self ! ReplyToSender(NoSuchUpload, protocol.replyTo)
         Behaviors.same
 
-      case PutObject(bucket, key, contentSource, replyTo) =>
+      case PutObject(bucket, key, contentSource, copy, replyTo) =>
         versionIndex = if (BucketVersioning.Enabled == bucket.version) versionIndex + 1 else versionIndex
         context.pipeToSelf(objectService.saveObject(bucket, key, objectId, versionIndex, contentSource)) {
           case Failure(ex) =>
             context.log.error(s"unable to save object: ${bucket.bucketName}/$key", ex)
             DatabaseError
           case Success(objectKey) =>
-            ReplyToSender(ObjectInfo(objectKey), replyTo, Some(objectKey), Some(Put))
+            val operationType = if (copy) Copy else Put
+            ReplyToSender(ObjectInfo(objectKey), replyTo, Some(objectKey), Some(operationType))
         }
         Behaviors.same
 
@@ -208,7 +211,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
 
       case ReplyToSender(reply, replyTo, maybeObjectKey, maybeOperation) =>
         // send notification if applicable
-        if (maybeOperation.isEmpty && maybeObjectKey.isDefined) {
+        if (enableNotification && maybeOperation.isEmpty && maybeObjectKey.isDefined) {
           val objectKey = maybeObjectKey.get
           val bucketName = objectKey.bucketName
           val notificationData = NotificationData(bucketName, objectKey.key,
@@ -248,20 +251,23 @@ object ObjectOperationsBehavior {
 
   val TypeKey: EntityTypeKey[Command] = EntityTypeKey[Command]("ObjectOperationsActor")
 
-  def apply(objectIO: ObjectIO,
+  def apply(enableNotification: Boolean,
+            objectIO: ObjectIO,
             database: NitriteDatabase,
             notificationActorRef: ActorRef[ShardingEnvelope[NotificationCommand]]): Behavior[Command] =
     Behaviors.setup[Command] { context =>
       Behaviors.withStash[Command](1000) { buffer =>
-        new ObjectOperationsBehavior(context, buffer, ObjectService(objectIO, database), notificationActorRef)
+        new ObjectOperationsBehavior(context, buffer, enableNotification, ObjectService(objectIO, database),
+          notificationActorRef)
       }
     }
 
   def init(sharding: ClusterSharding,
            objectIO: ObjectIO,
            database: NitriteDatabase,
-           notificationActorRef: ActorRef[ShardingEnvelope[NotificationCommand]]): ActorRef[ShardingEnvelope[Command]] =
-    sharding.init(Entity(TypeKey)(_ => ObjectOperationsBehavior(objectIO, database, notificationActorRef)))
+           notificationActorRef: ActorRef[ShardingEnvelope[NotificationCommand]])
+          (implicit settings: Settings): ActorRef[ShardingEnvelope[Command]] =
+    sharding.init(Entity(TypeKey)(_ => ObjectOperationsBehavior(settings.enableNotification, objectIO, database, notificationActorRef)))
 
   private def sanitizeVersionId(bucket: Bucket, maybeVersionId: Option[String]): Option[String] =
     if (BucketVersioning.NotExists == bucket.version && maybeVersionId.isDefined) {

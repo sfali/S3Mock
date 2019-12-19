@@ -44,6 +44,7 @@ private[actor] final case class ObjectResult(objects: List[ObjectKey], uploads: 
 final case class PutObject(bucket: Bucket,
                            key: String,
                            contentSource: Source[ByteString, _],
+                           copy: Boolean,
                            replyTo: ActorRef[Event]) extends ObjectInput
 
 final case class GetObjectMeta(bucket: Bucket,

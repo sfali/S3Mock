@@ -135,8 +135,8 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         context.self ! command
         Behaviors.same
 
-      case PutObjectWrapper(key, contentSource, replyTo) =>
-        objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), PutObject(bucket, key, contentSource, replyTo))
+      case PutObjectWrapper(key, contentSource, copy, replyTo) =>
+        objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), PutObject(bucket, key, contentSource, copy, replyTo))
         Behaviors.same
 
       case GetObjectMetaWrapper(key, replyTo) =>

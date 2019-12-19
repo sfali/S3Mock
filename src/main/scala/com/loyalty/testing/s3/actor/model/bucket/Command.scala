@@ -44,6 +44,7 @@ final case class SetBucketVersioning(versioningConfiguration: VersioningConfigur
 
 final case class PutObjectWrapper(key: String,
                                   contentSource: Source[ByteString, _],
+                                  copy: Boolean,
                                   replyTo: ActorRef[Event]) extends CommandWithReply
 
 final case class GetObjectMetaWrapper(key: String, replyTo: ActorRef[Event]) extends CommandWithReply
