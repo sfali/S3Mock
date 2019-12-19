@@ -12,7 +12,7 @@ import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model.bucket.{Command, UploadPartWrapper}
 import com.loyalty.testing.s3.actor.model._
-import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException, NoSuchUploadException}
+import com.loyalty.testing.s3.response.{InternalServiceResponse, NoSuchBucketResponse, NoSuchUploadResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
 
@@ -40,17 +40,17 @@ object UploadPartRoute extends CustomMarshallers {
         onComplete(eventualEvent) {
           case Success(PartUploaded(uploadInfo)) => complete(HttpResponse(OK)
             .withHeaders(createResponseHeaders(uploadInfo.toObjectKey)))
-          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
-          case Success(NoSuchUpload) => complete(NoSuchUploadException(bucketName, key))
+          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
+          case Success(NoSuchUpload) => complete(NoSuchUploadResponse(bucketName, key))
           case Success(InvalidAccess) =>
             system.log.warn("UploadPartRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
-            complete(InternalServiceException(s"$bucketName/$key"))
+            complete(InternalServiceResponse(s"$bucketName/$key"))
           case Success(event) =>
             system.log.warn("UploadPartRoute: invalid event received. event={}, bucket_name={}, key={}", event, bucketName, key)
-            complete(InternalServiceException(s"$bucketName/$key"))
+            complete(InternalServiceResponse(s"$bucketName/$key"))
           case Failure(ex: Throwable) =>
             system.log.error(s"UploadPartRoute: Internal service error occurred, bucket_name=$bucketName, key=$key", ex)
-            complete(InternalServiceException(s"$bucketName/$key"))
+            complete(InternalServiceResponse(s"$bucketName/$key"))
         }
     }
 }

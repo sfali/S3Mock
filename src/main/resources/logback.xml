@@ -19,8 +19,6 @@
         <appender-ref ref="ASYNC"/>
     </root>
 
-    <logger name="com.loyalty.testing.s3" level="INFO">
-        <appender-ref ref="ASYNC"/>
-    </logger>
+    <logger name="com.loyalty.testing.s3" level="INFO"/>
 
 </configuration>

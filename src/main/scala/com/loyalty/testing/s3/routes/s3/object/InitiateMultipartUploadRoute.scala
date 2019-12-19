@@ -10,7 +10,7 @@ import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model.bucket.{Command, InitiateMultiPartUploadWrapper}
 import com.loyalty.testing.s3.actor.model.{Event, InvalidAccess, MultiPartUploadedInitiated, NoSuchBucketExists}
-import com.loyalty.testing.s3.response.{InitiateMultipartUploadResult, InternalServiceException, NoSuchBucketException}
+import com.loyalty.testing.s3.response.{InitiateMultipartUploadResult, InternalServiceResponse, NoSuchBucketResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 
 import scala.util.{Failure, Success}
@@ -34,19 +34,19 @@ object InitiateMultipartUploadRoute extends CustomMarshallers {
       onComplete(eventualEvent) {
         case Success(MultiPartUploadedInitiated(uploadId)) =>
           complete(InitiateMultipartUploadResult(bucketName, key, uploadId))
-        case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
+        case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
         case Success(InvalidAccess) =>
           system.log.warn("InitiateMultipartUploadRoute: invalid access to actor. bucket_name={}, key={}", bucketName,
             key)
-          complete(InternalServiceException(s"$bucketName/$key"))
+          complete(InternalServiceResponse(s"$bucketName/$key"))
         case Success(event) =>
           system.log.warn("InitiateMultipartUploadRoute: invalid event received. event={}, bucket_name={}, key={}",
             event, bucketName, key)
-          complete(InternalServiceException(s"$bucketName/$key"))
+          complete(InternalServiceResponse(s"$bucketName/$key"))
         case Failure(ex: Throwable) =>
           system.log.error(s"InitiateMultipartUploadRoute: Internal service error occurred, bucket_name=$bucketName, " +
             s"key=$key", ex)
-          complete(InternalServiceException(s"$bucketName/$key"))
+          complete(InternalServiceResponse(s"$bucketName/$key"))
       }
     }
 }

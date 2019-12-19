@@ -13,7 +13,7 @@ import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model.bucket.{Command, ListBucket}
 import com.loyalty.testing.s3.actor.model.{Event, ListBucketContent, NoSuchBucketExists}
 import com.loyalty.testing.s3.request.ListBucketParams
-import com.loyalty.testing.s3.response.{InternalServiceException, ListBucketResult, NoSuchBucketException}
+import com.loyalty.testing.s3.response.{InternalServiceResponse, ListBucketResult, NoSuchBucketResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 
 import scala.util.{Failure, Success}
@@ -52,13 +52,13 @@ object ListBucketRoute extends CustomMarshallers {
                 contents = contents
               )
               complete(result)
-            case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
+            case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
             case Success(event: Event) =>
               system.log.warn("ListBucketRoute: invalid event received. event={}, bucket_name={}", event, bucketName)
-              complete(InternalServiceException(bucketName))
+              complete(InternalServiceResponse(bucketName))
             case Failure(ex: Throwable) =>
               system.log.error("ListBucketRoute: Internal service error occurred", ex)
-              complete(InternalServiceException(bucketName))
+              complete(InternalServiceResponse(bucketName))
           }
         }
     }

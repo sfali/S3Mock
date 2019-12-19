@@ -42,19 +42,19 @@ object CompleteUploadRoute extends CustomMarshallers {
           val result = CompleteMultipartUploadResult(bucketName, key, objectKey.eTag, objectKey.contentLength,
             objectKey.actualVersionId)
           complete(result)
-        case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
-        case Success(NoSuchUpload) => complete(NoSuchUploadException(bucketName, key))
-        case Success(InvalidPartOrder) => complete(InvalidPartOrderException(bucketName, key))
-        case Success(InvalidPart(partNumber)) => complete(InvalidPartException(bucketName, key, partNumber, uploadId))
+        case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
+        case Success(NoSuchUpload) => complete(NoSuchUploadResponse(bucketName, key))
+        case Success(InvalidPartOrder) => complete(InvalidPartOrderResponse(bucketName, key))
+        case Success(InvalidPart(partNumber)) => complete(InvalidPartResponse(bucketName, key, partNumber, uploadId))
         case Success(InvalidAccess) =>
           system.log.warn("CompleteUploadRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
-          complete(InternalServiceException(s"$bucketName/$key"))
+          complete(InternalServiceResponse(s"$bucketName/$key"))
         case Success(event) =>
           system.log.warn("CompleteUploadRoute: invalid event received. event={}, bucket_name={}, key={}", event, bucketName, key)
-          complete(InternalServiceException(s"$bucketName/$key"))
+          complete(InternalServiceResponse(s"$bucketName/$key"))
         case Failure(ex: Throwable) =>
           system.log.error(s"CompleteUploadRoute: Internal service error occurred, bucket_name=$bucketName, key=$key", ex)
-          complete(InternalServiceException(s"$bucketName/$key"))
+          complete(InternalServiceResponse(s"$bucketName/$key"))
       }
     }
 }

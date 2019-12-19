@@ -12,7 +12,7 @@ import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.CopyBehavior.{Command, CopyPart}
 import com.loyalty.testing.s3.actor.model._
-import com.loyalty.testing.s3.response.{CopyObjectResult, InternalServiceException, NoSuchBucketException, NoSuchKeyException}
+import com.loyalty.testing.s3.response.{CopyObjectResult, InternalServiceResponse, NoSuchBucketResponse, NoSuchKeyResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
 import com.loyalty.testing.s3.routes.s3.`object`.directives.{`x-amz-copy-source-range`, `x-amz-copy-source`}
@@ -53,21 +53,21 @@ object CopyPartRoute extends CustomMarshallers {
             complete(CopyObjectResult(objectKey.eTag, objectKey.actualVersionId, sourceVersionId))
           case Success(ObjectInfo(_)) =>
             system.log.warn("CopyPartRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
-            complete(InternalServiceException(s"$bucketName/$key"))
+            complete(InternalServiceResponse(s"$bucketName/$key"))
           case Success(NoSuchBucketExists(bucketId)) if bucketId == sourceBucketId =>
-            complete(NoSuchBucketException(sourceBucketName))
+            complete(NoSuchBucketResponse(sourceBucketName))
           case Success(NoSuchBucketExists(bucketId)) if bucketId == targetBucketId =>
-            complete(NoSuchBucketException(bucketName))
-          case Success(NoSuchKeyExists(bucketName, key)) => complete(NoSuchKeyException(bucketName, key))
+            complete(NoSuchBucketResponse(bucketName))
+          case Success(NoSuchKeyExists(bucketName, key)) => complete(NoSuchKeyResponse(bucketName, key))
           case Success(InvalidAccess) =>
             system.log.warn("CopyPartRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
-            complete(InternalServiceException(s"$bucketName/$key"))
+            complete(InternalServiceResponse(s"$bucketName/$key"))
           case Success(event) =>
             system.log.warn("CopyPartRoute: invalid event received. event={}, bucket_name={}, key={}", event, bucketName, key)
-            complete(InternalServiceException(s"$bucketName/$key"))
+            complete(InternalServiceResponse(s"$bucketName/$key"))
           case Failure(ex: Throwable) =>
             system.log.error(s"CopyPartRoute: Internal service error occurred, bucket_name=$bucketName, key=$key", ex)
-            complete(InternalServiceException(s"$bucketName/$key"))
+            complete(InternalServiceResponse(s"$bucketName/$key"))
         }
     }
 }

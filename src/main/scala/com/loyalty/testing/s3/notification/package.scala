@@ -68,15 +68,6 @@ package object notification {
 
   case class UserIdentity(principalId: String = "AIDAJDPLRKLG7UEXAMPLE")
 
-  @deprecated
-  def generateSqsMessage(notificationMeta: NotificationMeta,
-                         notificationData: NotificationData): String = {
-    val s3 = S3(configurationId = notificationMeta.configName, bucket =  Bucket(notificationData.bucketName),
-      `object` = S3Object(notificationData))
-    val eventName = s"${notificationMeta.notificationType}:${notificationData.operation}"
-    toJsonString(SqsEvent(SqsRecord(eventName = eventName, s3 = s3)))
-  }
-
   def generateMessage(notificationData: NotificationData,
                       notification: Notification): String = {
     val s3 = S3(configurationId = notification.name, bucket = Bucket(notificationData.bucketName),

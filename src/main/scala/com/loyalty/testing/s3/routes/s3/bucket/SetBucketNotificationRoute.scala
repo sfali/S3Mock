@@ -12,7 +12,7 @@ import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.NotificationBehavior.{Command, CreateBucketNotifications}
 import com.loyalty.testing.s3.actor.model.{Event, NoSuchBucketExists, NotificationsCreated}
-import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException}
+import com.loyalty.testing.s3.response.{InternalServiceResponse, NoSuchBucketResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
 
@@ -38,13 +38,13 @@ object SetBucketNotificationRoute extends CustomMarshallers {
             ).runWith(Sink.head)
         onComplete(eventualEvent) {
           case Success(NotificationsCreated) => complete(HttpResponse(OK))
-          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
+          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
           case Success(event: Event) =>
             system.log.warn("SetBucketNotificationRoute: invalid event received. event={}, bucket_name={}", event, bucketName)
-            complete(InternalServiceException(bucketName))
+            complete(InternalServiceResponse(bucketName))
           case Failure(ex: Throwable) =>
             system.log.error("SetBucketNotificationRoute: Internal service error occurred", ex)
-            complete(InternalServiceException(bucketName))
+            complete(InternalServiceResponse(bucketName))
         }
     }
 }

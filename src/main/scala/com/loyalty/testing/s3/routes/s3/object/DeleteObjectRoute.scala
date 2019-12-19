@@ -16,7 +16,7 @@ import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model.bucket.{Command, DeleteObjectWrapper}
 import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.repositories.model.ObjectKey
-import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException, NoSuchKeyException}
+import com.loyalty.testing.s3.response.{InternalServiceResponse, NoSuchBucketResponse, NoSuchKeyResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
 
@@ -56,17 +56,17 @@ object DeleteObjectRoute extends CustomMarshallers {
               deleteMarker = Some(deleteMarker)
             )
             complete(HttpResponse(NoContent).withHeaders(createResponseHeaders(objectKey)))
-          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
-          case Success(NoSuchKeyExists(bucketName, key)) => complete(NoSuchKeyException(bucketName, key))
+          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
+          case Success(NoSuchKeyExists(bucketName, key)) => complete(NoSuchKeyResponse(bucketName, key))
           case Success(InvalidAccess) =>
             system.log.warn("DeleteObjectRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
-            complete(InternalServiceException(s"$bucketName/$key"))
+            complete(InternalServiceResponse(s"$bucketName/$key"))
           case Success(event) =>
             system.log.warn("DeleteObjectRoute: invalid event received. event={}, bucket_name={}, key={}", event, bucketName, key)
-            complete(InternalServiceException(s"$bucketName/$key"))
+            complete(InternalServiceResponse(s"$bucketName/$key"))
           case Failure(ex: Throwable) =>
             system.log.error(s"DeleteObjectRoute: Internal service error occurred, bucket_name=$bucketName, key=$key", ex)
-            complete(InternalServiceException(s"$bucketName/$key"))
+            complete(InternalServiceResponse(s"$bucketName/$key"))
         }
     }
 }

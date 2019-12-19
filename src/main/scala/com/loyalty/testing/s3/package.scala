@@ -7,38 +7,33 @@ import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 import java.util.UUID
-import java.util.concurrent.CompletableFuture
 
 import akka.http.scaladsl.model.headers.ByteRange.{FromOffset, Slice, Suffix}
 import akka.http.scaladsl.model.headers.{ByteRange, RawHeader}
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
-import com.amazonaws.services.sns.AmazonSNSAsync
-import com.amazonaws.services.sqs.AmazonSQSAsync
 import com.loyalty.testing.s3.data.{BootstrapConfiguration, InitialBucket}
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.repositories.NitriteDatabase
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo}
-import com.loyalty.testing.s3.response.{CompleteMultipartUploadResult, InvalidNotificationConfigurationException, PutObjectResult}
+import com.loyalty.testing.s3.response.{CompleteMultipartUploadResult, InvalidNotificationConfigurationException}
 import com.typesafe.config.Config
+import io.circe.generic.auto._
+import io.circe.parser._
 import javax.xml.bind.DatatypeConverter
 import org.slf4j.Logger
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
 import software.amazon.awssdk.regions.Region
-import io.circe.generic.auto._
-import io.circe.parser._
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 import scala.xml.{Node, NodeSeq}
 
 package object s3 {
-
-  import scala.compat.java8.FutureConverters._
 
   type JavaFuture[V] = java.util.concurrent.Future[V]
 
@@ -122,28 +117,6 @@ package object s3 {
     val eTag = s"$hex-${parts.length}"
 
     CompleteMultipartUploadResult(bucketName, key, eTag, 0L, maybeVersionId)
-  }
-
-  def createPutObjectResult(filePath: String,
-                            eTag: String,
-                            contentMd5: String,
-                            contentLength: Long,
-                            maybeVersionId: Option[String] = None): PutObjectResult = {
-    PutObjectResult(filePath, eTag, contentMd5, contentLength, maybeVersionId)
-  }
-
-  implicit class JavaFutureOps[T](future: JavaFuture[T]) {
-    def toScalaFuture: Future[T] = CompletableFuture.supplyAsync(() => future.get()).toScala
-  }
-
-  trait SqsSettings {
-    @deprecated
-    val sqsClient: AmazonSQSAsync
-  }
-
-  trait SnsSettings {
-    @deprecated
-    val snsClient: AmazonSNSAsync
   }
 
   case class DownloadRange(startPosition: Long, endPosition: Long, capacity: Long)
@@ -428,4 +401,11 @@ package object s3 {
         } else log.warn("Initial buckets are not provided, skipping initialization")
       case None =>
     }
+
+  @scala.annotation.tailrec
+  def isTypeOf(ex: Throwable, cause: Class[_]): Boolean = {
+    if (ex == null) false
+    else if (cause.isAssignableFrom(ex.getClass)) true
+    else isTypeOf(ex.getCause, cause)
+  }
 }

@@ -15,7 +15,7 @@ import com.loyalty.testing.s3.actor.model.bucket.{Command, CreateBucket}
 import com.loyalty.testing.s3.actor.model.{BucketAlreadyExists, BucketInfo, Event}
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.{BucketVersioning, CreateBucketConfiguration}
-import com.loyalty.testing.s3.response.{BucketAlreadyExistsException, InternalServiceException}
+import com.loyalty.testing.s3.response.{BucketAlreadyExistsResponse, InternalServiceResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
 
@@ -46,13 +46,13 @@ object CreateBucketRoute extends CustomMarshallers {
       onComplete(eventualEvent) {
         case Success(BucketInfo(bucket)) =>
           complete(HttpResponse(OK).withHeaders(Location(s"/${bucket.bucketName}")))
-        case Success(BucketAlreadyExists(bucket)) => complete(BucketAlreadyExistsException(bucket.bucketName))
+        case Success(BucketAlreadyExists(bucket)) => complete(BucketAlreadyExistsResponse(bucket.bucketName))
         case Success(event: Event) =>
           system.log.warn("CreateBucketRoute: invalid event received. event={}, bucket_name={}", event, bucketName)
-          complete(InternalServiceException(bucketName))
+          complete(InternalServiceResponse(bucketName))
         case Failure(ex: Throwable) =>
           system.log.error("CreateBucketRoute: Internal service error occurred", ex)
-          complete(InternalServiceException(bucketName))
+          complete(InternalServiceResponse(bucketName))
       }
     }
 }

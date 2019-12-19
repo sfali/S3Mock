@@ -86,7 +86,7 @@ class RoutesSpec
   it should "send 404(BadRequest) if attempt to create bucket, which is already exists" in {
     Put(s"/$defaultBucketName") ~> routes ~> check {
       status mustBe BadRequest
-      responseAs[BucketAlreadyExistsException] mustEqual BucketAlreadyExistsException(defaultBucketName)
+      responseAs[BucketAlreadyExistsResponse] mustEqual BucketAlreadyExistsResponse(defaultBucketName)
     }
   }
 
@@ -195,7 +195,7 @@ class RoutesSpec
     val entity = HttpEntity(`application/octet-stream`, contentSource)
     Put(s"/$nonExistentBucketName/$key", entity) ~> routes ~> check {
       status mustEqual NotFound
-      responseAs[NoSuchBucketException] mustEqual NoSuchBucketException(nonExistentBucketName)
+      responseAs[NoSuchBucketResponse] mustEqual NoSuchBucketResponse(nonExistentBucketName)
     }
   }
 
@@ -335,7 +335,7 @@ class RoutesSpec
     val copySourceHeader = RawHeader("x-amz-copy-source", s"/$nonExistentBucketName/$key")
     Put(s"/$bucket2/$key").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
       status mustEqual NotFound
-      responseAs[NoSuchBucketException] mustEqual NoSuchBucketException(nonExistentBucketName)
+      responseAs[NoSuchBucketResponse] mustEqual NoSuchBucketResponse(nonExistentBucketName)
     }
   }
 
@@ -344,7 +344,7 @@ class RoutesSpec
     val copySourceHeader = RawHeader("x-amz-copy-source", s"/$defaultBucketName/$key")
     Put(s"/$nonExistentBucketName/$key").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
       status mustEqual NotFound
-      responseAs[NoSuchBucketException] mustEqual NoSuchBucketException(nonExistentBucketName)
+      responseAs[NoSuchBucketResponse] mustEqual NoSuchBucketResponse(nonExistentBucketName)
     }
   }
 
@@ -353,7 +353,7 @@ class RoutesSpec
     val copySourceHeader = RawHeader("x-amz-copy-source", s"/$defaultBucketName/$key")
     Put(s"/$bucket2/$key").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
       status mustEqual NotFound
-      responseAs[NoSuchKeyException] mustEqual NoSuchKeyException(defaultBucketName, key)
+      responseAs[NoSuchKeyResponse] mustEqual NoSuchKeyResponse(defaultBucketName, key)
     }
   }
 

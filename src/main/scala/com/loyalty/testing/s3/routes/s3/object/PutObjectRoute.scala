@@ -12,7 +12,7 @@ import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model.bucket.{Command, PutObjectWrapper}
 import com.loyalty.testing.s3.actor.model.{Event, InvalidAccess, NoSuchBucketExists, ObjectInfo}
-import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException}
+import com.loyalty.testing.s3.response.{InternalServiceResponse, NoSuchBucketResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
 
@@ -38,16 +38,16 @@ object PutObjectRoute extends CustomMarshallers {
           ).runWith(Sink.head)
       onComplete(eventualEvent) {
         case Success(ObjectInfo(objectKey)) => complete(HttpResponse(OK).withHeaders(createResponseHeaders(objectKey)))
-        case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
+        case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
         case Success(InvalidAccess) =>
           system.log.warn("PutObjectRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
-          complete(InternalServiceException(s"$bucketName/$key"))
+          complete(InternalServiceResponse(s"$bucketName/$key"))
         case Success(event) =>
           system.log.warn("PutObjectRoute: invalid event received. event={}, bucket_name={}, key={}", event, bucketName, key)
-          complete(InternalServiceException(s"$bucketName/$key"))
+          complete(InternalServiceResponse(s"$bucketName/$key"))
         case Failure(ex: Throwable) =>
           system.log.error(s"PutObjectRoute: Internal service error occurred, bucket_name=$bucketName, key=$key", ex)
-          complete(InternalServiceException(s"$bucketName/$key"))
+          complete(InternalServiceResponse(s"$bucketName/$key"))
       }
     }
 }

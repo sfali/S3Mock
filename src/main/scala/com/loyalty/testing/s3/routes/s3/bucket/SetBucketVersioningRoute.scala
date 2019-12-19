@@ -14,7 +14,7 @@ import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model.bucket.{Command, SetBucketVersioning}
 import com.loyalty.testing.s3.actor.model.{BucketInfo, Event, NoSuchBucketExists}
 import com.loyalty.testing.s3.request.VersioningConfiguration
-import com.loyalty.testing.s3.response.{InternalServiceException, NoSuchBucketException}
+import com.loyalty.testing.s3.response.{InternalServiceResponse, NoSuchBucketResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
 
@@ -41,13 +41,13 @@ object SetBucketVersioningRoute extends CustomMarshallers {
         onComplete(eventualEvent) {
           case Success(BucketInfo(bucket)) =>
             complete(HttpResponse(OK).withHeaders(Location(s"/${bucket.bucketName}")))
-          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketException(bucketName))
+          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
           case Success(event: Event) =>
             system.log.warn("SetBucketVersioningRoute: invalid event received. event={}, bucket_name={}", event, bucketName)
-            complete(InternalServiceException(bucketName))
+            complete(InternalServiceResponse(bucketName))
           case Failure(ex: Throwable) =>
             system.log.error("SetBucketVersioningRoute: Internal service error occurred", ex)
-            complete(InternalServiceException(bucketName))
+            complete(InternalServiceResponse(bucketName))
         }
     }
 }
