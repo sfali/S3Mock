@@ -53,13 +53,14 @@ abstract class S3IntegrationSpec(resourceBasename: String)
   private lazy val database = NitriteDatabase()
   private val notificationService: NotificationService = NotificationService(settings.awsSettings)(system.toClassic)
 
-  private val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+  private val notificationActorRef: ActorRef[ShardingEnvelope[NotificationBehavior.Command]] =
+    testKit.spawn(shardingEnvelopeWrapper(NotificationBehavior(database, notificationService)))
+  private val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(enableNotification = false,
+    objectIO, database, notificationActorRef)))
   private val bucketOperationsActorRef: ActorRef[ShardingEnvelope[bucket.Command]] =
     testKit.spawn(shardingEnvelopeWrapper(BucketOperationsBehavior(database, objectActorRef)))
   private val copyActorRef: ActorRef[ShardingEnvelope[CopyBehavior.Command]] =
     testKit.spawn(shardingEnvelopeWrapper(CopyBehavior(bucketOperationsActorRef)))
-  private val notificationActorRef: ActorRef[ShardingEnvelope[NotificationBehavior.Command]] =
-    testKit.spawn(shardingEnvelopeWrapper(NotificationBehavior(database, notificationService)))
   private val httpServer = HttpServer(database, bucketOperationsActorRef, copyActorRef, notificationActorRef)
   protected val s3Client: S3Client
 
@@ -72,6 +73,10 @@ abstract class S3IntegrationSpec(resourceBasename: String)
 
   override protected def afterAll(): Unit = {
     super.afterAll()
+    testKit.stop(notificationActorRef)
+    testKit.stop(objectActorRef)
+    testKit.stop(copyActorRef)
+    testKit.stop(bucketOperationsActorRef)
     database.close()
     // clean(rootPath)
     Files.delete(rootPath -> settings.dbSettings.fileName)

@@ -50,13 +50,14 @@ class RoutesSpec
   private val database: NitriteDatabase = NitriteDatabase(rootPath, settings.dbSettings)
   private val notificationService: NotificationService = NotificationService(settings.awsSettings)
 
-  private val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+  override protected val notificationActorRef: ActorRef[ShardingEnvelope[NotificationBehavior.Command]] =
+    testKit.spawn(shardingEnvelopeWrapper(NotificationBehavior(database, notificationService)))
+  private val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(enableNotification = false,
+    objectIO, database, notificationActorRef)))
   override protected val bucketOperationsActorRef: ActorRef[ShardingEnvelope[bucket.Command]] =
     testKit.spawn(shardingEnvelopeWrapper(BucketOperationsBehavior(database, objectActorRef)))
   override protected val copyActorRef: ActorRef[ShardingEnvelope[CopyBehavior.Command]] =
     testKit.spawn(shardingEnvelopeWrapper(CopyBehavior(bucketOperationsActorRef)))
-  override protected val notificationActorRef: ActorRef[ShardingEnvelope[NotificationBehavior.Command]] =
-    testKit.spawn(shardingEnvelopeWrapper(NotificationBehavior(database, notificationService)))
   private val xmlContentType = ContentType(MediaTypes.`application/xml`, HttpCharsets.`UTF-8`)
 
   override protected def beforeAll(): Unit = {
@@ -66,6 +67,10 @@ class RoutesSpec
 
   override protected def afterAll(): Unit = {
     super.afterAll()
+    testKit.stop(notificationActorRef)
+    testKit.stop(objectActorRef)
+    testKit.stop(copyActorRef)
+    testKit.stop(bucketOperationsActorRef)
     database.close()
     Files.delete(rootPath -> settings.dbSettings.fileName)
     system.terminate()

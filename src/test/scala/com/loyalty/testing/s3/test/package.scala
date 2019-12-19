@@ -3,13 +3,18 @@ package com.loyalty.testing.s3
 import java.nio.file.{Path, Paths}
 
 import akka.NotUsed
-import akka.actor.typed.Behavior
+import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.{ActorRef, Behavior}
 import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Concat, Sink, Source}
 import akka.util.ByteString
+import com.loyalty.testing.s3.actor.model.`object`.Command
+import com.loyalty.testing.s3.actor.{NotificationBehavior, ObjectOperationsBehavior}
+import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.response.CopyObjectResult
+import com.loyalty.testing.s3.service.NotificationService
 import com.loyalty.testing.s3.streams.{DigestCalculator, DigestInfo}
 import com.loyalty.testing.s3.utils.StaticDateTimeProvider
 
@@ -56,6 +61,20 @@ package object test {
         actorRef ! envelope.message
         Behaviors.same
     }
+
+  def shardingNotificationActorRef(testKit: ActorTestKit,
+                                   database: NitriteDatabase,
+                                   notificationService: NotificationService): ActorRef[ShardingEnvelope[NotificationBehavior.Command]] =
+    testKit.spawn(shardingEnvelopeWrapper(NotificationBehavior(database, notificationService)))
+
+  def shardingObjectOperationsActorRef(testKit: ActorTestKit,
+                                       objectIO: ObjectIO,
+                                       database: NitriteDatabase,
+                                       notificationService: NotificationService): ActorRef[ShardingEnvelope[Command]] = {
+    val notificationActorRef = shardingNotificationActorRef(testKit, database, notificationService)
+    val behavior = ObjectOperationsBehavior(enableNotification = false, objectIO, database, notificationActorRef)
+    testKit.spawn(shardingEnvelopeWrapper(behavior))
+  }
 
   val userDir: String = System.getProperty("user.dir")
   val rootPath: Path = Paths.get(userDir, "target", ".s3mock")

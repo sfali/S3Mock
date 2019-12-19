@@ -67,7 +67,7 @@ class BucketOperationsBehaviorSpec
 
   it should "create a bucket" in {
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
 
     actorRef ! CreateBucket(Bucket(defaultBucketName, defaultRegion, NotExists), probe.ref)
@@ -79,7 +79,7 @@ class BucketOperationsBehaviorSpec
 
   it should "raise BucketAlreadyExistsException when attempt to create bucket which is already exists" in {
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
 
     actorRef ! CreateBucket(Bucket(defaultBucketName, defaultRegion, NotExists), probe.ref)
@@ -91,7 +91,7 @@ class BucketOperationsBehaviorSpec
 
   it should "create a bucket in region other than default region" in {
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
 
     actorRef ! CreateBucket(Bucket(versionedBucketName, "us-west-1", NotExists), probe.ref)
@@ -103,7 +103,7 @@ class BucketOperationsBehaviorSpec
 
   it should "set versioning on a bucket" in {
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
 
     val configuration = VersioningConfiguration(Enabled)
@@ -168,7 +168,7 @@ class BucketOperationsBehaviorSpec
 
   it should "create different buckets" in {
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef1 = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), bucket2UUID)
     val actorRef2 = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), bucket3UUID)
 
@@ -189,9 +189,9 @@ class BucketOperationsBehaviorSpec
     val contentSource = FileIO.fromPath(path)
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
-    actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
+    actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
     val objectKey = ObjectKey(
       id = createObjectId(defaultBucketName, key),
@@ -216,7 +216,7 @@ class BucketOperationsBehaviorSpec
     val path = resourcePath -> key
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectMetaWrapper(key, probe.ref)
 
@@ -245,9 +245,9 @@ class BucketOperationsBehaviorSpec
     val contentSource = FileIO.fromPath(path)
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
-    actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
+    actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
     val objectKey = ObjectKey(
       id = createObjectId(defaultBucketName, key),
@@ -274,9 +274,9 @@ class BucketOperationsBehaviorSpec
     val contentSource = FileIO.fromPath(path)
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
-    actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
+    actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
     val objectKey = ObjectKey(
       id = createObjectId(defaultBucketName, key),
@@ -302,9 +302,9 @@ class BucketOperationsBehaviorSpec
     val contentSource = FileIO.fromPath(path)
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
-    actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
+    actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
     val index = 1
     val objectKey = ObjectKey(
@@ -330,9 +330,9 @@ class BucketOperationsBehaviorSpec
     val contentSource = FileIO.fromPath(path)
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
-    actorRef ! PutObjectWrapper(key, contentSource, probe.ref)
+    actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
     val index = 2
     val objectKey = ObjectKey(
@@ -371,7 +371,7 @@ class BucketOperationsBehaviorSpec
     )
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectWrapper(key, replyTo = probe.ref)
 
@@ -402,7 +402,7 @@ class BucketOperationsBehaviorSpec
     )
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange(0, 53)), replyTo = probe.ref)
 
@@ -433,7 +433,7 @@ class BucketOperationsBehaviorSpec
     )
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange(265, 318)), replyTo = probe.ref)
 
@@ -464,7 +464,7 @@ class BucketOperationsBehaviorSpec
     )
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange.suffix(53)), replyTo = probe.ref)
 
@@ -495,7 +495,7 @@ class BucketOperationsBehaviorSpec
     )
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange.fromOffset(371)), replyTo = probe.ref)
 
@@ -528,7 +528,7 @@ class BucketOperationsBehaviorSpec
     )
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
     actorRef ! GetObjectWrapper(key, replyTo = probe.ref)
 
@@ -561,7 +561,7 @@ class BucketOperationsBehaviorSpec
     )
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
     actorRef ! GetObjectWrapper(key, maybeVersionId = Some(index.toVersionId.toString), replyTo = probe.ref)
 
@@ -583,7 +583,7 @@ class BucketOperationsBehaviorSpec
     val key = "sample.txt"
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectWrapper(key, maybeVersionId = Some(UUID.randomUUID().toString), replyTo = probe.ref)
     probe.expectMessage(NoSuchKeyExists(defaultBucketName, key))
@@ -596,7 +596,7 @@ class BucketOperationsBehaviorSpec
     val key = "sample.txt"
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val bucketOperationsActorRef = testKit.spawn(shardingEnvelopeWrapper(BucketOperationsBehavior(database, objectActorRef)))
     val actorRef = testKit.spawn(CopyBehavior(bucketOperationsActorRef), UUID.randomUUID().toString)
 
@@ -614,7 +614,7 @@ class BucketOperationsBehaviorSpec
     val key = "big-sample.txt"
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
 
     actorRef ! InitiateMultiPartUploadWrapper(key, probe.ref)
@@ -651,7 +651,7 @@ class BucketOperationsBehaviorSpec
     val key = "big-sample.txt"
 
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val bucketOperationsActorRef = testKit.spawn(shardingEnvelopeWrapper(BucketOperationsBehavior(database, objectActorRef)))
     val actorRef = testKit.spawn(CopyBehavior(bucketOperationsActorRef), UUID.randomUUID().toString)
 
@@ -698,7 +698,7 @@ class BucketOperationsBehaviorSpec
 
   it should "list bucket contents with default params" in {
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
 
     actorRef ! ListBucket(replyTo = probe.ref)
@@ -714,7 +714,7 @@ class BucketOperationsBehaviorSpec
 
     val expected = DeleteInfo(deleteMarker = false, NotExists)
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! DeleteObjectWrapper(key, replyTo = probe.ref)
     val actual = probe.receiveMessage().asInstanceOf[DeleteInfo]
@@ -729,7 +729,7 @@ class BucketOperationsBehaviorSpec
 
     val expected = DeleteInfo(deleteMarker = true, NotExists)
     val probe = testKit.createTestProbe[Event]()
-    val objectActorRef = testKit.spawn(shardingEnvelopeWrapper(ObjectOperationsBehavior(objectIO, database)))
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! DeleteObjectWrapper(key, replyTo = probe.ref)
     val actual = probe.receiveMessage().asInstanceOf[DeleteInfo]
