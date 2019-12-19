@@ -2,13 +2,13 @@ package com.loyalty.testing.s3.it.client
 
 import java.nio.file.{Files, Path}
 
-import akka.actor.typed.scaladsl.adapter._
 import akka.Done
 import akka.actor.typed.ActorSystem
+import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.http.scaladsl.model.headers.ByteRange.{FromOffset, Slice, Suffix}
 import com.github.matsluni.akkahttpspi.AkkaHttpClient
-import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.{data, _}
 import com.loyalty.testing.s3.it._
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.BucketVersioning
@@ -73,7 +73,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
 
   override def putObject(bucketName: String,
                          key: String,
-                         filePath: Path): Future[ObjectInfo] = {
+                         filePath: Path): Future[data.ObjectInfo] = {
     val contentLength = Files.size(filePath)
     val request = PutObjectRequest
       .builder()
@@ -84,11 +84,10 @@ class AwsClient(override protected val awsSettings: AwsSettings)
     s3Client.putObject(request, filePath).asScala
       .map {
         response =>
-          ObjectInfo(
+          data.ObjectInfo(
             bucketName = bucketName,
             key = key,
             eTag = response.eTag().drop(1).dropRight(1),
-            contentMd5 = "",
             contentLength = contentLength,
             versionId = Option(response.versionId()),
           )
@@ -98,18 +97,17 @@ class AwsClient(override protected val awsSettings: AwsSettings)
   override def getObject(bucketName: String,
                          key: String,
                          maybeVersionId: Option[String],
-                         maybeRange: Option[ByteRange]): Future[(String, ObjectInfo)] = {
+                         maybeRange: Option[ByteRange]): Future[(String, data.ObjectInfo)] = {
     val request = GetObjectRequest.builder().bucket(bucketName).key(key).range(getRange(maybeRange))
       .versionId(maybeVersionId.orNull).build()
     s3Client.getObject(request, new ByteArrayAsyncResponseTransformer[GetObjectResponse]()).asScala
       .map {
         bytesResponse =>
           val response = bytesResponse.response()
-          val objectInfo = ObjectInfo(
+          val objectInfo = data.ObjectInfo(
             bucketName = bucketName,
             key = key,
             eTag = response.eTag().drop(1).dropRight(1),
-            contentMd5 = "",
             contentLength = response.contentLength(),
             versionId = Option(response.versionId())
           )
@@ -120,17 +118,16 @@ class AwsClient(override protected val awsSettings: AwsSettings)
   def getObjectMeta(bucketName: String,
                     key: String,
                     maybeVersionId: Option[String],
-                    maybeRange: Option[ByteRange]): Future[ObjectInfo] = {
+                    maybeRange: Option[ByteRange]): Future[data.ObjectInfo] = {
     val request = HeadObjectRequest.builder().bucket(bucketName).key(key).versionId(maybeVersionId.orNull)
       .range(getRange(maybeRange)).build()
     s3Client.headObject(request).asScala
       .map {
         response =>
-          ObjectInfo(
+          data.ObjectInfo(
             bucketName,
             key,
             response.eTag().drop(1).dropRight(1),
-            "",
             response.contentLength(),
             Option(response.versionId())
           )
@@ -159,7 +156,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
       }
   }
 
-  override def multiPartUpload(bucketName: String, key: String, totalSize: Int): Future[ObjectInfo] = {
+  override def multiPartUpload(bucketName: String, key: String, totalSize: Int): Future[data.ObjectInfo] = {
     /*val inputFile = saveFile(1, totalSize, createObjectId(bucketName, key).toString, ".txt")
     val pathAndPartitions = inputFile.map {
       path =>
@@ -199,18 +196,17 @@ class AwsClient(override protected val awsSettings: AwsSettings)
   private def completedMultipartUpload(bucketName: String,
                                        key: String,
                                        uploadId: String,
-                                       parts: List[CompletedPart]): Future[ObjectInfo] = {
+                                       parts: List[CompletedPart]): Future[data.ObjectInfo] = {
     val completedMultipartUpload = CompletedMultipartUpload.builder().parts(parts: _*).build()
     val request = CompleteMultipartUploadRequest.builder().bucket(bucketName).key(key).uploadId(uploadId)
       .multipartUpload(completedMultipartUpload).build()
     s3Client.completeMultipartUpload(request).asScala
       .map {
         response =>
-          ObjectInfo(
+          data.ObjectInfo(
             bucketName = response.bucket(),
             key = response.key(),
             eTag = response.eTag().drop(1).dropRight(1),
-            contentMd5 = "",
             contentLength = 0,
             versionId = Option(response.versionId())
           )

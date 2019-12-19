@@ -12,7 +12,6 @@ import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.alpakka.s3.{S3Exception => AlpakkaS3Exception}
 import akka.stream.scaladsl.{FileIO, Sink}
-import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model.bucket
 import com.loyalty.testing.s3.actor.{BucketOperationsBehavior, CopyBehavior, NotificationBehavior, ObjectOperationsBehavior}
 import com.loyalty.testing.s3.it.client.S3Client
@@ -22,6 +21,7 @@ import com.loyalty.testing.s3.request.BucketVersioning
 import com.loyalty.testing.s3.response.CopyObjectResult
 import com.loyalty.testing.s3.service.NotificationService
 import com.loyalty.testing.s3.streams.FileStream
+import com.loyalty.testing.s3.{data, _}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
@@ -111,30 +111,16 @@ abstract class S3IntegrationSpec(resourceBasename: String)
   it should "put an object in the specified non-version bucket" in {
     val key = "sample.txt"
     val path = resourcePath -> key
-    val contentLength = Files.size(path)
     val actualObjectInfo = s3Client.putObject(defaultBucketName, key, path).futureValue
-    val expectedObjectInfo = ObjectInfo(
-      bucketName = defaultBucketName,
-      key = key,
-      eTag = etagDigest,
-      contentMd5 = "",
-      contentLength = contentLength
-    )
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest, Files.size(path))
     actualObjectInfo mustEqual expectedObjectInfo
   }
 
   it should "update object in non-version bucket" in {
     val key = "sample.txt"
     val path = resourcePath -> "sample1.txt"
-    val contentLength = Files.size(path)
     val actualObjectInfo = s3Client.putObject(defaultBucketName, key, path).futureValue
-    val expectedObjectInfo = ObjectInfo(
-      bucketName = defaultBucketName,
-      key = key,
-      eTag = etagDigest1,
-      contentMd5 = "",
-      contentLength = contentLength
-    )
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, Files.size(path))
     actualObjectInfo mustEqual expectedObjectInfo
   }
 
@@ -142,15 +128,8 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val fileName = "sample.txt"
     val key = s"input/$fileName"
     val path = resourcePath -> fileName
-    val contentLength = Files.size(path)
     val actualObjectInfo = s3Client.putObject(defaultBucketName, key, path).futureValue
-    val expectedObjectInfo = ObjectInfo(
-      bucketName = defaultBucketName,
-      key = key,
-      eTag = etagDigest,
-      contentMd5 = "",
-      contentLength = contentLength
-    )
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest, Files.size(path))
     actualObjectInfo mustEqual expectedObjectInfo
   }
 
@@ -165,34 +144,18 @@ abstract class S3IntegrationSpec(resourceBasename: String)
   it should "put an object in the specified bucket with bucket versioning on" in {
     val key = "sample.txt"
     val path = resourcePath -> key
-    val contentLength = Files.size(path)
     val index = 1
     val actualObjectKey = s3Client.putObject(versionedBucketName, key, path).futureValue
-    val expectedObjectInfo = ObjectInfo(
-      bucketName = versionedBucketName,
-      key = key,
-      eTag = etagDigest,
-      contentMd5 = "",
-      contentLength = contentLength,
-      versionId = Some(index.toVersionId)
-    )
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, Files.size(path), Some(index.toVersionId))
     actualObjectKey mustEqual expectedObjectInfo
   }
 
   it should "update object in the specified bucket with bucket versioning on" in {
     val key = "sample.txt"
     val path = resourcePath -> "sample1.txt"
-    val contentLength = Files.size(path)
     val index = 2
     val actualObjectInfo = s3Client.putObject(versionedBucketName, key, path).futureValue
-    val expectedObjectKey = ObjectInfo(
-      bucketName = versionedBucketName,
-      key = key,
-      eTag = etagDigest1,
-      contentMd5 = "",
-      contentLength = contentLength,
-      versionId = Some(index.toVersionId),
-    )
+    val expectedObjectKey = data.ObjectInfo(versionedBucketName, key, etagDigest1, Files.size(path), Some(index.toVersionId))
     actualObjectInfo mustEqual expectedObjectKey
   }
 
@@ -200,13 +163,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val key = "sample.txt"
     val path = resourcePath -> "sample1.txt"
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
-    val expectedObjectInfo = ObjectInfo(
-      bucketName = defaultBucketName,
-      key = key,
-      eTag = etagDigest1,
-      contentMd5 = "",
-      contentLength = Files.size(path)
-    )
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, Files.size(path))
     val (actualContent, actualObjectInfo) = s3Client.getObject(defaultBucketName, key).futureValue
     actualContent mustEqual expectedContent
     actualObjectInfo mustEqual expectedObjectInfo
@@ -215,13 +172,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
   it should "get object with range between two positions from the start of file" in {
     val key = "sample.txt"
     val expectedContent = "1. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = ObjectInfo(
-      bucketName = defaultBucketName,
-      key = key,
-      eTag = etagDigest1,
-      contentMd5 = "",
-      contentLength = expectedContent.length
-    )
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
     val range = ByteRange(0, 53)
     val (actualContent, actualObjectKey) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
     actualContent mustEqual expectedContent
@@ -231,13 +182,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
   it should "get object with range between two positions from the middle of file" in {
     val key = "sample.txt"
     val expectedContent = "6. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = ObjectInfo(
-      bucketName = defaultBucketName,
-      key = key,
-      eTag = etagDigest1,
-      contentMd5 = "",
-      contentLength = expectedContent.length
-    )
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
     val range = ByteRange(265, 318)
     val (actualContent, actualObjectInfo) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
     actualContent mustEqual expectedContent
@@ -247,13 +192,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
   it should "get object with suffix range" in {
     val key = "sample.txt"
     val expectedContent = "8. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = ObjectInfo(
-      bucketName = defaultBucketName,
-      key = key,
-      eTag = etagDigest1,
-      contentMd5 = "",
-      contentLength = expectedContent.length
-    )
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
     val range = ByteRange.suffix(53)
     val (actualContent, actualObjectInfo) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
     actualContent mustEqual expectedContent
@@ -263,13 +202,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
   it should "get object with range with offset" in {
     val key = "sample.txt"
     val expectedContent = "8. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = ObjectInfo(
-      bucketName = defaultBucketName,
-      key = key,
-      eTag = etagDigest1,
-      contentMd5 = "",
-      contentLength = expectedContent.length
-    )
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
     val range = ByteRange.fromOffset(371)
     val (actualContent, actualObjectInfo) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
     actualContent mustEqual expectedContent
@@ -281,14 +214,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val path = resourcePath -> "sample1.txt"
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 2
-    val expectedObjectInfo = ObjectInfo(
-      bucketName = versionedBucketName,
-      key = key,
-      eTag = etagDigest1,
-      contentMd5 = "",
-      contentLength = expectedContent.length,
-      versionId = Some(index.toVersionId),
-    )
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest1, expectedContent.length, Some(index.toVersionId))
     val (actualContent, actualObjectKey) = s3Client.getObject(versionedBucketName, key).futureValue
     actualContent mustEqual expectedContent
     actualObjectKey mustEqual expectedObjectInfo
@@ -299,14 +225,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val path = resourcePath -> key
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 1
-    val expectedObjectInfo = ObjectInfo(
-      bucketName = versionedBucketName,
-      key = key,
-      eTag = etagDigest,
-      contentMd5 = "",
-      contentLength = expectedContent.length,
-      versionId = Some(index.toVersionId)
-    )
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, expectedContent.length, Some(index.toVersionId))
     val (actualContent, actualObjectInfo) = s3Client.getObject(versionedBucketName, key, maybeVersionId = Some(index.toVersionId)).futureValue
     actualContent mustEqual expectedContent
     actualObjectInfo mustEqual expectedObjectInfo

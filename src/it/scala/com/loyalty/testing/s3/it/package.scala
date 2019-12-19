@@ -22,13 +22,6 @@ package object it {
 
   val rootPath: Path = Paths.get(userDir, "target", ".s3mock")
 
-  case class ObjectInfo(bucketName: String,
-                        key: String,
-                        eTag: String,
-                        contentMd5: String,
-                        contentLength: Long,
-                        versionId: Option[String] = None)
-
   def createContentSource(start: Int, totalSize: Int): Source[ByteString, NotUsed] =
     Source
       .repeat("A quick brown fox jumps over the silly lazy dog.")

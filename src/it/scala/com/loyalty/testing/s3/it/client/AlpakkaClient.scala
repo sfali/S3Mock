@@ -2,17 +2,17 @@ package com.loyalty.testing.s3.it.client
 
 import java.nio.file.{Files, Path}
 
-import akka.{Done, NotUsed}
 import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.headers.ByteRange
-import akka.stream.alpakka.s3.{ListBucketResultContents, S3Headers}
 import akka.stream.alpakka.s3.scaladsl.S3
+import akka.stream.alpakka.s3.{ListBucketResultContents, S3Headers}
 import akka.stream.scaladsl.{FileIO, Framing, Sink, Source}
 import akka.util.ByteString
-import com.loyalty.testing.s3._
+import akka.{Done, NotUsed}
 import com.loyalty.testing.s3.it._
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.response.{CopyObjectResult, CopyPartResult}
+import com.loyalty.testing.s3.{data, _}
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{BucketVersioningStatus, NoSuchKeyException}
@@ -42,16 +42,15 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
     S3.listBucket(bucketName, prefix)
   }
 
-  override def putObject(bucketName: String, key: String, filePath: Path): Future[ObjectInfo] = {
+  override def putObject(bucketName: String, key: String, filePath: Path): Future[data.ObjectInfo] = {
     val contentLength = Files.size(filePath)
     S3.putObject(bucketName, key, FileIO.fromPath(filePath), contentLength, s3Headers = S3Headers())
       .map {
         objectMetadata =>
-          ObjectInfo(
+          data.ObjectInfo(
             bucketName = bucketName,
             key = key,
             eTag = objectMetadata.eTag.getOrElse(""),
-            contentMd5 = "",
             contentLength = contentLength,
             versionId = objectMetadata.versionId,
           )
@@ -62,7 +61,7 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
   override def getObject(bucketName: String,
                          key: String,
                          maybeVersionId: Option[String],
-                         maybeRange: Option[ByteRange]): Future[(String, ObjectInfo)] = {
+                         maybeRange: Option[ByteRange]): Future[(String, data.ObjectInfo)] = {
     import system.executionContext
     S3.download(bucketName, key, maybeRange, maybeVersionId)
       .map {
@@ -79,11 +78,10 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
             .awsErrorDetails(errorDetails)
             .build()
         case Some((source, objectMetadata)) =>
-          val objectKey = ObjectInfo(
+          val objectKey = data.ObjectInfo(
             bucketName = bucketName,
             key = key,
             eTag = objectMetadata.eTag.getOrElse(""),
-            contentMd5 = "",
             contentLength = objectMetadata.getContentLength,
             versionId = objectMetadata.versionId
           )
@@ -108,14 +106,13 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
 
   override def multiPartUpload(bucketName: String,
                                key: String,
-                               totalSize: Int): Future[ObjectInfo] =
+                               totalSize: Int): Future[data.ObjectInfo] =
     createContentSource(1, totalSize)
       .runWith(S3.multipartUpload(bucketName, key))
-      .map(result => ObjectInfo(
+      .map(result => data.ObjectInfo(
         bucketName = result.bucket,
         key = result.key,
         eTag = result.etag,
-        contentMd5 = "",
         contentLength = 0,
         versionId = result.versionId
       ))

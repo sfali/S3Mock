@@ -4,8 +4,7 @@ import java.nio.file.Path
 
 import akka.Done
 import akka.http.scaladsl.model.headers.ByteRange
-import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.it.ObjectInfo
+import com.loyalty.testing.s3.{data, _}
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.response.{CopyObjectResult, CopyPartResult}
 import software.amazon.awssdk.regions.Region
@@ -21,12 +20,12 @@ trait S3Client {
 
   def setBucketVersioning(bucketName: String, status: BucketVersioningStatus): Future[Done]
 
-  def putObject(bucketName: String, key: String, filePath: Path): Future[ObjectInfo]
+  def putObject(bucketName: String, key: String, filePath: Path): Future[data.ObjectInfo]
 
   def getObject(bucketName: String,
                 key: String,
                 maybeVersionId: Option[String] = None,
-                maybeRange: Option[ByteRange] = None): Future[(String, ObjectInfo)]
+                maybeRange: Option[ByteRange] = None): Future[(String, data.ObjectInfo)]
 
   def deleteObject(bucketName: String,
                    key: String,
@@ -34,7 +33,7 @@ trait S3Client {
 
   def multiPartUpload(bucketName: String,
                       key: String,
-                      totalSize: Int): Future[ObjectInfo]
+                      totalSize: Int): Future[data.ObjectInfo]
 
   def copyObject(sourceBucketName: String,
                  sourceKey: String,
