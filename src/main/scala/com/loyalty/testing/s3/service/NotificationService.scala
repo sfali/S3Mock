@@ -7,6 +7,7 @@ import akka.stream.alpakka.sqs.scaladsl.SqsPublishSink
 import akka.stream.scaladsl.Source
 import com.github.matsluni.akkahttpspi.AkkaHttpClient
 import com.loyalty.testing.s3.AwsSettings
+import org.slf4j.LoggerFactory
 import software.amazon.awssdk.http.async.SdkAsyncHttpClient
 import software.amazon.awssdk.services.sns.SnsAsyncClient
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
@@ -19,6 +20,8 @@ class NotificationService(awsSettings: AwsSettings)
                          (implicit system: ActorSystem) {
 
   import system.dispatcher
+
+  private val log = LoggerFactory.getLogger(classOf[NotificationService])
 
   private val httpClient: SdkAsyncHttpClient = AkkaHttpClient.builder().withActorSystem(system).build()
 
@@ -48,6 +51,7 @@ class NotificationService(awsSettings: AwsSettings)
   def sendSqsMessage(message: String, queueName: String): Future[Done] =
     for {
       queueUrl <- getQueueUrl(queueName)
+      _ = log.info("Sending message to queue: {}", queueUrl)
       r <- Source.single(message).runWith(SqsPublishSink(queueUrl))
     } yield r
 

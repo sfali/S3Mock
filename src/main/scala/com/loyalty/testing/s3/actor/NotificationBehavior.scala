@@ -143,6 +143,7 @@ class NotificationBehavior(context: ActorContext[Command],
     val suffixMatch = suffix.exists(key.endsWith) || suffix.isEmpty
     if (notification.notificationType.isValidOperation(notificationData.operation) || (prefixMatch && suffixMatch)) {
       val message = generateMessage(notificationData, notification)
+      log.info("Sending message `{}` to queue: {}", message, notification.destinationName)
       SendNotificationToDestination(notification.destinationType, notification.destinationName, message)
     } else {
       log.warn("Not sending notification, data={}, notification={}", notificationData, notification)
