@@ -159,8 +159,8 @@ class RoutesSpec
     val entity = HttpEntity(`application/octet-stream`, contentSource)
     Put(s"/$defaultBucketName/$key", entity) ~> routes ~> check {
       status mustEqual OK
-      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, etagDigest))
-      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest"))
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest""""))
+      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, md5Digest))
     }
   }
 
@@ -171,8 +171,8 @@ class RoutesSpec
     val entity = HttpEntity(`application/octet-stream`, contentSource)
     Put(s"/$defaultBucketName/$key", entity) ~> routes ~> check {
       status mustEqual OK
-      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, etagDigest1))
-      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest1"))
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG,  s""""$etagDigest1""""))
+      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, md5Digest1))
     }
   }
 
@@ -184,8 +184,8 @@ class RoutesSpec
     val entity = HttpEntity(`application/octet-stream`, contentSource)
     Put(s"/$defaultBucketName/$key", entity) ~> routes ~> check {
       status mustEqual OK
-      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, etagDigest))
-      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest"))
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest""""))
+      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, md5Digest))
     }
   }
 
@@ -207,8 +207,8 @@ class RoutesSpec
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     Get(s"/$defaultBucketName/$key") ~> routes ~> check {
       status mustEqual OK
-      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, etagDigest1))
-      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, s"$md5Digest1"))
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest1""""))
+      getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, md5Digest1))
       response.entity.contentLengthOption mustBe Some(Files.size(path))
       expectedContent mustEqual getContent(response)
     }
@@ -220,7 +220,7 @@ class RoutesSpec
     val rangeHeader = Range(ByteRange(0, 53))
     Get(s"/$defaultBucketName/$key").withHeaders(rangeHeader :: Nil) ~> routes ~> check {
       status mustEqual OK
-      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, etagDigest1))
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest1""""))
       getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, md5Digest1))
       response.entity.contentLengthOption mustBe Some(53)
       expectedContent mustEqual getContent(response)
@@ -234,7 +234,7 @@ class RoutesSpec
     val entity = HttpEntity(`application/octet-stream`, contentSource)
     Put(s"/$versionedBucketName/$key", entity) ~> routes ~> check {
       status mustEqual OK
-      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, etagDigest))
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest""""))
       getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, md5Digest))
       getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, 1.toVersionId))
     }
@@ -247,7 +247,7 @@ class RoutesSpec
     val entity = HttpEntity(`application/octet-stream`, contentSource)
     Put(s"/$versionedBucketName/$key", entity) ~> routes ~> check {
       status mustEqual OK
-      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, etagDigest1))
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest1""""))
       getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, md5Digest1))
       getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, 2.toVersionId))
     }

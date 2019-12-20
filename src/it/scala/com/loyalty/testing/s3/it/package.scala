@@ -18,10 +18,6 @@ package object it {
 
   implicit val dateTimeProvider: StaticDateTimeProvider = StaticDateTimeProvider()
 
-  private val userDir: String = System.getProperty("user.dir")
-
-  val rootPath: Path = Paths.get(userDir, "target", ".s3mock")
-
   def createContentSource(start: Int, totalSize: Int): Source[ByteString, NotUsed] =
     Source
       .repeat("A quick brown fox jumps over the silly lazy dog.")

@@ -79,7 +79,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     testKit.stop(bucketOperationsActorRef)
     database.close()
     // clean(rootPath)
-    Files.delete(rootPath -> settings.dbSettings.fileName)
+    Files.delete(settings.dataDirectory -> settings.dbSettings.fileName)
     system.terminate()
   }
 

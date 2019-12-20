@@ -108,7 +108,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
             bucketName = bucketName,
             key = key,
             eTag = response.eTag().drop(1).dropRight(1),
-            contentLength = response.contentLength(),
+            contentLength = bytesResponse.asUtf8String().length,
             versionId = Option(response.versionId())
           )
           (bytesResponse.asUtf8String(), objectInfo)
