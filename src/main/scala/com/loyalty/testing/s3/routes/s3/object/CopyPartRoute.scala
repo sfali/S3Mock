@@ -12,7 +12,7 @@ import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.CopyBehavior.{Command, CopyPart}
 import com.loyalty.testing.s3.actor.model._
-import com.loyalty.testing.s3.response.{CopyObjectResult, InternalServiceResponse, NoSuchBucketResponse, NoSuchKeyResponse}
+import com.loyalty.testing.s3.response.{CopyPartResult, InternalServiceResponse, NoSuchBucketResponse, NoSuchKeyResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
 import com.loyalty.testing.s3.routes.s3.`object`.directives.{`x-amz-copy-source-range`, `x-amz-copy-source`}
@@ -50,7 +50,7 @@ object CopyPartRoute extends CustomMarshallers {
             complete(HttpResponse(NotFound).withHeaders(createResponseHeaders(objectKey)))
           case Success(CopyPartInfo(uploadInfo, sourceVersionId)) =>
             val objectKey = uploadInfo.toObjectKey
-            complete(CopyObjectResult(objectKey.eTag, objectKey.actualVersionId, sourceVersionId))
+            complete(CopyPartResult(objectKey.eTag, objectKey.actualVersionId, sourceVersionId))
           case Success(ObjectInfo(_)) =>
             system.log.warn("CopyPartRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
             complete(InternalServiceResponse(s"$bucketName/$key"))
