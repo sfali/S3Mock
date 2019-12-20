@@ -76,8 +76,6 @@ package object test {
     testKit.spawn(shardingEnvelopeWrapper(behavior))
   }
 
-  val userDir: String = System.getProperty("user.dir")
-  val rootPath: Path = Paths.get(userDir, "target", ".s3mock")
   val resourcePath: Path = Paths.get("src", "test", "resources")
   val (defaultBucketName, defaultBucketNameUUID) = bucketIdentifier("non-versioned-bucket")
   val (versionedBucketName, versionedBucketNameUUID) = bucketIdentifier("versioned-bucket")

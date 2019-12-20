@@ -20,9 +20,10 @@ import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.response._
 import com.loyalty.testing.s3.routes.{CustomMarshallers, Routes}
 import com.loyalty.testing.s3.service.NotificationService
+import com.loyalty.testing.s3.settings.Settings
 import com.loyalty.testing.s3.streams.FileStream
 import com.loyalty.testing.s3.test._
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
@@ -40,14 +41,15 @@ class RoutesSpec
     with BeforeAndAfterAll
     with ScalaFutures {
 
-  private val testKit = ActorTestKit("test", ConfigFactory.load("test"))
+  private val config: Config = ConfigFactory.load("routes")
+  private val testKit = ActorTestKit(config.getString("app.name"), config)
   protected implicit val spawnSystem: ActorSystem[_] = testKit.system
   protected override implicit val timeout: Timeout = Timeout(10.seconds)
+  private implicit val settings: Settings = AppSettings(spawnSystem.settings.config)
   private implicit val defaultPatience: PatienceConfig = PatienceConfig(timeout = Span(15, Seconds),
     interval = Span(500, Millis))
-  private val settings = AppSettings(spawnSystem.settings.config)
-  private val objectIO: ObjectIO = ObjectIO(rootPath, FileStream())
-  private val database: NitriteDatabase = NitriteDatabase(rootPath, settings.dbSettings)
+  private val objectIO: ObjectIO = ObjectIO(FileStream())
+  private val database: NitriteDatabase = NitriteDatabase()
   private val notificationService: NotificationService = NotificationService(settings.awsSettings)
 
   override protected val notificationActorRef: ActorRef[ShardingEnvelope[NotificationBehavior.Command]] =
@@ -72,7 +74,7 @@ class RoutesSpec
     testKit.stop(copyActorRef)
     testKit.stop(bucketOperationsActorRef)
     database.close()
-    Files.delete(rootPath -> settings.dbSettings.fileName)
+    Files.delete(settings.dataDirectory -> settings.dbSettings.fileName)
     system.terminate()
   }
 

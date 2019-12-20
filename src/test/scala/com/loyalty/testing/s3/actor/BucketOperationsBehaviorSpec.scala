@@ -21,8 +21,10 @@ import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo, VersioningConfiguration}
 import com.loyalty.testing.s3.service.NotificationService
+import com.loyalty.testing.s3.settings.Settings
 import com.loyalty.testing.s3.streams.FileStream
 import com.loyalty.testing.s3.test._
+import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
@@ -42,16 +44,18 @@ class BucketOperationsBehaviorSpec
   import BucketOperationsBehaviorSpec._
   import BucketVersioning._
 
-  private val testKit = ActorTestKit("test")
+  private val config = ConfigFactory.load("test")
+  private val testKit = ActorTestKit(config.getString("app.name"), config)
 
   private implicit val system: ActorSystem[Nothing] = testKit.system
+  private implicit val settings: Settings = AppSettings(system.settings.config)
   private implicit val ec: ExecutionContextExecutor = system.executionContext
   private implicit val defaultPatience: PatienceConfig = PatienceConfig(timeout = Span(15, Seconds),
     interval = Span(500, Millis))
 
   private val notificationService = NotificationService(awsSettings)(system.toClassic)
-  private val objectIO = ObjectIO(rootPath, FileStream())
-  private val database = NitriteDatabase(rootPath, dBSettings)
+  private val objectIO = ObjectIO(FileStream())
+  private val database = NitriteDatabase()
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -61,7 +65,7 @@ class BucketOperationsBehaviorSpec
   override protected def afterAll(): Unit = {
     super.afterAll()
     database.close()
-    Files.delete(rootPath -> dBSettings.fileName)
+    Files.delete(settings.dataDirectory -> settings.dbSettings.fileName)
     testKit.shutdownTestKit()
   }
 
@@ -632,9 +636,6 @@ class BucketOperationsBehaviorSpec
 }
 
 object BucketOperationsBehaviorSpec {
-  private val dBSettings: DBSettings = new DBSettings {
-    override val fileName: String = "s3mock.db"
-  }
   private val awsSettings: AwsSettings = new AwsSettings {
     override val region: Region = Region.US_EAST_1
     override val credentialsProvider: AwsCredentialsProvider = AnonymousCredentialsProvider.create()
