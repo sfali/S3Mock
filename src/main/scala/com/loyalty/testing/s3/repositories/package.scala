@@ -65,6 +65,8 @@ package object repositories {
 
     def getPath(key: String): Path = getString(key).toPath
 
+    def getOptionalPath(key: String): Option[Path] = getOptionalString(key).map(_.toPath)
+
     def getOptionalForeignField(key: String): Option[List[Document]] =
       Option(src.get(key, classOf[util.HashSet[Document]])).map(_.asScala.toList)
 

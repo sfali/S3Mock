@@ -16,7 +16,7 @@ import akka.util.ByteString
 import com.loyalty.testing.s3.data.{BootstrapConfiguration, InitialBucket}
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.repositories.NitriteDatabase
-import com.loyalty.testing.s3.repositories.model.{Bucket, UploadInfo}
+import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo}
 import com.loyalty.testing.s3.response.{CompleteMultipartUploadResult, InvalidNotificationConfigurationException}
 import com.typesafe.config.Config
@@ -308,13 +308,11 @@ package object s3 {
   def toObjectDir(bucketName: String,
                   key: String,
                   bucketVersioning: BucketVersioning,
-                  versionId: String): String =
-    toBase16(s"$bucketName-$key-${bucketVersioning.entryName}-$versionId")
-
-  def toUploadDir(uploadInfo: UploadInfo): String =
-    toBase16(
-      s"""${uploadInfo.bucketName}-${uploadInfo.key}-${uploadInfo.uploadId}-
-         |${uploadInfo.version.entryName}-${uploadInfo.versionIndex.toVersionId}""".stripMargin.replaceNewLine)
+                  versionId: String,
+                  uploadId: Option[String] = None): String = {
+    val value = s"$bucketName-$key-${bucketVersioning.entryName}-$versionId"
+    toBase16(uploadId.map(s => s"$value-$s").getOrElse(value))
+  }
 
   implicit class IntOps(src: Int) {
     def toVersionId: String = toBase16(src.toString.toUUID.toString)

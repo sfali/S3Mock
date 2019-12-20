@@ -148,17 +148,22 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
         Behaviors.same
 
       case InitiateMultiPartUpload(bucket, key, replyTo) =>
-        versionIndex = if (BucketVersioning.Enabled == bucket.version) versionIndex + 1 else versionIndex
+        val bucketName = bucket.bucketName
+        val version = bucket.version
+        versionIndex = if (BucketVersioning.Enabled == version) versionIndex + 1 else versionIndex
+        val uploadId = createUploadId(bucketName, version, key, versionIndex)
+        val uploadPath = toObjectDir(bucketName, key, version, versionIndex.toVersionId, Some(uploadId))
         val uploadInfo = UploadInfo(
-          bucketName = bucket.bucketName,
+          bucketName = bucketName,
           key = key,
-          version = bucket.version,
+          version = version,
           versionIndex = versionIndex,
-          uploadId = createUploadId(bucket.bucketName, bucket.version, key, versionIndex)
+          uploadId = uploadId,
+          uploadPath = uploadPath
         )
         context.pipeToSelf(objectService.createUpload(uploadInfo)) {
           case Failure(ex) =>
-            context.log.error(s"unable to initiated multi part upload: ${bucket.bucketName}/$key", ex)
+            context.log.error(s"unable to initiated multi part upload: ${bucketName}/$key", ex)
             DatabaseError // TODO: retry
           case Success(_) => UploadInfoCreated(uploadInfo, replyTo)
         }

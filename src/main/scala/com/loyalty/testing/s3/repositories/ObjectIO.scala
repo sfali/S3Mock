@@ -56,7 +56,8 @@ class ObjectIO(root: Path, fileStream: FileStream) {
 
   def savePart(uploadInfo: UploadInfo, contentSource: Source[ByteString, _])
               (implicit ec: ExecutionContext): Future[UploadInfo] = {
-    val objectPath = getUploadPath(uploadInfo, staging = true)
+    val uploadDir = uploadInfo.uploadPath
+    val objectPath = getUploadPath(uploadDir, uploadInfo.partNumber, staging = true)
     fileStream.saveContent(contentSource, objectPath)
       .flatMap {
         digestInfo =>
@@ -65,7 +66,8 @@ class ObjectIO(root: Path, fileStream: FileStream) {
             val updateUploadInfo = uploadInfo.copy(
               eTag = digestInfo.etag,
               contentMd5 = digestInfo.md5,
-              contentLength = digestInfo.length
+              contentLength = digestInfo.length,
+              uploadPath = uploadDir
             )
             Future.successful(updateUploadInfo)
           }
@@ -75,9 +77,10 @@ class ObjectIO(root: Path, fileStream: FileStream) {
   def mergeFiles(uploadInfo: UploadInfo, parts: List[PartInfo])
                 (implicit ec: ExecutionContext): Future[ObjectKey] = {
     val versionId = uploadInfo.versionIndex.toVersionId
+    val uploadDir = uploadInfo.uploadPath
     val objectPath = getObjectPath(uploadInfo.bucketName, uploadInfo.key, uploadInfo.version, versionId)
     val partPaths = parts.map(partInfo => uploadInfo.copy(partNumber = partInfo.partNumber))
-      .map(uploadInfo => getUploadPath(uploadInfo, staging = true))
+      .map(uploadInfo => getUploadPath(uploadDir, uploadInfo.partNumber, staging = true))
 
     val concatenatedETag =
       parts
@@ -109,12 +112,14 @@ class ObjectIO(root: Path, fileStream: FileStream) {
   }
 
   def moveParts(objectKey: ObjectKey, uploadInfo: UploadInfo): Future[Done] = {
-    val stagingPath = getUploadPath(uploadInfo, staging = true)
-    val path = getUploadPath(uploadInfo, staging = false)
+    val uploadDir = uploadInfo.uploadPath
+    val stagingPath = getUploadPath(uploadDir, uploadInfo.partNumber, staging = true)
+    val path = getUploadPath(uploadDir, uploadInfo.partNumber, staging = false)
+    // TODO
     Try {
       if (BucketVersioning.Enabled != objectKey.version) clean(path) // first clean existing folder, if applicable
       Files.move(stagingPath, path)
-      clean(getUploadPath(uploadInfo, staging = true))
+      clean(getUploadPath(uploadDir, uploadInfo.partNumber, staging = true))
     } match {
       case Failure(ex) => Future.failed(ex)
       case Success(_) => Future.successful(Done)
@@ -133,7 +138,8 @@ class ObjectIO(root: Path, fileStream: FileStream) {
     clean(parent)
   }
 
-  def initiateMultipartUpload(uploadInfo: UploadInfo): Path = getUploadPath(uploadInfo, staging = true)
+  def initiateMultipartUpload(uploadInfo: UploadInfo): Path =
+    getUploadPath(uploadInfo.uploadPath, uploadInfo.partNumber, staging = true)
 
   private def getObjectPath(bucketName: String,
                             key: String,
@@ -141,10 +147,10 @@ class ObjectIO(root: Path, fileStream: FileStream) {
                             versionId: String) =
     (dataDir + toObjectDir(bucketName, key, bucketVersioning, versionId)) -> ContentFileName
 
-  private def getUploadPath(uploadInfo: UploadInfo, staging: Boolean) = {
+  private def getUploadPath(uploadDir: String, partNumber: Int, staging: Boolean) = {
     val path = if (staging) uploadsStagingDir else uploadsDir
-    val uploadPath = path + toUploadDir(uploadInfo)
-    if (uploadInfo.partNumber > 0) (uploadPath + uploadInfo.partNumber.toString) -> ContentFileName
+    val uploadPath = path + uploadDir
+    if (partNumber > 0) (uploadPath + partNumber.toString) -> ContentFileName
     else uploadPath
   }
 

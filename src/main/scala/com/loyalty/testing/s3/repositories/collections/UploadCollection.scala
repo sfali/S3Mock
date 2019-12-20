@@ -43,6 +43,7 @@ class UploadCollection(db: Nitrite, staging: Boolean) {
             .put(ETagField, uploadInfo.eTag)
             .put(ContentMd5Field, uploadInfo.contentMd5)
             .put(ContentLengthField, uploadInfo.contentLength)
+            .put(PathField, uploadInfo.uploadPath.toString)
         case document :: Nil =>
           val other = UploadInfo(document)
           if (other != uploadInfo) {

@@ -10,6 +10,7 @@ case class UploadInfo(bucketName: String,
                       version: BucketVersioning,
                       versionIndex: Int,
                       uploadId: String,
+                      uploadPath: String,
                       partNumber: Int,
                       eTag: String,
                       contentMd5: String,
@@ -34,11 +35,12 @@ object UploadInfo {
             version: BucketVersioning,
             versionIndex: Int,
             uploadId: String,
+            uploadPath: String,
             partNumber: Int = 0,
             eTag: String = "",
             contentMd5: String = "",
             contentLength: Long = 0): UploadInfo =
-    new UploadInfo(bucketName, key, version, versionIndex, uploadId, partNumber, eTag, contentMd5, contentLength)
+    new UploadInfo(bucketName, key, version, versionIndex, uploadId, uploadPath, partNumber, eTag, contentMd5, contentLength)
 
   def apply(document: Document): UploadInfo =
     UploadInfo(
@@ -47,6 +49,7 @@ object UploadInfo {
       version = BucketVersioning.withName(document.getString(VersionField)),
       versionIndex = document.getInt(VersionIndexField),
       uploadId = document.getString(UploadIdField),
+      uploadPath = document.getString(PathField),
       partNumber = document.getInt(PartNumberField),
       eTag = document.getString(ETagField),
       contentMd5 = document.getString(ContentMd5Field),
