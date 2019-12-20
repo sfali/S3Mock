@@ -20,12 +20,12 @@ case class UploadInfo(bucketName: String,
     bucketName = bucketName,
     key = key,
     index = versionIndex,
-    version = BucketVersioning.NotExists,
-    versionId = NonVersionId,
+    version = version,
+    versionId = versionIndex.toVersionId,
     eTag = eTag,
     contentMd5 = contentMd5,
     contentLength = contentLength,
-    objectPath = null // TODO
+    objectPath = toObjectDir(bucketName, key, version, versionIndex.toVersionId)
   )
 }
 

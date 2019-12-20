@@ -48,7 +48,7 @@ class ObjectIO(root: Path, fileStream: FileStream) {
               eTag = digestInfo.etag,
               contentMd5 = digestInfo.md5,
               contentLength = digestInfo.length,
-              objectPath = objectPath.getParent,
+              objectPath = objectPath.getParent.getFileName.toString,
               lastModifiedTime = OffsetDateTime.now()
             ))
       }
@@ -104,7 +104,7 @@ class ObjectIO(root: Path, fileStream: FileStream) {
               eTag = finalETag,
               contentMd5 = digestInfo.md5,
               contentLength = digestInfo.length,
-              objectPath = objectPath.getParent,
+              objectPath = objectPath.getParent.getFileName.toString,
               lastModifiedTime = OffsetDateTime.now(),
               uploadId = Some(uploadInfo.uploadId)
             ))
@@ -115,7 +115,6 @@ class ObjectIO(root: Path, fileStream: FileStream) {
     val uploadDir = uploadInfo.uploadPath
     val stagingPath = getUploadPath(uploadDir, uploadInfo.partNumber, staging = true)
     val path = getUploadPath(uploadDir, uploadInfo.partNumber, staging = false)
-    // TODO
     Try {
       if (BucketVersioning.Enabled != objectKey.version) clean(path) // first clean existing folder, if applicable
       Files.move(stagingPath, path)

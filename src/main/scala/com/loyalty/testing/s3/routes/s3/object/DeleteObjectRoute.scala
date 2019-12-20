@@ -52,7 +52,7 @@ object DeleteObjectRoute extends CustomMarshallers {
               eTag = "",
               contentMd5 = "",
               contentLength = 0,
-              objectPath = ".".toPath,
+              objectPath = ".",
               lastModifiedTime = OffsetDateTime.now,
               deleteMarker = Some(deleteMarker)
             )
