@@ -11,6 +11,7 @@ import scala.xml.Elem
 
 trait XmlResponse {
   def toXml: Elem
+
   def toByteString: ByteString = ByteString(toXml.toString().getBytes(UTF_8))
 }
 
@@ -22,11 +23,13 @@ case class ListBucketResult(bucketName: String,
                             contents: List[BucketContent])
   extends XmlResponse {
   override def toXml: Elem = {
+    // @formatter:off
     val prefixElem = maybePrefix match {
       case Some(prefix) => <Prefix>{prefix}</Prefix>
       case None => <Prefix/>
     }
     <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>{bucketName}</Name>{prefixElem}<KeyCount>{keyCount}</KeyCount><MaxKeys>{maxKeys}</MaxKeys><EncodingType>url</EncodingType> <IsTruncated>{isTruncated}</IsTruncated>{contents.map(_.toXml)}</ListBucketResult>
+    // @formatter:on
   }
 }
 
@@ -40,13 +43,15 @@ case class BucketContent(expand: Boolean,
 
   def prefix(delimiter: String = "/"): Option[String] = {
     val index = key.lastIndexOf(delimiter)
-    if(index <= -1) None else Option(key.substring(0, index))
+    if (index <= -1) None else Option(key.substring(0, index))
   }
 
   override def toXml: Elem =
+  // @formatter:off
     if (expand || size > 0)
       <Contents><Key>{key}</Key><LastModified>{lastModifiedDate.toString}</LastModified><Size>{size}</Size><StorageClass>{storageClass}</StorageClass><ETag>"{eTag}"</ETag></Contents>
     else <CommonPrefixes><Prefix>{key}</Prefix></CommonPrefixes>
+  // @formatter:on
 }
 
 object BucketContent {
@@ -59,7 +64,7 @@ object BucketContent {
 
   def apply(objectKey: ObjectKey): BucketContent =
     BucketContent(
-      expand= true,
+      expand = true,
       objectKey.key,
       objectKey.contentLength,
       objectKey.eTag,
@@ -69,7 +74,9 @@ object BucketContent {
 
 case class InitiateMultipartUploadResult(bucketName: String, key: String, uploadId: String) extends XmlResponse {
   override def toXml: Elem =
+  // @formatter:off
     <InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>{bucketName}</Bucket><Key>{key.decode}</Key><UploadId>{uploadId}</UploadId></InitiateMultipartUploadResult>
+    // @formatter:on
 }
 
 case class CopyObjectResult(eTag: String,
@@ -78,7 +85,9 @@ case class CopyObjectResult(eTag: String,
                             lastModifiedDate: Instant = Instant.now())
   extends XmlResponse {
   override def toXml: Elem =
+  // @formatter:off
     <CopyObjectResult><LastModified>{lastModifiedDate.toString}</LastModified><ETag>"{eTag}"</ETag></CopyObjectResult>
+  // @formatter:on
 }
 
 case class CopyPartResult(eTag: String,
@@ -86,15 +95,22 @@ case class CopyPartResult(eTag: String,
                           maybeSourceVersionId: Option[String] = None,
                           lastModifiedDate: Instant = Instant.now()) extends XmlResponse {
   override def toXml: Elem =
+  // @formatter:off
     <CopyPartResult><LastModified>{lastModifiedDate.toString}</LastModified><ETag>"{eTag}"</ETag></CopyPartResult>
+  // @formatter:on
 }
 
-case class CompleteMultipartUploadResult(bucketName: String, key: String, eTag: String, contentLength: Long,
+case class CompleteMultipartUploadResult(bucketName: String,
+                                         key: String,
+                                         eTag: String,
+                                         contentLength: Long,
                                          versionId: Option[String] = None) extends XmlResponse {
   val location = s"http://s3.amazonaws.com/${Paths.get(bucketName, key.decode).toString}"
 
   override def toXml: Elem =
+  // @formatter:off
     <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Location>{location}</Location><Bucket>{bucketName}</Bucket><Key>{key.decode}</Key><ETag>"{eTag}"</ETag></CompleteMultipartUploadResult>
+  // @formatter:on
 }
 
 object ErrorCodes {
@@ -115,7 +131,9 @@ sealed trait ErrorResponse extends XmlResponse {
   val resource: String
 
   override def toXml: Elem =
+  // @formatter:off
     <Error xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Code>{code}</Code><Message>{message}</Message><Resource>{resource}</Resource></Error>
+  // @formatter:on
 }
 
 import com.loyalty.testing.s3.response.ErrorCodes._
