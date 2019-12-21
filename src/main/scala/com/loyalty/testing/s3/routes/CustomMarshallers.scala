@@ -61,6 +61,26 @@ trait CustomMarshallers
         CopyPartResult(etag, lastModifiedDate = lastModified)
     }
 
+  implicit val InitiateMultipartUploadResultUnmarshaller: FromEntityUnmarshaller[InitiateMultipartUploadResult] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x =>
+        val bucketName = (x \ "Bucket").text
+        val key = (x \ "Key").text
+        val uploadId = (x \ "UploadId").text
+        InitiateMultipartUploadResult(bucketName, key, uploadId)
+    }
+
+  implicit val CompleteMultipartUploadResultUnmarshaller: FromEntityUnmarshaller[CompleteMultipartUploadResult] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x =>
+        val bucketName = (x \ "Bucket").text
+        val key = (x \ "Key").text
+        val etag = (x \ "ETag").text.drop(1).dropRight(1)
+        CompleteMultipartUploadResult(bucketName, key, etag, 0L)
+    }
+
   /*
     implicit def v(implicit system: ActorSystem[_]): Marshaller[NodeSeq, Future[CreateBucketConfiguration]] =
       nodeSeqMarshaller(MediaTypes.`application/xml`) map {

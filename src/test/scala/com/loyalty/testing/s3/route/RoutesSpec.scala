@@ -10,13 +10,14 @@ import akka.http.scaladsl.model.ContentTypes._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.testkit.ScalatestRouteTest
+import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.stream.scaladsl.{FileIO, Sink}
 import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model.bucket
 import com.loyalty.testing.s3.actor.{BucketOperationsBehavior, CopyBehavior, NotificationBehavior, ObjectOperationsBehavior}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
+import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo}
 import com.loyalty.testing.s3.response._
 import com.loyalty.testing.s3.routes.{CustomMarshallers, Routes}
 import com.loyalty.testing.s3.service.NotificationService
@@ -24,11 +25,11 @@ import com.loyalty.testing.s3.settings.Settings
 import com.loyalty.testing.s3.streams.FileStream
 import com.loyalty.testing.s3.test._
 import com.typesafe.config.{Config, ConfigFactory}
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Millis, Seconds, Span}
+import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 import scala.concurrent.duration._
 
@@ -48,6 +49,7 @@ class RoutesSpec
   private implicit val settings: Settings = AppSettings(spawnSystem.settings.config)
   private implicit val defaultPatience: PatienceConfig = PatienceConfig(timeout = Span(15, Seconds),
     interval = Span(500, Millis))
+  private implicit val testTimeout: RouteTestTimeout = RouteTestTimeout(5.seconds)
   private val objectIO: ObjectIO = ObjectIO(FileStream())
   private val database: NitriteDatabase = NitriteDatabase()
   private val notificationService: NotificationService = NotificationService(settings.awsSettings)
@@ -98,7 +100,7 @@ class RoutesSpec
         |<CreateBucketConfiguration xmlns="http:/.amazonaws.com/doc/2006-03-01/">
         |<LocationConstraint>us-west-1</LocationConstraint>
         |</CreateBucketConfiguration>
-       """.stripMargin.replaceAll(System.lineSeparator(), "")
+       """.stripMargin.replaceNewLine
     val entity = HttpEntity(xmlContentType, xml)
     Put(s"/$versionedBucketName", entity) ~> routes ~> check {
       headers.head mustBe Location(s"/$versionedBucketName")
@@ -171,7 +173,7 @@ class RoutesSpec
     val entity = HttpEntity(`application/octet-stream`, contentSource)
     Put(s"/$defaultBucketName/$key", entity) ~> routes ~> check {
       status mustEqual OK
-      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG,  s""""$etagDigest1""""))
+      getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest1""""))
       getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, md5Digest1))
     }
   }
@@ -366,6 +368,71 @@ class RoutesSpec
     }
   }
 
+  it should "multipart upload an object" in {
+    val key = "big-sample.txt"
+    val uploadId = initiateMultiPartUpload(defaultBucketName, key)
+
+    val partInfos: List[PartInfo] = uploadPart(defaultBucketName, key, uploadId, 1, 1, 90395) ::
+      uploadPart(defaultBucketName, key, uploadId, 2, 90396, 90395) ::
+      uploadPart(defaultBucketName, key, uploadId, 3, 180791, 24210) :: Nil
+
+    completeMultipartUpload(defaultBucketName, key, uploadId, partInfos)
+  }
+
+  private def initiateMultiPartUpload(bucketName: String,
+                                      key: String,
+                                      version: BucketVersioning = BucketVersioning.NotExists,
+                                      index: Int = 0): String = {
+    val uploadId = createUploadId(bucketName, version, key, index)
+    val expected = InitiateMultipartUploadResult(bucketName, key, uploadId)
+    Post(s"/$bucketName/$key?uploads") ~> routes ~> check {
+      status mustEqual OK
+      responseAs[InitiateMultipartUploadResult] mustEqual expected
+    }
+    uploadId
+  }
+
+  private def uploadPart(bucketName: String,
+                         key: String,
+                         uploadId: String,
+                         partNumber: Int,
+                         start: Int,
+                         totalSize: Int) = {
+    val entity = HttpEntity(`application/octet-stream`, createContentSource(start, totalSize))
+    val etag = calculateDigest(start, totalSize).futureValue.etag
+    Put(s"/$bucketName/$key?partNumber=$partNumber&uploadId=$uploadId", entity) ~> routes ~> check {
+      status mustEqual OK
+      val maybeETagHeader = getHeader(headers, ETAG)
+      maybeETagHeader mustBe defined
+      maybeETagHeader.get.value().drop(1).dropRight(1) mustEqual etag
+    }
+    PartInfo(partNumber, etag)
+  }
+
+  private def completeMultipartUpload(bucketName: String,
+                                      key: String,
+                                      uploadId: String,
+                                      partInfos: List[PartInfo]): Assertion = {
+    val parts = partInfos
+      .map {
+        partInfo =>
+          s"""<Part><PartNumber>${partInfo.partNumber}</PartNumber><ETag>"${partInfo.eTag}"</ETag></Part>"""
+      }.mkString("")
+
+
+    val concatenatedETag =
+      partInfos.foldLeft("") {
+        case (agg, partInfo) => agg + partInfo.eTag
+      }
+    val finalETag = s"${toBase16(concatenatedETag)}-${partInfos.length}"
+    val expectedResult = CompleteMultipartUploadResult(defaultBucketName, key, finalETag, 0)
+    val xml = s"<CompleteMultipartUploadResult>$parts</CompleteMultipartUploadResult>"
+    Post(s"/$bucketName/$key?uploadId=$uploadId", HttpEntity(xmlContentType, xml)) ~> routes ~> check {
+      status mustEqual OK
+      responseAs[CompleteMultipartUploadResult] mustEqual expectedResult
+    }
+  }
+
   it should "set delete marker on an object" in {
     val key: String = "sample.txt"
     Delete(s"/$defaultBucketName/$key") ~> routes ~> check {
@@ -457,4 +524,5 @@ class RoutesSpec
       maybeSourceVersionId = getHeader(headers, SourceVersionIdHeader).map(_.value()),
       lastModifiedDate = Instant.now()
     )
+
 }
