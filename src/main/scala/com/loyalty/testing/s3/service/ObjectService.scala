@@ -62,7 +62,9 @@ class ObjectService(objectIO: ObjectIO, database: NitriteDatabase) {
   def savePart(partInfo: UploadInfo, contentSource: Source[ByteString, _])
               (implicit ec: ExecutionContext): Future[UploadInfo] =
     for {
-      uploadInfo <- objectIO.savePart(partInfo, contentSource)
+      maybeUploadInfo <- objectIO.savePart(partInfo, contentSource)
+      if maybeUploadInfo.isDefined
+      uploadInfo = maybeUploadInfo.get
       _ <- database.createUpload(uploadInfo)
     } yield uploadInfo
 

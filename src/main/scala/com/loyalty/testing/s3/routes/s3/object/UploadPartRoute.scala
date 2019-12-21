@@ -10,8 +10,8 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.typed.scaladsl.ActorFlow
 import akka.util.Timeout
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.model.bucket.{Command, UploadPartWrapper}
 import com.loyalty.testing.s3.actor.model._
+import com.loyalty.testing.s3.actor.model.bucket.{Command, UploadPartWrapper}
 import com.loyalty.testing.s3.response.{InternalServiceResponse, NoSuchBucketResponse, NoSuchUploadResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
@@ -27,6 +27,8 @@ object UploadPartRoute extends CustomMarshallers {
             timeout: Timeout): Route =
     (extractRequest & parameter("partNumber".as[Int]) & parameter("uploadId")) {
       (request, partNumber, uploadId) =>
+        system.log.info("Upload part: bucket_name={}, key={}, upload_id={}, part_number={}", bucketName, key, uploadId,
+          partNumber)
         val eventualEvent =
           Source
             .single("")

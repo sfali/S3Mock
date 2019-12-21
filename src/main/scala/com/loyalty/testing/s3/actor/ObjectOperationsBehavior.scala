@@ -163,7 +163,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
         )
         context.pipeToSelf(objectService.createUpload(uploadInfo)) {
           case Failure(ex) =>
-            context.log.error(s"unable to initiated multi part upload: ${bucketName}/$key", ex)
+            context.log.error(s"unable to initiated multi part upload: $bucketName/$key", ex)
             DatabaseError // TODO: retry
           case Success(_) => UploadInfoCreated(uploadInfo, replyTo)
         }

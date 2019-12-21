@@ -14,11 +14,14 @@ import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
 import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo}
 import com.loyalty.testing.s3.settings.Settings
 import com.loyalty.testing.s3.streams.FileStream
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 class ObjectIO(root: Path, fileStream: FileStream) {
+
+  private val log = LoggerFactory.getLogger(classOf[ObjectIO])
 
   private val workDir: Path = root.toAbsolutePath
   private val dataDir: Path = workDir + "data"
@@ -55,7 +58,7 @@ class ObjectIO(root: Path, fileStream: FileStream) {
   }
 
   def savePart(uploadInfo: UploadInfo, contentSource: Source[ByteString, _])
-              (implicit ec: ExecutionContext): Future[UploadInfo] = {
+              (implicit ec: ExecutionContext): Future[Option[UploadInfo]] = {
     val uploadDir = uploadInfo.uploadPath
     val objectPath = getUploadPath(uploadDir, uploadInfo.partNumber, staging = true)
     fileStream.saveContent(contentSource, objectPath)
@@ -69,9 +72,15 @@ class ObjectIO(root: Path, fileStream: FileStream) {
               contentLength = digestInfo.length,
               uploadPath = uploadDir
             )
-            Future.successful(updateUploadInfo)
+            Future.successful(Some(updateUploadInfo))
           }
-      }
+      }.recover {
+      case ex =>
+        log.error(
+          s"""Unable to save part, bucket_name=${uploadInfo.bucketName}, key=${uploadInfo.key},
+             | upload_id=${uploadInfo.uploadId}, part_number=${uploadInfo.partNumber}""".stripMargin.replaceNewLine, ex)
+        None
+    }
   }
 
   def mergeFiles(uploadInfo: UploadInfo, parts: List[PartInfo])
