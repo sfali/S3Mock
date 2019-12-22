@@ -372,11 +372,22 @@ class RoutesSpec
     val key = "big-sample.txt"
     val uploadId = initiateMultiPartUpload(defaultBucketName, key)
 
-    val partInfos: List[PartInfo] = uploadPart(defaultBucketName, key, uploadId, 1, 1, 90395) ::
+    val partInfos = uploadPart(defaultBucketName, key, uploadId, 1, 1, 90395) ::
       uploadPart(defaultBucketName, key, uploadId, 2, 90396, 90395) ::
       uploadPart(defaultBucketName, key, uploadId, 3, 180791, 24210) :: Nil
 
     completeMultipartUpload(defaultBucketName, key, uploadId, partInfos)
+  }
+
+  it should "multi part copy an object" in {
+    val key = "big-sample.txt"
+    val uploadId = initiateMultiPartUpload(bucket2, key)
+
+    val partInfos = copyPart(bucket2, key, defaultBucketName, uploadId, 1, 0, 5242910) ::
+      copyPart(bucket2, key, defaultBucketName, uploadId, 2, 5242910, 10485820) ::
+      copyPart(bucket2, key, defaultBucketName, uploadId, 3, 10485820, 11890000) :: Nil
+
+    completeMultipartUpload(bucket2, key, uploadId, partInfos)
   }
 
   private def initiateMultiPartUpload(bucketName: String,
@@ -409,6 +420,25 @@ class RoutesSpec
     PartInfo(partNumber, etag)
   }
 
+  private def copyPart(bucketName: String,
+                       key: String,
+                       sourceBucketName: String,
+                       uploadId: String,
+                       partNumber: Int,
+                       start: Int,
+                       end: Int) = {
+    val headers = RawHeader("x-amz-copy-source", s"/$sourceBucketName/$key") ::
+      RawHeader("x-amz-copy-source-range", s"bytes=$start-$end") :: Nil
+    // 58 is the length of string "nnnnnn: A quick brown fox jumps over the silly lazy dog.\r\n"
+    val etag = calculateDigest((start / 58) + 1, (end - start) / 58).futureValue.etag
+    val expected = CopyPartResult(etag)
+    Put(s"/$bucketName/$key?partNumber=$partNumber&uploadId=$uploadId").withHeaders(headers) ~> routes ~> check {
+      status mustEqual OK
+      entityAs[CopyPartResult].copy(lastModifiedDate = expected.lastModifiedDate) mustEqual expected
+    }
+    PartInfo(partNumber, etag)
+  }
+
   private def completeMultipartUpload(bucketName: String,
                                       key: String,
                                       uploadId: String,
@@ -425,7 +455,7 @@ class RoutesSpec
         case (agg, partInfo) => agg + partInfo.eTag
       }
     val finalETag = s"${toBase16(concatenatedETag)}-${partInfos.length}"
-    val expectedResult = CompleteMultipartUploadResult(defaultBucketName, key, finalETag, 0)
+    val expectedResult = CompleteMultipartUploadResult(bucketName, key, finalETag, 0)
     val xml = s"<CompleteMultipartUploadResult>$parts</CompleteMultipartUploadResult>"
     Post(s"/$bucketName/$key?uploadId=$uploadId", HttpEntity(xmlContentType, xml)) ~> routes ~> check {
       status mustEqual OK

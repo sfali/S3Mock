@@ -44,8 +44,8 @@ class CopyBehavior(context: ActorContext[Command],
       case CopyPart(sourceBucketName, sourceKey, targetBucketName, targetKey, uploadId, partNumber, range,
       maybeSourceVersionId, replyTo) =>
         context.log.info(
-          "Copy part: source_bucket_name={}, source_key={},  target_bucket_name={}, target_key={}",
-          sourceBucketName, sourceKey, targetBucketName, targetKey)
+          "Copy part: source_bucket_name={}, source_key={},  target_bucket_name={}, target_key={}, range={}",
+          sourceBucketName, sourceKey, targetBucketName, targetKey, range)
         val behavior = copyOperationBehavior(
           bucketOperationsActorRef,
           S3Location(sourceBucketName, sourceKey),
