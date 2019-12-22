@@ -68,7 +68,7 @@ package object s3 {
   def toBase16FromRandomUUID: String = toBase16(UUID.randomUUID().toString)
 
   implicit class StringOps(s: String) {
-    def decode: String = URLDecoder.decode(s, UTF_8.toString)
+    def decode: String = URLDecoder.decode(s, UTF_8.toString).replaceAll(" ", "+")
 
     def encode: String = URLEncoder.encode(s, UTF_8.toString)
 
@@ -300,10 +300,10 @@ package object s3 {
   def createObjectId(bucketName: String, key: String): UUID = s"$bucketName-$key".toUUID
 
   def createUploadId(bucketName: String,
-                     version: BucketVersioning,
                      key: String,
+                     version: BucketVersioning,
                      versionIndex: Int): String =
-    toBase16(s"$bucketName-$key-${version.entryName}-$versionIndex")
+    toBase64(s"upload-$bucketName-$key-${version.entryName}-$versionIndex".toUUID.toString)
 
   def toObjectDir(bucketName: String,
                   key: String,

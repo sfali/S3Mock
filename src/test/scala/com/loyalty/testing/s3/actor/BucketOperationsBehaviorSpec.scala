@@ -485,7 +485,7 @@ class BucketOperationsBehaviorSpec
     actorRef ! InitiateMultiPartUploadWrapper(key, probe.ref)
     val event = probe.receiveMessage().asInstanceOf[MultiPartUploadedInitiated]
     val uploadId = event.uploadId
-    createUploadId(defaultBucketName, NotExists, key, 0) mustEqual uploadId
+    createUploadId(defaultBucketName, key, NotExists, 0) mustEqual uploadId
 
     val partNumbers = 1 :: 2 :: 3 :: Nil
     val partBoundaries = (1, 100000) :: (100001, 100000) :: (200001, 5000) :: Nil
@@ -511,7 +511,7 @@ class BucketOperationsBehaviorSpec
     bucketOperationsActorRef ! ShardingEnvelope(bucket2UUID, InitiateMultiPartUploadWrapper(key, probe.ref))
     val event = probe.receiveMessage().asInstanceOf[MultiPartUploadedInitiated]
     val uploadId = event.uploadId
-    createUploadId(bucket2, NotExists, key, 0) mustEqual uploadId
+    createUploadId(bucket2, key, NotExists, 0) mustEqual uploadId
 
     val range1 = ByteRange(0, chunkSize)
     actorRef ! CopyPart(defaultBucketName, key, bucket2, key, uploadId, 1, Some(range1), None, probe.ref)

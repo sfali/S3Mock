@@ -24,7 +24,8 @@ object CompleteUploadRoute extends CustomMarshallers {
             bucketOperationsActorRef: ActorRef[ShardingEnvelope[Command]])
            (implicit system: ActorSystem[_],
             timeout: Timeout): Route =
-    (extractRequest & parameter("uploadId")) { (request, uploadId) =>
+    (extractRequest & parameter("uploadId")) { (request, rawUploadId) =>
+      val uploadId = rawUploadId.decode
       val eventualEvent =
         extractRequestTo(request)
           .map(Option.apply)

@@ -394,7 +394,7 @@ class RoutesSpec
                                       key: String,
                                       version: BucketVersioning = BucketVersioning.NotExists,
                                       index: Int = 0): String = {
-    val uploadId = createUploadId(bucketName, version, key, index)
+    val uploadId = createUploadId(bucketName, key, version, index)
     val expected = InitiateMultipartUploadResult(bucketName, key, uploadId)
     Post(s"/$bucketName/$key?uploads") ~> routes ~> check {
       status mustEqual OK

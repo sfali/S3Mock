@@ -151,7 +151,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
         val bucketName = bucket.bucketName
         val version = bucket.version
         versionIndex = if (BucketVersioning.Enabled == version) versionIndex + 1 else versionIndex
-        val uploadId = createUploadId(bucketName, version, key, versionIndex)
+        val uploadId = createUploadId(bucketName, key, version, versionIndex)
         val uploadPath = toObjectDir(bucketName, key, version, versionIndex.toVersionId, Some(uploadId))
         val uploadInfo = UploadInfo(
           bucketName = bucketName,
