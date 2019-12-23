@@ -490,60 +490,6 @@ class RoutesSpec
     }
   }
 
-  /*it should "initiate multi part upload" in {
-    Post("/test-bucket/file.txt?uploads") ~> s3Routes ~> {
-      check {
-        status mustBe OK
-      }
-    }
-  }*/
-
-  /*ignore should "upload multi part" in {
-    Put("/test-bucket/file.txt?partNumber=1&uploadId=asdf") ~> s3Routes ~> {
-      check {
-        status mustBe OK
-      }
-    }
-  }*/
-
-  /*ignore should "Range" in {
-    val rangeHeader = Range(ByteRange.suffix(20))
-    Get("/test-bucket/file.txt") ~> rangeHeader ~> s3Routes ~> {
-      check {
-        status mustBe OK
-      }
-    }
-  }*/
-
-  // import com.loyalty.testing.s3.routes.s3.`object`.directives._
-
-  /*ignore should "copy" in {
-    val sourceHeader = `x-amz-copy-source`.parse("/test/input/test.txt?versionId=ooo").toOption.get
-    val h = `x-amz-copy-source-range`.parse("bytes=50-100").toOption.get
-    Put("/test-bucket/file.txt?partNumber=1&uploadId=asdfqwer") ~> sourceHeader ~> h ~> s3Routes ~> {
-      check {
-        status mustBe OK
-      }
-    }
-  }*/
-
-  /*it should "" in {
-    Head("/test-bucket/file.txt") ~> s3Routes ~> {
-      check {
-        status mustBe OK
-        headers.foreach(println)
-      }
-    }
-  }*/
-
-  /*it should "complete multi part upload" in {
-    Post("/test-bucket?uploadId=asdf") ~> s3Routes ~> {
-      check {
-        status mustBe OK
-      }
-    }
-  }*/
-
   private def getHeader(headers: Seq[HttpHeader], headerName: String): Option[HttpHeader] =
     headers.find(_.lowercaseName() == headerName.toLowerCase)
 
