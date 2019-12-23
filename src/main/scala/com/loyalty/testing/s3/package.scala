@@ -311,7 +311,7 @@ package object s3 {
                   versionId: String,
                   uploadId: Option[String] = None): String = {
     val value = s"$bucketName-$key-${bucketVersioning.entryName}-$versionId"
-    toBase16(uploadId.map(s => s"$value-$s").getOrElse(value))
+    toBase16(uploadId.map(s => s"$value-$s").getOrElse(value).toUUID.toString)
   }
 
   implicit class IntOps(src: Int) {
