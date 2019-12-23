@@ -1,54 +1,65 @@
 package com.loyalty.testing.s3.routes.s3.bucket
 
-import akka.event.LoggingAdapter
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.HttpResponse
-import akka.http.scaladsl.model.StatusCodes.{BadRequest, InternalServerError}
+import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import com.loyalty.testing.s3.repositories.Repository
+import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.typed.scaladsl.ActorFlow
+import akka.util.Timeout
+import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.actor.model.bucket.{Command, ListBucket}
+import com.loyalty.testing.s3.actor.model.{Event, ListBucketContent, NoSuchBucketExists}
 import com.loyalty.testing.s3.request.ListBucketParams
-import com.loyalty.testing.s3.response.NoSuchBucketException
+import com.loyalty.testing.s3.response.{InternalServiceResponse, ListBucketResult, NoSuchBucketResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 
 import scala.util.{Failure, Success}
 
-class ListBucketRoute private(log: LoggingAdapter, repository: Repository)
-  extends CustomMarshallers {
+object ListBucketRoute extends CustomMarshallers {
 
-  def route(bucketName: String): Route =
-    (get & parameter("list-type".as[Int]) & parameter("delimiter".?)
-      & parameter("max-keys".as[Int].?) & parameter("prefix".?)) {
-      (listType, delimiterParam, maxKeysParam, prefixParam) =>
-        val maybePrefix = prefixParam match {
-          case Some(value) => if (value == "") None else Some(value)
-          case None => None
-        }
-
-        val maybeDelimiter = delimiterParam match {
-          case Some(value) => if (value == "") None else Some(value)
-          case None => None
-        }
-        log.debug("Delimiter: {}, Prefix: {}", maybeDelimiter, maybePrefix)
+  def apply(bucketName: String,
+            bucketOperationsActorRef: ActorRef[ShardingEnvelope[Command]])
+           (implicit system: ActorSystem[_],
+            timeout: Timeout): Route =
+    (get & parameter("list-type".as[Int]) & parameter("max-keys".as[Int].?) & parameter("delimiter".?)
+      & parameter("prefix".?)) {
+      (listType, maxKeysParam, delimiterParam, prefixParam) =>
+        val maybePrefix = prefixParam.filterNot(_ == "")
+        val maybeDelimiter = delimiterParam.filterNot(_ == "")
         if (listType != 2) complete(HttpResponse(BadRequest))
         else {
           val maxKeys = maxKeysParam.getOrElse(1000)
           val params = ListBucketParams(maxKeys, maybePrefix, maybeDelimiter)
-          onComplete(repository.listBucket(bucketName, params)) {
-            case Success(result) => complete(result)
-
-            case Failure(ex: NoSuchBucketException) =>
-              log.error(ex, ex.message)
-              complete(ex)
-
-            case Failure(ex) =>
-              log.error(ex, "Error happened while getting list bucket: {}", bucketName)
-              complete(HttpResponse(InternalServerError))
+          val eventualEvent =
+            Source
+              .single("")
+              .via(
+                ActorFlow.ask(bucketOperationsActorRef)(
+                  (_, replyTo: ActorRef[Event]) =>
+                    ShardingEnvelope(bucketName.toUUID.toString, ListBucket(params, replyTo))
+                )
+              ).runWith(Sink.head)
+          onComplete(eventualEvent) {
+            case Success(ListBucketContent(contents)) =>
+              val result = ListBucketResult(
+                bucketName = bucketName,
+                maybePrefix = params.maybePrefix,
+                keyCount = contents.length,
+                maxKeys = params.maxKeys,
+                contents = contents
+              )
+              complete(result)
+            case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
+            case Success(event: Event) =>
+              system.log.warn("ListBucketRoute: invalid event received. event={}, bucket_name={}", event, bucketName)
+              complete(InternalServiceResponse(bucketName))
+            case Failure(ex: Throwable) =>
+              system.log.error("ListBucketRoute: Internal service error occurred", ex)
+              complete(InternalServiceResponse(bucketName))
           }
         }
     }
-}
-
-object ListBucketRoute {
-  def apply()(implicit log: LoggingAdapter, repository: Repository): ListBucketRoute =
-    new ListBucketRoute(log, repository)
 }

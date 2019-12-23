@@ -1,57 +1,53 @@
 package com.loyalty.testing.s3.routes.s3.`object`
 
-import akka.actor.ActorRef
-import akka.event.LoggingAdapter
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.HttpResponse
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.model.StatusCodes.OK
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.typed.scaladsl.ActorFlow
+import akka.util.Timeout
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.notification.NotificationData
-import com.loyalty.testing.s3.notification.actor.NotificationRouter
-import com.loyalty.testing.s3.repositories.Repository
-import com.loyalty.testing.s3.response.NoSuchBucketException
+import com.loyalty.testing.s3.actor.model.bucket.{Command, PutObjectWrapper}
+import com.loyalty.testing.s3.actor.model.{Event, InvalidAccess, NoSuchBucketExists, ObjectInfo}
+import com.loyalty.testing.s3.response.{InternalServiceResponse, NoSuchBucketResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
+import com.loyalty.testing.s3.routes.s3._
 
 import scala.util.{Failure, Success}
 
-class PutObjectRoute private(notificationRouterRef: ActorRef,
-                             log: LoggingAdapter,
-                             repository: Repository)
-  extends CustomMarshallers {
+object PutObjectRoute extends CustomMarshallers {
 
-  def route(bucketName: String, key: String): Route = {
-    put {
-      extractRequest { request =>
-        val eventualResult = repository.putObject(bucketName, key, request.entity.dataBytes)
-        onComplete(eventualResult) {
-          case Success(objectMeta) =>
-            val putObjectResult = objectMeta.result
-            val maybeVersionId = putObjectResult.maybeVersionId
-            val notificationData = NotificationData(bucketName, key,
-              putObjectResult.contentLength, putObjectResult.etag, "Put", maybeVersionId)
-            notificationRouterRef ! NotificationRouter.SendNotification(notificationData)
-
-            var response = HttpResponse(OK)
-              .withHeaders(RawHeader(CONTENT_MD5, putObjectResult.contentMd5),
-                RawHeader(ETAG, s""""${putObjectResult.etag}""""))
-            response = maybeVersionId
-              .map(versionId => response.addHeader(RawHeader("x-amz-version-id", versionId)))
-              .getOrElse(response)
-            complete(response)
-          case Failure(ex: NoSuchBucketException) => complete(ex)
-          case Failure(ex) =>
-            log.error(ex, "Error happened while putting object {} in bucket: {}", key, bucketName)
-            complete(HttpResponse(InternalServerError))
-        }
+  def apply(bucketName: String,
+            key: String,
+            bucketOperationsActorRef: ActorRef[ShardingEnvelope[Command]])
+           (implicit system: ActorSystem[_],
+            timeout: Timeout): Route =
+    extractRequest { request =>
+      val eventualEvent =
+        Source
+          .single("")
+          .via(
+            ActorFlow.ask(bucketOperationsActorRef)(
+              (_, replyTo: ActorRef[Event]) =>
+                ShardingEnvelope(bucketName.toUUID.toString, PutObjectWrapper(key, request.entity.dataBytes,
+                  copy = false, replyTo))
+            )
+          ).runWith(Sink.head)
+      onComplete(eventualEvent) {
+        case Success(ObjectInfo(objectKey)) => complete(HttpResponse(OK).withHeaders(createResponseHeaders(objectKey)))
+        case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
+        case Success(InvalidAccess) =>
+          system.log.warn("PutObjectRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
+          complete(InternalServiceResponse(s"$bucketName/$key"))
+        case Success(event) =>
+          system.log.warn("PutObjectRoute: invalid event received. event={}, bucket_name={}, key={}", event, bucketName, key)
+          complete(InternalServiceResponse(s"$bucketName/$key"))
+        case Failure(ex: Throwable) =>
+          system.log.error(s"PutObjectRoute: Internal service error occurred, bucket_name=$bucketName, key=$key", ex)
+          complete(InternalServiceResponse(s"$bucketName/$key"))
       }
     }
-  }
-
-}
-
-object PutObjectRoute {
-  def apply(notificationRouterRef: ActorRef)(implicit log: LoggingAdapter, repository: Repository): PutObjectRoute =
-    new PutObjectRoute(notificationRouterRef, log, repository)
 }

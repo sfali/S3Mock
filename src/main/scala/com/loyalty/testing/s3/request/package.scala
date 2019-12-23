@@ -1,10 +1,11 @@
 package com.loyalty.testing.s3
 
-import com.loyalty.testing.s3.request.BucketVersioning.BucketVersioning
+import com.loyalty.testing.s3.repositories.model.UploadInfo
+import enumeratum.{CirceEnum, Enum, EnumEntry}
 
+import scala.collection.immutable
 import scala.util.Try
 import scala.xml.NodeSeq
-
 
 package object request {
 
@@ -34,35 +35,48 @@ package object request {
     }
   }
 
-  case class UploadPart(partNumber: Int, eTag: String)
+  case class PartInfo(partNumber: Int, eTag: String)
 
-  object UploadPart {
-    def apply(node: NodeSeq): UploadPart = {
+  object PartInfo {
+    def apply(partNumber: Int, eTag: String): PartInfo = new PartInfo(partNumber, eTag)
+
+    def apply(node: NodeSeq): PartInfo = {
       val partNumber = (node \ "PartNumber").text.toInt
-      val eTag = (node \ "ETag").text
-      UploadPart(partNumber, eTag)
+      val eTag = (node \ "ETag").text.drop(1).dropRight(1) // remove quotations
+      PartInfo(partNumber, eTag)
     }
+
+    def apply(uploadInfo: UploadInfo): PartInfo = PartInfo(uploadInfo.partNumber, uploadInfo.eTag)
+
   }
 
-  case class CompleteMultipartUpload(parts: List[UploadPart])
+  case class CompleteMultipartUpload(parts: List[PartInfo])
 
   object CompleteMultipartUpload {
     def apply(maybeXml: Option[String]): Option[CompleteMultipartUpload] =
       if (maybeXml.getOrElse("").trim.nonEmpty) {
         val node = scala.xml.XML.loadString(maybeXml.get.trim)
         val children = node \ "Part"
-        Some(CompleteMultipartUpload(children.map(UploadPart.apply).toList))
+        Some(CompleteMultipartUpload(children.map(PartInfo.apply).toList))
       } else None
   }
 
-  object BucketVersioning extends Enumeration {
-    type BucketVersioning = Value
-    val Enabled, Suspended = Value
+  sealed trait BucketVersioning extends EnumEntry
 
-    def fromNode(node: NodeSeq): Option[request.BucketVersioning.Value] = Try(withName(node.text)).toOption
+  object BucketVersioning extends Enum[BucketVersioning] with CirceEnum[BucketVersioning] {
+    override def values: immutable.IndexedSeq[BucketVersioning] = findValues
+
+    def fromNode(node: NodeSeq): Option[BucketVersioning] = Try(withName(node.text)).toOption
+
+    case object Enabled extends BucketVersioning
+
+    case object Suspended extends BucketVersioning
+
+    case object NotExists extends BucketVersioning
+
   }
 
-  case class ListBucketParams(maxKeys: Int,
+  case class ListBucketParams(maxKeys: Int = 1000,
                               maybePrefix: Option[String] = None,
                               maybeDelimiter: Option[String] = None)
 

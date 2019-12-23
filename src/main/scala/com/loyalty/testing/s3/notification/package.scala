@@ -1,21 +1,12 @@
 package com.loyalty.testing.s3
 
 import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
 
-import io.circe._
+import com.loyalty.testing.s3.parser._
+import io.circe.Encoder._
 import io.circe.generic.auto._
-import io.circe.java8.time.{decodeZonedDateTimeWithFormatter, encodeZonedDateTimeWithFormatter}
 
 package object notification {
-
-  import parser._
-
-  implicit final val decodeZonedDateTimeDefault: Decoder[ZonedDateTime] =
-    decodeZonedDateTimeWithFormatter(ISO_OFFSET_DATE_TIME)
-
-  implicit final val encodeZonedDateTimeDefault: Encoder[ZonedDateTime] =
-    encodeZonedDateTimeWithFormatter(ISO_OFFSET_DATE_TIME)
 
   case class SqsEvent(Records: List[SqsRecord])
 
@@ -40,6 +31,23 @@ package object notification {
                       versionId: Option[String] = None,
                       sequencer: String = "0055AED6DCD90281E5")
 
+  object S3Object {
+    def apply(key: String,
+              size: Long,
+              eTag: String,
+              versionId: Option[String],
+              sequencer: String = "0055AED6DCD90281E5"): S3Object =
+      new S3Object(key, size, eTag, versionId, sequencer)
+
+    def apply(notificationData: NotificationData): S3Object =
+      S3Object(
+        key = notificationData.key,
+        size = notificationData.size,
+        eTag = notificationData.eTag,
+        versionId = notificationData.maybeVersionId
+      )
+  }
+
   case class OwnerIdentity(principalId: String = "A3NL1KOZZKExample")
 
   case class Bucket(name: String,
@@ -60,15 +68,11 @@ package object notification {
 
   case class UserIdentity(principalId: String = "AIDAJDPLRKLG7UEXAMPLE")
 
-  def generateSqsMessage(notificationMeta: NotificationMeta,
-                         notificationData: NotificationData): String = {
-    val s3Object = S3Object(notificationData.key,
-      notificationData.size,
-      notificationData.eTag,
-      notificationData.maybeVersionId)
-    val bucket = Bucket(notificationData.bucketName)
-    val s3 = S3(configurationId = notificationMeta.configName, bucket = bucket, `object` = s3Object)
-    val eventName = s"${notificationMeta.notificationType}:${notificationData.operation}"
+  def generateMessage(notificationData: NotificationData,
+                      notification: Notification): String = {
+    val s3 = S3(configurationId = notification.name, bucket = Bucket(notificationData.bucketName),
+      `object` = S3Object(notificationData))
+    val eventName = s"${notification.notificationType}:${notificationData.operation}"
     toJsonString(SqsEvent(SqsRecord(eventName = eventName, s3 = s3)))
   }
 

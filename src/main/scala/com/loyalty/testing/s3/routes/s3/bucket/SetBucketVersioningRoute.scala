@@ -1,33 +1,53 @@
 package com.loyalty.testing.s3.routes.s3.bucket
 
-import akka.event.LoggingAdapter
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.HttpResponse
-import akka.http.scaladsl.model.StatusCodes.{InternalServerError, NotFound, OK}
+import akka.http.scaladsl.model.StatusCodes.OK
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import com.loyalty.testing.s3.repositories.Repository
-import com.loyalty.testing.s3.response.NoSuchBucketException
+import akka.stream.scaladsl.Sink
+import akka.stream.typed.scaladsl.ActorFlow
+import akka.util.Timeout
+import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.actor.model.bucket.{Command, SetBucketVersioning}
+import com.loyalty.testing.s3.actor.model.{BucketInfo, Event, NoSuchBucketExists}
+import com.loyalty.testing.s3.request.VersioningConfiguration
+import com.loyalty.testing.s3.response.{InternalServiceResponse, NoSuchBucketResponse}
+import com.loyalty.testing.s3.routes.CustomMarshallers
+import com.loyalty.testing.s3.routes.s3._
 
 import scala.util.{Failure, Success}
 
-class SetBucketVersioningRoute private(log: LoggingAdapter, repository: Repository) {
-
-  def route(bucketName: String): Route =
-    (put & extractRequest & parameter('versioning)) {
+object SetBucketVersioningRoute extends CustomMarshallers {
+  def apply(bucketName: String,
+            bucketOperationsActorRef: ActorRef[ShardingEnvelope[Command]])
+           (implicit system: ActorSystem[_],
+            timeout: Timeout): Route =
+    (put & extractRequest & parameter("versioning")) {
       (request, _) =>
-        onComplete(repository.setBucketVersioning(bucketName, request.entity.dataBytes)) {
-          case Success(response) =>
-            complete(HttpResponse(OK).withHeaders(Location(s"/${response.bucketName}")))
-          case Failure(ex: NoSuchBucketException) => complete(HttpResponse(NotFound, entity = ex.toXml.toString()))
-          case Failure(ex) =>
-            log.error(ex, "Error happened while setting bucket versioning: {}", bucketName)
-            complete(HttpResponse(InternalServerError))
+        val eventualEvent =
+          extractRequestTo(request)
+            .map(Option.apply)
+            .map(VersioningConfiguration.apply)
+            .via(
+              ActorFlow.ask(bucketOperationsActorRef)(
+                (maybeVersioningConfiguration, replyTo: ActorRef[Event]) =>
+                  ShardingEnvelope(bucketName.toUUID.toString, SetBucketVersioning(maybeVersioningConfiguration.get,
+                    replyTo))
+              )
+            ).runWith(Sink.head)
+        onComplete(eventualEvent) {
+          case Success(BucketInfo(bucket)) =>
+            complete(HttpResponse(OK).withHeaders(Location(s"/${bucket.bucketName}")))
+          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
+          case Success(event: Event) =>
+            system.log.warn("SetBucketVersioningRoute: invalid event received. event={}, bucket_name={}", event, bucketName)
+            complete(InternalServiceResponse(bucketName))
+          case Failure(ex: Throwable) =>
+            system.log.error("SetBucketVersioningRoute: Internal service error occurred", ex)
+            complete(InternalServiceResponse(bucketName))
         }
     }
-}
-
-object SetBucketVersioningRoute {
-  def apply()(implicit log: LoggingAdapter, repository: Repository): SetBucketVersioningRoute =
-    new SetBucketVersioningRoute(log, repository)
 }

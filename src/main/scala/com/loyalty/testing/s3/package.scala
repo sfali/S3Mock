@@ -1,34 +1,49 @@
 package com.loyalty.testing
 
-import java.net.{URLDecoder, URLEncoder}
+import java.io.IOException
+import java.net.{URI, URLDecoder, URLEncoder}
 import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file._
+import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 import java.util.UUID
-import java.util.concurrent.CompletableFuture
 
 import akka.http.scaladsl.model.headers.ByteRange.{FromOffset, Slice, Suffix}
 import akka.http.scaladsl.model.headers.{ByteRange, RawHeader}
-import com.amazonaws.services.sns.AmazonSNSAsync
-import com.amazonaws.services.sqs.AmazonSQSAsync
+import akka.stream.Materializer
+import akka.stream.scaladsl.{Sink, Source}
+import akka.util.ByteString
+import com.loyalty.testing.s3.data.{BootstrapConfiguration, InitialBucket}
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
-import com.loyalty.testing.s3.request.UploadPart
-import com.loyalty.testing.s3.response.{CompleteMultipartUploadResult, InvalidNotificationConfigurationException, PutObjectResult}
+import com.loyalty.testing.s3.repositories.NitriteDatabase
+import com.loyalty.testing.s3.repositories.model.Bucket
+import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo}
+import com.loyalty.testing.s3.response.{CompleteMultipartUploadResult, InvalidNotificationConfigurationException}
+import com.typesafe.config.Config
+import io.circe.generic.auto._
+import io.circe.parser._
 import javax.xml.bind.DatatypeConverter
+import org.slf4j.Logger
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
+import software.amazon.awssdk.regions.Region
 
 import scala.concurrent.Future
+import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
+import scala.jdk.CollectionConverters._
+import scala.util.{Failure, Success, Try}
 import scala.xml.{Node, NodeSeq}
 
 package object s3 {
 
-  import scala.compat.java8.FutureConverters._
-
   type JavaFuture[V] = java.util.concurrent.Future[V]
 
   val defaultRegion: String = "us-east-1"
-
+  val UserDir: Path = System.getProperty("user.dir").toPath
   val ETAG = "ETag"
   val CONTENT_MD5 = "Content-MD5"
+  val VersionIdHeader = "x-amz-version-id"
+  val SourceVersionIdHeader = "x-amz-copy-source-version-id"
+  val DeleteMarkerHeader = "x-amz-delete-marker"
 
   private val md = MessageDigest.getInstance("MD5")
 
@@ -53,7 +68,7 @@ package object s3 {
   def toBase16FromRandomUUID: String = toBase16(UUID.randomUUID().toString)
 
   implicit class StringOps(s: String) {
-    def decode: String = URLDecoder.decode(s, UTF_8.toString)
+    def decode: String = URLDecoder.decode(s, UTF_8.toString).replaceAll(" ", "+")
 
     def encode: String = URLEncoder.encode(s, UTF_8.toString)
 
@@ -63,6 +78,10 @@ package object s3 {
     }
 
     def toPath: Path = Paths.get(s)
+
+    def toUUID: UUID = UUID.nameUUIDFromBytes(s.getBytes)
+
+    def replaceNewLine: String = s.replaceAll(System.lineSeparator(), "")
   }
 
   implicit class PathOps(path: Path) {
@@ -92,39 +111,12 @@ package object s3 {
 
   def createCompleteMultipartUploadResult(bucketName: String,
                                           key: String,
-                                          parts: List[UploadPart],
+                                          parts: List[PartInfo],
                                           maybeVersionId: Option[String] = None): CompleteMultipartUploadResult = {
     val hex = toBase16(parts.map(_.eTag).mkString)
     val eTag = s"$hex-${parts.length}"
 
     CompleteMultipartUploadResult(bucketName, key, eTag, 0L, maybeVersionId)
-  }
-
-  def createPutObjectResult(filePath: String,
-                            eTag: String,
-                            contentMd5: String,
-                            contentLength: Long,
-                            maybeVersionId: Option[String] = None): PutObjectResult = {
-    val path = filePath.toPath
-    val key = if (contentLength == 0) path.toUnixPath + "/" else path.toUnixPath
-    val parentPath = Option(path.getParent)
-    val prefix = parentPath match {
-      case Some(value) => value.toUnixPath + "/"
-      case None => "/"
-    }
-    PutObjectResult(prefix, key, eTag, contentMd5, contentLength, maybeVersionId)
-  }
-
-  implicit class JavaFutureOps[T](future: JavaFuture[T]) {
-    def toScalaFuture: Future[T] = CompletableFuture.supplyAsync(() => future.get()).toScala
-  }
-
-  trait SqsSettings {
-    val sqsClient: AmazonSQSAsync
-  }
-
-  trait SnsSettings {
-    val snsClient: AmazonSNSAsync
   }
 
   case class DownloadRange(startPosition: Long, endPosition: Long, capacity: Long)
@@ -156,6 +148,13 @@ package object s3 {
     def +(key: String, maybeValue: Option[String]): List[RawHeader] =
       maybeValue.map(value => headers :+ RawHeader(key, value)).getOrElse(headers)
   }
+
+  def toBucketNotification(bucketName: String, contentSource: Source[ByteString, _])
+                          (implicit mat: Materializer): Future[List[Notification]] =
+    contentSource
+      .map(_.utf8String)
+      .map(s => parseNotificationConfiguration(bucketName, s))
+      .runWith(Sink.head)
 
   def parseNotificationConfiguration(bucketName: String, xml: String): List[Notification] = {
     val node = scala.xml.XML.loadString(xml)
@@ -263,4 +262,158 @@ package object s3 {
     else throw InvalidNotificationConfigurationException(bucketName,
       s""""$s", must be one of: TopicConfiguration, QueueConfiguration, CloudFunctionConfiguration""")
 
+
+  trait HttpSettings {
+    val host: String
+    val port: Int
+  }
+
+  object HttpSettings {
+    def apply(config: Config): HttpSettings = new HttpSettings {
+      override val host: String = config.getString("app.http.host")
+      override val port: Int = config.getInt("app.http.port")
+    }
+  }
+
+  trait AwsSettings {
+    val region: Region
+    val credentialsProvider: AwsCredentialsProvider
+    val sqsEndPoint: Option[URI]
+    val s3EndPoint: Option[URI]
+    val snsEndPoint: Option[URI]
+  }
+
+  trait DBSettings {
+    val fileName: String
+    val userName: Option[String] = None
+    val password: Option[String] = None
+  }
+
+  object DBSettings {
+    def apply(config: Config): DBSettings = new DBSettings {
+      override val fileName: String = config.getString("app.db.file-name")
+      override val userName: Option[String] = config.getOptionalString("app.db-user-name")
+      override val password: Option[String] = config.getOptionalString("app.db-password")
+    }
+  }
+
+  def createObjectId(bucketName: String, key: String): UUID = s"$bucketName-$key".toUUID
+
+  def createUploadId(bucketName: String,
+                     key: String,
+                     version: BucketVersioning,
+                     versionIndex: Int): String =
+    toBase64(s"upload-$bucketName-$key-${version.entryName}-$versionIndex".toUUID.toString)
+
+  def createVersionId(objectId: UUID, versionIndex: Int): String =
+    toBase16(s"${objectId.toString}-$versionIndex".toUUID.toString)
+
+  def toObjectDir(bucketName: String,
+                  key: String,
+                  bucketVersioning: BucketVersioning,
+                  versionId: String,
+                  uploadId: Option[String] = None): String = {
+    val value = s"$bucketName-$key-${bucketVersioning.entryName}-$versionId"
+    toBase16(uploadId.map(s => s"$value-$s").getOrElse(value).toUUID.toString)
+  }
+
+  implicit class ConfigOps(src: Config) {
+    def getOptionalString(keyPath: String): Option[String] = {
+      val maybeValue =
+        if (src.hasPath(keyPath)) Some(src.getString(keyPath))
+        else None
+
+      maybeValue match {
+        case Some(value) => if (value.trim.nonEmpty) Some(value.trim) else None
+        case None => None
+      }
+    }
+
+    def getOptionalUri(path: String): Option[URI] = {
+      if (src.hasPath(path)) {
+        val endPoint = src.getString(path)
+        if (endPoint.isEmpty) None else Some(new URI(endPoint))
+      } else None
+    }
+
+    def getFiniteDuration(path: String): FiniteDuration = FiniteDuration(src.getDuration(path).toMillis, MILLISECONDS)
+  }
+
+  def clean(rootPath: Path): Path =
+    Files.walkFileTree(rootPath, new SimpleFileVisitor[Path] {
+      override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+        Files.delete(file)
+        FileVisitResult.CONTINUE
+      }
+
+      override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
+        Files.delete(dir)
+        FileVisitResult.CONTINUE
+      }
+    })
+
+  def checkPartOrders(parts: List[Int]): Boolean =
+    if (parts.isEmpty || (parts.head != 1 || parts.last != parts.length)) false
+    else isSortedInternal(parts)
+
+  @scala.annotation.tailrec
+  private def isSortedInternal(ls: List[Int]): Boolean =
+    ls match {
+      case Nil | _ :: Nil => true
+      case item1 :: item2 :: xs => item1 + 1 == item2 && isSortedInternal(item2 :: xs)
+    }
+
+  private def readInitialData(initialDataPath: Path, log: Logger): Option[BootstrapConfiguration] = {
+    if (Files.exists(initialDataPath)) {
+      log.info("Initial data found @ {}", initialDataPath)
+      val json = Files.readAllLines(initialDataPath).asScala.mkString(System.lineSeparator())
+      decode[BootstrapConfiguration](json) match {
+        case Left(error) =>
+          log.warn(s"Unable to parse json: $json", error)
+          None
+        case Right(bootstrapConfiguration) => Some(bootstrapConfiguration)
+      }
+    } else {
+      log.info("No initial data found @ {}", initialDataPath)
+      None
+    }
+  }
+
+
+  private def initializeBucket(log: Logger,
+                               database: NitriteDatabase)
+                              (initialBucket: InitialBucket): Unit =
+    Try(database.createBucket(Bucket(initialBucket))) match {
+      case Failure(ex) =>
+        log.warn("Unable to initialize bucket {}, error_message={}", initialBucket.bucketName, ex.getMessage)
+      case Success(_) => log.info("Bucket initialized {}", initialBucket.bucketName)
+    }
+
+  private def initializeNotification(log: Logger,
+                                     database: NitriteDatabase)
+                                    (bucketName: String, notifications: List[Notification]): Unit =
+    Try(database.setBucketNotifications(notifications)) match {
+      case Failure(ex) =>
+        log.warn("Unable to create notifications for bucket: {}, error_message={}", bucketName, ex.getMessage)
+      case Success(_) => log.info("Notifications created for bucket {}", bucketName)
+    }
+
+  def initializeInitialData(initialDataPath: Path, log: Logger, database: NitriteDatabase): Unit =
+    readInitialData(initialDataPath, log) match {
+      case Some(bootstrapConfiguration) =>
+        val initialBuckets = bootstrapConfiguration.initialBuckets
+        if (initialBuckets.nonEmpty) {
+          initialBuckets.foreach(initializeBucket(log, database))
+          val notifications = bootstrapConfiguration.notifications.groupBy(_.bucketName)
+          notifications.foreach((initializeNotification(log, database) _).tupled)
+        } else log.warn("Initial buckets are not provided, skipping initialization")
+      case None =>
+    }
+
+  @scala.annotation.tailrec
+  def isTypeOf(ex: Throwable, cause: Class[_]): Boolean = {
+    if (ex == null) false
+    else if (cause.isAssignableFrom(ex.getClass)) true
+    else isTypeOf(ex.getCause, cause)
+  }
 }

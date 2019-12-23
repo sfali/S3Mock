@@ -1,72 +1,167 @@
 package com.loyalty.testing.s3.routes
 
-import java.nio.charset.StandardCharsets
+import java.time.Instant
 
-import akka.http.scaladsl.marshalling.Marshaller.fromToEntityMarshaller
+import akka.http.scaladsl.marshallers.xml.ScalaXmlSupport
+import akka.http.scaladsl.marshalling.Marshaller.{fromStatusCodeAndHeadersAndValue, fromToEntityMarshaller}
 import akka.http.scaladsl.marshalling.{Marshaller, ToEntityMarshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity}
-import akka.util.ByteString
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, Unmarshaller}
+import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.response._
 import de.heikoseeberger.akkahttpcirce.ErrorAccumulatingCirceSupport
 
-import scala.language.implicitConversions
+import scala.xml.NodeSeq
 
-trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
-
-  import StandardCharsets.UTF_8
+trait CustomMarshallers
+  extends ErrorAccumulatingCirceSupport
+    with ScalaXmlSupport {
 
   import ContentTypes._
+
+  implicit val BucketAlreadyExistsUnmarshaller: FromEntityUnmarshaller[BucketAlreadyExistsResponse] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x => BucketAlreadyExistsResponse((x \ "Resource").text)
+    }
+
+  implicit val NoSuchBucketUnmarshaller: FromEntityUnmarshaller[NoSuchBucketResponse] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x => NoSuchBucketResponse((x \ "Resource").text)
+    }
+
+  implicit val NoSuchKeyUnmarshaller: FromEntityUnmarshaller[NoSuchKeyResponse] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x =>
+        val resource = (x \ "Resource").text.drop(1) // drop starting '/'
+        val indexOfSeparator = resource.indexOf('/')
+        val bucketName = resource.substring(0, indexOfSeparator)
+        val key = resource.substring(indexOfSeparator + 1)
+        NoSuchKeyResponse(bucketName, key)
+    }
+
+  implicit val CopyObjectResultUnmarshaller: FromEntityUnmarshaller[CopyObjectResult] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x =>
+        val etag = (x \ "ETag").text.drop(1).dropRight(1)
+        val lastModified = Instant.parse((x \ "LastModified").text)
+        CopyObjectResult(etag, lastModifiedDate = lastModified)
+    }
+
+  implicit val CopyPartResultUnmarshaller: FromEntityUnmarshaller[CopyPartResult] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x =>
+        val etag = (x \ "ETag").text.drop(1).dropRight(1)
+        val lastModified = Instant.parse((x \ "LastModified").text)
+        CopyPartResult(etag, lastModifiedDate = lastModified)
+    }
+
+  implicit val InitiateMultipartUploadResultUnmarshaller: FromEntityUnmarshaller[InitiateMultipartUploadResult] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x =>
+        val bucketName = (x \ "Bucket").text
+        val key = (x \ "Key").text
+        val uploadId = (x \ "UploadId").text
+        InitiateMultipartUploadResult(bucketName, key, uploadId)
+    }
+
+  implicit val CompleteMultipartUploadResultUnmarshaller: FromEntityUnmarshaller[CompleteMultipartUploadResult] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x =>
+        val bucketName = (x \ "Bucket").text
+        val key = (x \ "Key").text
+        val etag = (x \ "ETag").text.drop(1).dropRight(1)
+        CompleteMultipartUploadResult(bucketName, key, etag, 0L)
+    }
+
+  /*
+    implicit def v(implicit system: ActorSystem[_]): Marshaller[NodeSeq, Future[CreateBucketConfiguration]] =
+      nodeSeqMarshaller(MediaTypes.`application/xml`) map {
+        case NodeSeq.Empty => Future.successful(CreateBucketConfiguration())
+        case x =>
+          import system.executionContext
+          x.dataBytes.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).map {
+            s =>
+              CreateBucketConfiguration()
+          }
+      }*/
 
   implicit val InitiateMultipartUploadResultMarshallers: ToEntityMarshaller[InitiateMultipartUploadResult] =
     xmlResponseMarshallers(`application/octet-stream`)
 
+  implicit val CopyObjectResultMarshallers: ToEntityMarshaller[CopyObjectResult] =
+    xmlResponseMarshallers(`text/xml(UTF-8)`)
+
   implicit val CopyPartResultMarshallers: ToEntityMarshaller[CopyPartResult] =
-    xmlResponseMarshallers(`application/octet-stream`)
+    xmlResponseMarshallers(`text/xml(UTF-8)`)
 
   implicit val CompleteMultipartUploadResultMarshallers: ToEntityMarshaller[CompleteMultipartUploadResult] =
-    xmlResponseMarshallers(`application/octet-stream`)
+    xmlResponseMarshallers(`text/xml(UTF-8)`)
 
   implicit val ListBucketResultMarshallers: ToEntityMarshaller[ListBucketResult] =
     xmlResponseMarshallers(`application/octet-stream`)
 
-  implicit val BucketAlreadyExistsExceptionMarshallers: ToEntityMarshaller[BucketAlreadyExistsException] =
+  implicit val BucketAlreadyExistsMarshallers: ToEntityMarshaller[BucketAlreadyExistsResponse] =
     xmlResponseMarshallers(`application/octet-stream`)
 
-  implicit val NoSuchBucketExceptionMarshallers: ToEntityMarshaller[NoSuchBucketException] =
+  implicit val NoSuchBucketMarshallers: ToEntityMarshaller[NoSuchBucketResponse] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
+  implicit val NoSuchKeyMarshallers: ToEntityMarshaller[NoSuchKeyResponse] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
+  implicit val NoSuchUploadMarshallers: ToEntityMarshaller[NoSuchUploadResponse] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
+  implicit val InvalidPartMarshallers: ToEntityMarshaller[InvalidPartResponse] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
+  implicit val InvalidPartOrderMarshallers: ToEntityMarshaller[InvalidPartOrderResponse] =
     xmlResponseMarshallers(`application/octet-stream`)
 
   implicit val InvalidNotificationConfigurationExceptionMarshallers: ToEntityMarshaller[InvalidNotificationConfigurationException] =
     xmlResponseMarshallers(`application/octet-stream`)
 
+  implicit val InternalServiceMarshallers: ToEntityMarshaller[InternalServiceResponse] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
   private def xmlResponseMarshallers(contentType: ContentType): ToEntityMarshaller[XmlResponse] =
     Marshaller.withFixedContentType(contentType) { result =>
-      HttpEntity(contentType, ByteString(result.toXml.toString().getBytes(UTF_8)))
+      contentType match {
+        case `text/xml(UTF-8)` => HttpEntity(MediaTypes.`application/xml`.toContentType(HttpCharsets.`UTF-8`),
+          result.toByteString.utf8String)
+        case `application/octet-stream` => HttpEntity(contentType, result.toByteString)
+        case _ => throw new RuntimeException(s"unsupported content type: $contentType")
+      }
     }
 
   implicit val InitiateMultipartUploadResultResponse: ToResponseMarshaller[InitiateMultipartUploadResult] =
     fromToEntityMarshaller[InitiateMultipartUploadResult](OK)
 
-  implicit val CopyPartResultResponse: ToResponseMarshaller[CopyPartResult] =
-    fromToEntityMarshaller[CopyPartResult](OK)
+  implicit val BucketAlreadyExistsResponseMarshaller: ToResponseMarshaller[BucketAlreadyExistsResponse] =
+    fromToEntityMarshaller[BucketAlreadyExistsResponse](BadRequest)
 
-  implicit val BucketAlreadyExistsExceptionResponse: ToResponseMarshaller[BucketAlreadyExistsException] =
-    fromToEntityMarshaller[BucketAlreadyExistsException](BadRequest)
+  implicit val NoSuchBucketResponseMarshaller: ToResponseMarshaller[NoSuchBucketResponse] =
+    fromToEntityMarshaller[NoSuchBucketResponse](NotFound)
 
-  implicit val NoSuchBucketExceptionResponse: ToResponseMarshaller[NoSuchBucketException] =
-    fromToEntityMarshaller[NoSuchBucketException](NotFound)
+  implicit val NoSuchKeyResponseMarshaller: ToResponseMarshaller[NoSuchKeyResponse] =
+    fromToEntityMarshaller[NoSuchKeyResponse](NotFound)
 
-  implicit val NoSuchUploadExceptionResponse: ToResponseMarshaller[NoSuchUploadException] =
-    fromToEntityMarshaller[NoSuchUploadException](NotFound)
+  implicit val NoSuchUploadResponseMarshaller: ToResponseMarshaller[NoSuchUploadResponse] =
+    fromToEntityMarshaller[NoSuchUploadResponse](NotFound)
 
-  implicit val InvalidPartOrderExceptionResponse: ToResponseMarshaller[InvalidPartOrderException] =
-    fromToEntityMarshaller[InvalidPartOrderException](BadRequest)
+  implicit val InvalidPartOrderResponseMarshaller: ToResponseMarshaller[InvalidPartOrderResponse] =
+    fromToEntityMarshaller[InvalidPartOrderResponse](BadRequest)
 
-  implicit val InvalidPartExceptionResponse: ToResponseMarshaller[InvalidPartException] =
-    fromToEntityMarshaller[InvalidPartException](BadRequest)
-
-  implicit val CompleteMultipartUploadResultResponse: ToResponseMarshaller[CompleteMultipartUploadResult] =
-    fromToEntityMarshaller[CompleteMultipartUploadResult](OK)
+  implicit val InvalidPartResponseMarshaller: ToResponseMarshaller[InvalidPartResponse] =
+    fromToEntityMarshaller[InvalidPartResponse](BadRequest)
 
   implicit val ListBucketResultResponse: ToResponseMarshaller[ListBucketResult] =
     fromToEntityMarshaller[ListBucketResult](OK)
@@ -74,21 +169,31 @@ trait CustomMarshallers extends ErrorAccumulatingCirceSupport {
   implicit val InvalidNotificationConfigurationExceptionResponse: ToResponseMarshaller[InvalidNotificationConfigurationException] =
     fromToEntityMarshaller[InvalidNotificationConfigurationException](BadRequest)
 
-  /*implicit val CompleteMultipartUploadResultResponse: ToResponseMarshaller[CompleteMultipartUploadResult] =
+  implicit val InternalServiceExceptionResponse: ToResponseMarshaller[InternalServiceResponse] =
+    fromToEntityMarshaller[InternalServiceResponse](InternalServerError)
+
+  implicit val CompleteMultipartUploadResultResponse: ToResponseMarshaller[CompleteMultipartUploadResult] =
     fromStatusCodeAndHeadersAndValue[CompleteMultipartUploadResult]
-      .compose {
-        result =>
-          val headers: List[HttpHeader] =
-            result.versionId.fold(List[HttpHeader]()) {
-              vId => RawHeader("x-amz-version-id", vId) :: Nil
-            }
-          (OK, headers, result)
-      }*/
+      .compose { result =>
+        val headers = Nil + (VersionIdHeader, result.versionId)
+        (OK, headers, result)
+      }
 
+  implicit val CopyObjectResultResponse: ToResponseMarshaller[CopyObjectResult] =
+    fromStatusCodeAndHeadersAndValue[CopyObjectResult]
+      .compose { result =>
+        val headers = Nil +
+          (SourceVersionIdHeader, result.maybeSourceVersionId) +
+          (VersionIdHeader, result.maybeVersionId)
+        (OK, headers, result)
+      }
 
-  /*implicit def noSuchBucketExceptionResponse(
-      implicit entity: ToEntityMarshaller[NoSuchBucketException])
-    : ToResponseMarshaller[NoSuchBucketException] =
-    fromToEntityMarshaller[NoSuchBucketException](NotFound)*/
-
+  implicit val CopyPartResultResponse: ToResponseMarshaller[CopyPartResult] =
+    fromStatusCodeAndHeadersAndValue[CopyPartResult]
+      .compose { result =>
+        val headers = Nil +
+          (SourceVersionIdHeader, result.maybeSourceVersionId) +
+          (VersionIdHeader, result.maybeVersionId)
+        (OK, headers, result)
+      }
 }

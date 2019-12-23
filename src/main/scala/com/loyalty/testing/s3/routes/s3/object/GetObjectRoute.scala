@@ -1,59 +1,59 @@
 package com.loyalty.testing.s3.routes.s3.`object`
 
-import akka.event.LoggingAdapter
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.headers._
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
+import akka.http.scaladsl.model.StatusCodes.{NotFound, OK}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.typed.scaladsl.ActorFlow
+import akka.util.Timeout
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.repositories.Repository
-import com.loyalty.testing.s3.response.{NoSuchBucketException, NoSuchKeyException}
+import com.loyalty.testing.s3.actor.model._
+import com.loyalty.testing.s3.actor.model.bucket.{Command, GetObjectWrapper}
+import com.loyalty.testing.s3.response.{InternalServiceResponse, NoSuchBucketResponse, NoSuchKeyResponse}
+import com.loyalty.testing.s3.routes.CustomMarshallers
+import com.loyalty.testing.s3.routes.s3._
 
 import scala.util.{Failure, Success}
 
-class GetObjectRoute private(log: LoggingAdapter, repository: Repository) {
+object GetObjectRoute extends CustomMarshallers {
 
-  def route(bucketName: String, key: String): Route = {
-    (get & parameters("versionId".?) & optionalHeaderValueByType[Range]()) { (maybeVersionId, maybeRanges) =>
-      val maybeRange: Option[ByteRange] = maybeRanges.map(_.ranges.head)
-      onComplete(repository.getObject(bucketName, key, maybeVersionId, maybeRange)) {
-        case Success(getObjectResponse) =>
-          val eTagHeader = RawHeader(ETAG, s""""${getObjectResponse.eTag}"""")
-          val maybeVersionHeader = getObjectResponse.maybeVersionId
-            .map(versionId => RawHeader("x-amz-version-id", versionId))
-          val defaultHeaders = List(eTagHeader)
-          val headers = maybeVersionHeader.map(_ +: defaultHeaders).getOrElse(defaultHeaders)
-          complete(HttpResponse(OK,
-            entity = HttpEntity(
-              ContentTypes.`application/octet-stream`,
-              getObjectResponse.contentLength,
-              getObjectResponse.content
-            )
-          ).withHeaders(headers))
-
-        case Failure(ex: NoSuchBucketException) =>
-          log.error(
-            """NoSuchBucketException:
-              |{}
-            """.stripMargin, ex.toXml)
-          complete(HttpResponse(NotFound, entity = ex.toXml.toString()))
-        case Failure(ex: NoSuchKeyException) =>
-          log.error(
-            """NoSuchKeyException:
-              |{}
-            """.stripMargin, ex.toXml)
-          complete(HttpResponse(NotFound, entity = ex.toXml.toString()))
-        case Failure(ex) =>
-          log.error(ex, "Error happened while getting object {} in bucket: {}", key, bucketName)
-          complete(HttpResponse(InternalServerError))
-      }
+  def apply(bucketName: String,
+            key: String,
+            bucketOperationsActorRef: ActorRef[ShardingEnvelope[Command]])
+           (implicit system: ActorSystem[_],
+            timeout: Timeout): Route =
+    (parameter("versionId".?) & optionalHeaderValue(extractRange)) {
+      (maybeVersionId, maybeRange) =>
+        val eventualEvent =
+          Source
+            .single("")
+            .via(
+              ActorFlow.ask(bucketOperationsActorRef)(
+                (_, replyTo: ActorRef[Event]) =>
+                  ShardingEnvelope(bucketName.toUUID.toString, GetObjectWrapper(key, maybeVersionId, maybeRange, replyTo))
+              )
+            ).runWith(Sink.head)
+        onComplete(eventualEvent) {
+          case Success(ObjectContent(objectKey, content)) =>
+            complete(HttpResponse(OK)
+              .withEntity(HttpEntity(ContentTypes.`application/octet-stream`, objectKey.contentLength, content))
+              .withHeaders(createResponseHeaders(objectKey)))
+          case Success(ObjectInfo(objectKey)) => complete(HttpResponse(NotFound)
+            .withHeaders(createResponseHeaders(objectKey)))
+          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
+          case Success(NoSuchKeyExists(bucketName, key)) => complete(NoSuchKeyResponse(bucketName, key))
+          case Success(InvalidAccess) =>
+            system.log.warn("GetObjectRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
+            complete(InternalServiceResponse(s"$bucketName/$key"))
+          case Success(event) =>
+            system.log.warn("GetObjectRoute: invalid event received. event={}, bucket_name={}, key={}", event, bucketName, key)
+            complete(InternalServiceResponse(s"$bucketName/$key"))
+          case Failure(ex: Throwable) =>
+            system.log.error(s"GetObjectRoute: Internal service error occurred, bucket_name=$bucketName, key=$key", ex)
+            complete(InternalServiceResponse(s"$bucketName/$key"))
+        }
     }
-  }
-
-}
-
-object GetObjectRoute {
-  def apply()(implicit log: LoggingAdapter,
-              repository: Repository): GetObjectRoute = new GetObjectRoute(log, repository)
 }

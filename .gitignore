@@ -8,6 +8,7 @@
 s3/initial.json
 .s3mock/
 password.txt
+null/**
 
 # sbt specific
 project/.sbtserver

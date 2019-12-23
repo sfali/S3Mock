@@ -1,41 +1,50 @@
 package com.loyalty.testing.s3.routes.s3.bucket
 
-import akka.event.LoggingAdapter
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.HttpResponse
-import akka.http.scaladsl.model.StatusCodes.{InternalServerError, OK}
+import akka.http.scaladsl.model.StatusCodes.OK
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import com.loyalty.testing.s3.repositories.Repository
-import com.loyalty.testing.s3.response.{InvalidNotificationConfigurationException, NoSuchBucketException}
+import akka.stream.scaladsl.Sink
+import akka.stream.typed.scaladsl.ActorFlow
+import akka.util.Timeout
+import com.loyalty.testing.s3._
+import com.loyalty.testing.s3.actor.NotificationBehavior.{Command, CreateBucketNotifications}
+import com.loyalty.testing.s3.actor.model.{Event, NoSuchBucketExists, NotificationsCreated}
+import com.loyalty.testing.s3.response.{InternalServiceResponse, NoSuchBucketResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
+import com.loyalty.testing.s3.routes.s3._
 
 import scala.util.{Failure, Success}
 
-class SetBucketNotificationRoute private(log: LoggingAdapter, repository: Repository)
-  extends CustomMarshallers {
-
-  def route(bucketName: String): Route =
-    (put & extractRequest & parameter('notification)) {
+object SetBucketNotificationRoute extends CustomMarshallers {
+  def apply(bucketName: String,
+            notificationActorRef: ActorRef[ShardingEnvelope[Command]])
+           (implicit system: ActorSystem[_],
+            timeout: Timeout): Route =
+    (put & extractRequest & parameter("notification")) {
       (request, _) =>
-        onComplete(repository.setBucketNotification(bucketName, request.entity.dataBytes)) {
-          case Success(_) => complete(HttpResponse(OK))
-
-          case Failure(ex: InvalidNotificationConfigurationException) =>
-            log.error(ex, ex.message)
-            complete(ex)
-
-          case Failure(ex: NoSuchBucketException) =>
-            log.error(ex, ex.message)
-            complete(ex)
-
-          case Failure(ex) =>
-            log.error(ex, "Error happened while setting bucket notification: {}", bucketName)
-            complete(HttpResponse(InternalServerError))
+        val eventualEvent =
+          extractRequestTo(request)
+            .map(s => parseNotificationConfiguration(bucketName, s))
+            .via(
+              ActorFlow.ask(notificationActorRef)(
+                (notifications, replyTo: ActorRef[Event]) =>
+                  ShardingEnvelope(
+                    bucketName.toUUID.toString, CreateBucketNotifications(notifications, replyTo)
+                  )
+              )
+            ).runWith(Sink.head)
+        onComplete(eventualEvent) {
+          case Success(NotificationsCreated) => complete(HttpResponse(OK))
+          case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
+          case Success(event: Event) =>
+            system.log.warn("SetBucketNotificationRoute: invalid event received. event={}, bucket_name={}", event, bucketName)
+            complete(InternalServiceResponse(bucketName))
+          case Failure(ex: Throwable) =>
+            system.log.error("SetBucketNotificationRoute: Internal service error occurred", ex)
+            complete(InternalServiceResponse(bucketName))
         }
     }
-}
-
-object SetBucketNotificationRoute {
-  def apply()(implicit log: LoggingAdapter, repository: Repository): SetBucketNotificationRoute =
-    new SetBucketNotificationRoute(log, repository)
 }

@@ -1,24 +1,23 @@
 package com.loyalty.testing.s3.streams
 
-
 import java.security.MessageDigest
 
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.util.ByteString
-import com.amazonaws.util.BinaryUtils
 import javax.xml.bind.DatatypeConverter
 
-class DigestCalculator(algorithm: String) extends GraphStage[FlowShape[ByteString, (String, String)]] {
+class DigestCalculator(algorithm: String) extends GraphStage[FlowShape[ByteString, DigestInfo]] {
 
   private val in = Inlet[ByteString]("DigestCalculator.in")
-  private val out = Outlet[(String, String)]("DigestCalculator.out")
+  private val out = Outlet[DigestInfo]("DigestCalculator.out")
 
-  override def shape: FlowShape[ByteString, (String, String)] = FlowShape(in, out)
+  override def shape: FlowShape[ByteString, DigestInfo] = FlowShape(in, out)
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new GraphStageLogic(shape) {
       private val digest = MessageDigest.getInstance(algorithm)
+      private var size = 0L
 
       setHandler(out, new OutHandler {
         override def onPull(): Unit = pull(in)
@@ -27,6 +26,7 @@ class DigestCalculator(algorithm: String) extends GraphStage[FlowShape[ByteStrin
       setHandler(in, new InHandler {
         override def onPush(): Unit = {
           val chunk = grab(in)
+          size += chunk.length
           digest.update(chunk.toArray)
           pull(in)
         }
@@ -35,7 +35,7 @@ class DigestCalculator(algorithm: String) extends GraphStage[FlowShape[ByteStrin
           val bytes = digest.digest()
           val etag = DatatypeConverter.printHexBinary(bytes).toLowerCase
           val contentMd5 = DatatypeConverter.printBase64Binary(bytes)
-          emit(out, (etag, contentMd5))
+          emit(out, DigestInfo(etag, contentMd5, size))
           completeStage()
         }
       })
@@ -49,3 +49,5 @@ object DigestCalculator {
 
   def apply(algorithm: String): DigestCalculator = new DigestCalculator(algorithm)
 }
+
+case class DigestInfo(etag: String, md5: String, length: Long)
