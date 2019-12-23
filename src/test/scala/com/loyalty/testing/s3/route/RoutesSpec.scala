@@ -232,26 +232,28 @@ class RoutesSpec
   it should "put an object in the specified bucket with bucket versioning on" in {
     val key = "sample.txt"
     val path = resourcePath -> key
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), 1)
     val contentSource = FileIO.fromPath(path)
     val entity = HttpEntity(`application/octet-stream`, contentSource)
     Put(s"/$versionedBucketName/$key", entity) ~> routes ~> check {
       status mustEqual OK
       getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest""""))
       getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, md5Digest))
-      getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, 1.toVersionId))
+      getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, versionId))
     }
   }
 
   it should "update object in the specified bucket with bucket versioning on" in {
     val key = "sample.txt"
     val path = resourcePath -> "sample1.txt"
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), 2)
     val contentSource = FileIO.fromPath(path)
     val entity = HttpEntity(`application/octet-stream`, contentSource)
     Put(s"/$versionedBucketName/$key", entity) ~> routes ~> check {
       status mustEqual OK
       getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest1""""))
       getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, md5Digest1))
-      getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, 2.toVersionId))
+      getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, versionId))
     }
   }
 
@@ -301,7 +303,8 @@ class RoutesSpec
 
   it should "copy object between versioned buckets with source version id provided" in {
     val key = "sample.txt"
-    val copySourceHeader = RawHeader("x-amz-copy-source", s"/$versionedBucketName/$key?versionId=${1.toVersionId}")
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), 1)
+    val copySourceHeader = RawHeader("x-amz-copy-source", s"/$versionedBucketName/$key?versionId=$versionId")
     Put(s"/$bucket3/$key").withHeaders(copySourceHeader :: Nil) ~> routes ~> check {
       status mustEqual OK
       val expectedResult = createCopyObjectResult(etagDigest, headers)

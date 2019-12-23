@@ -305,6 +305,9 @@ package object s3 {
                      versionIndex: Int): String =
     toBase64(s"upload-$bucketName-$key-${version.entryName}-$versionIndex".toUUID.toString)
 
+  def createVersionId(objectId: UUID, versionIndex: Int): String =
+    toBase16(s"${objectId.toString}-$versionIndex".toUUID.toString)
+
   def toObjectDir(bucketName: String,
                   key: String,
                   bucketVersioning: BucketVersioning,
@@ -312,10 +315,6 @@ package object s3 {
                   uploadId: Option[String] = None): String = {
     val value = s"$bucketName-$key-${bucketVersioning.entryName}-$versionId"
     toBase16(uploadId.map(s => s"$value-$s").getOrElse(value).toUUID.toString)
-  }
-
-  implicit class IntOps(src: Int) {
-    def toVersionId: String = toBase16(src.toString.toUUID.toString)
   }
 
   implicit class ConfigOps(src: Config) {

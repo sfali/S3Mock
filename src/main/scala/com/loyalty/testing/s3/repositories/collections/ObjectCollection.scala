@@ -25,7 +25,7 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
   if (!collection.hasIndex(BucketNameField)) {
     collection.createIndex(BucketNameField, indexOptions(NonUnique))
     collection.createIndex(KeyField, indexOptions(Fulltext))
-    collection.createIndex(VersionIdField, indexOptions(Fulltext))
+    collection.createIndex(VersionIdField, indexOptions(NonUnique))
   }
 
   private[repositories] def createObject(objectKey: ObjectKey): ObjectKey = {
@@ -95,19 +95,12 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
     collection.find(filter).toScalaList.map(ObjectKey(_))
   }
 
-  def findObject(objectId: UUID, maybeVersionId: Option[String] = None): ObjectKey =
-    findById(objectId, maybeVersionId) match {
-      case Nil => throw NoSuchId(objectId)
-      case document :: Nil => ObjectKey(document)
-      case _ => throw new IllegalStateException(s"Multiple documents found for $objectId")
-    }
-
   private def findAllById(objectId: UUID): List[Document] =
     collection.find(feq(IdField, objectId.toString), FindOptions.sort(VersionIndexField, SortOrder.Ascending)).toScalaList
 
   private def findById(objectId: UUID, maybeVersionId: Option[String]): List[Document] = {
-    val versionId = maybeVersionId.getOrElse(NonVersionId)
-    val filter = and(feq(IdField, objectId.toString), text(VersionIdField, s"*$versionId*"))
+    val versionId = maybeVersionId.getOrElse(NonVersionId(objectId))
+    val filter = and(feq(IdField, objectId.toString), feq(VersionIdField, versionId))
     collection.find(filter, FindOptions.sort(VersionIndexField, SortOrder.Ascending)).toScalaList
   }
 

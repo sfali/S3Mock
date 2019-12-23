@@ -34,7 +34,7 @@ class ObjectIO(root: Path, fileStream: FileStream) {
                  versionIndex: Int,
                  contentSource: Source[ByteString, _])
                 (implicit ec: ExecutionContext): Future[ObjectKey] = {
-    val versionId = versionIndex.toVersionId
+    val versionId = createVersionId(keyId, versionIndex)
     val objectPath = getObjectPath(bucket.bucketName, key, bucket.version, versionId)
     fileStream.saveContent(contentSource, objectPath)
       .flatMap {
@@ -85,7 +85,7 @@ class ObjectIO(root: Path, fileStream: FileStream) {
 
   def mergeFiles(uploadInfo: UploadInfo, parts: List[PartInfo])
                 (implicit ec: ExecutionContext): Future[ObjectKey] = {
-    val versionId = uploadInfo.versionIndex.toVersionId
+    val versionId = uploadInfo.toObjectKey.versionId
     val uploadDir = uploadInfo.uploadPath
     val objectPath = getObjectPath(uploadInfo.bucketName, uploadInfo.key, uploadInfo.version, versionId)
     val partPaths = parts.map(partInfo => uploadInfo.copy(partNumber = partInfo.partNumber))

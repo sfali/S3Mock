@@ -269,7 +269,8 @@ class BucketOperationsBehaviorSpec
     actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
     val index = 1
-    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, Files.size(path), Some(index.toVersionId))
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, Files.size(path), Some(versionId))
     val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
     actualObjectInfo mustEqual expectedObjectInfo
 
@@ -287,7 +288,8 @@ class BucketOperationsBehaviorSpec
     actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
     val index = 2
-    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest1, Files.size(path), Some(index.toVersionId))
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest1, Files.size(path), Some(versionId))
     val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
     actualObjectInfo mustEqual expectedObjectInfo
 
@@ -401,7 +403,8 @@ class BucketOperationsBehaviorSpec
     val path = resourcePath -> "sample1.txt"
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 2
-    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest1, expectedContent.length, Some(index.toVersionId))
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest1, expectedContent.length, Some(versionId))
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -423,12 +426,13 @@ class BucketOperationsBehaviorSpec
     val path = resourcePath -> key
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 1
-    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, expectedContent.length, Some(index.toVersionId))
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, expectedContent.length, Some(versionId))
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
-    actorRef ! GetObjectWrapper(key, maybeVersionId = Some(index.toVersionId.toString), replyTo = probe.ref)
+    actorRef ! GetObjectWrapper(key, maybeVersionId = Some(versionId), replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
     val actualObjectInfo = data.ObjectInfo(objectContent.objectKey)

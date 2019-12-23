@@ -146,7 +146,8 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val path = resourcePath -> key
     val index = 1
     val actualObjectKey = s3Client.putObject(versionedBucketName, key, path).futureValue
-    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, Files.size(path), Some(index.toVersionId))
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, Files.size(path), Some(versionId))
     actualObjectKey mustEqual expectedObjectInfo
   }
 
@@ -155,7 +156,8 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val path = resourcePath -> "sample1.txt"
     val index = 2
     val actualObjectInfo = s3Client.putObject(versionedBucketName, key, path).futureValue
-    val expectedObjectKey = data.ObjectInfo(versionedBucketName, key, etagDigest1, Files.size(path), Some(index.toVersionId))
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
+    val expectedObjectKey = data.ObjectInfo(versionedBucketName, key, etagDigest1, Files.size(path), Some(versionId))
     actualObjectInfo mustEqual expectedObjectKey
   }
 
@@ -214,7 +216,8 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val path = resourcePath -> "sample1.txt"
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 2
-    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest1, expectedContent.length, Some(index.toVersionId))
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest1, expectedContent.length, Some(versionId))
     val (actualContent, actualObjectKey) = s3Client.getObject(versionedBucketName, key).futureValue
     actualContent mustEqual expectedContent
     actualObjectKey mustEqual expectedObjectInfo
@@ -225,8 +228,9 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val path = resourcePath -> key
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 1
-    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, expectedContent.length, Some(index.toVersionId))
-    val (actualContent, actualObjectInfo) = s3Client.getObject(versionedBucketName, key, maybeVersionId = Some(index.toVersionId)).futureValue
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, expectedContent.length, Some(versionId))
+    val (actualContent, actualObjectInfo) = s3Client.getObject(versionedBucketName, key, maybeVersionId = Some(versionId)).futureValue
     actualContent mustEqual expectedContent
     actualObjectInfo mustEqual expectedObjectInfo
   }
@@ -239,7 +243,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
 
   it should "get NoSuchKey when getObject is called on a bucket which does not have versioning on but version id provided" in {
     val key = "sample.txt"
-    val ex = s3Client.getObject(defaultBucketName, key, Some(NonVersionId)).failed.futureValue
+    val ex = s3Client.getObject(defaultBucketName, key, Some(NonVersionId(createObjectId(defaultBucketName, key)))).failed.futureValue
     extractErrorResponse(ex) mustEqual AwsError(404, "The resource you requested does not exist", "NoSuchKey")
   }
 
@@ -263,15 +267,19 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val lastModified = Instant.now()
     val actualResult = s3Client.copyObject(versionedBucketName, key, otherBucket2, key).futureValue
       .copy(lastModifiedDate = lastModified)
-    val expectedResult = CopyObjectResult(etagDigest1, Some(1.toVersionId), Some(2.toVersionId), lastModifiedDate = lastModified)
+    val versionId = createVersionId(createObjectId(otherBucket2, key), 1)
+    val sourceVersionId = createVersionId(createObjectId(versionedBucketName, key), 2)
+    val expectedResult = CopyObjectResult(etagDigest1, Some(versionId), Some(sourceVersionId), lastModifiedDate = lastModified)
     actualResult mustEqual expectedResult
   }
   it should "copy object between versioned buckets with source version id provided" in {
     val key = "sample.txt"
     val lastModified = Instant.now()
-    val actualResult = s3Client.copyObject(versionedBucketName, key, otherBucket2, key, Some(1.toVersionId)).futureValue
+    val versionId = createVersionId(createObjectId(otherBucket2, key), 2)
+    val sourceVersionId = createVersionId(createObjectId(versionedBucketName, key), 1)
+    val actualResult = s3Client.copyObject(versionedBucketName, key, otherBucket2, key, Some(sourceVersionId)).futureValue
       .copy(lastModifiedDate = lastModified)
-    val expectedResult = CopyObjectResult(etagDigest, Some(2.toVersionId), Some(1.toVersionId), lastModifiedDate = lastModified)
+    val expectedResult = CopyObjectResult(etagDigest, Some(versionId), Some(sourceVersionId), lastModifiedDate = lastModified)
     actualResult mustEqual expectedResult
   }
 
@@ -281,7 +289,8 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val lastModified = Instant.now()
     val actualResult = s3Client.copyObject(defaultBucketName, sourceKey, otherBucket2, targetKey).futureValue
       .copy(lastModifiedDate = lastModified)
-    val expectedResult = CopyObjectResult(etagDigest1, Some(1.toVersionId), None, lastModifiedDate = lastModified)
+    val versionId = createVersionId(createObjectId(otherBucket2, targetKey), 1)
+    val expectedResult = CopyObjectResult(etagDigest1, Some(versionId), None, lastModifiedDate = lastModified)
     actualResult mustEqual expectedResult
   }
 
@@ -291,7 +300,8 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val lastModified = Instant.now()
     val actualResult = s3Client.copyObject(versionedBucketName, sourceKey, otherBucket1, targetKey).futureValue
       .copy(lastModifiedDate = lastModified)
-    val expectedResult = CopyObjectResult(etagDigest1, None, Some(2.toVersionId), lastModifiedDate = lastModified)
+    val versionId = createVersionId(createObjectId(versionedBucketName, sourceKey), 2)
+    val expectedResult = CopyObjectResult(etagDigest1, None, Some(versionId), lastModifiedDate = lastModified)
     actualResult mustEqual expectedResult
   }
 
@@ -341,17 +351,19 @@ abstract class S3IntegrationSpec(resourceBasename: String)
 
   it should "set delete marker on latest object on a versioned bucket" in {
     val key = "sample.txt"
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), 2)
     val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(versionedBucketName, key).futureValue
     maybeDeleteMarker mustBe empty
-    maybeVersionId mustBe Some(2.toVersionId)
+    maybeVersionId mustBe Some(versionId)
   }
 
   it should "set delete marker on by version id" in {
     val key = "sample.txt"
     val index = 1
-    val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(versionedBucketName, key, Some(index.toVersionId)).futureValue
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
+    val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(versionedBucketName, key, Some(versionId)).futureValue
     maybeDeleteMarker mustBe empty
-    maybeVersionId mustBe Some(index.toVersionId)
+    maybeVersionId mustBe Some(versionId)
   }
 
   @scala.annotation.tailrec

@@ -33,7 +33,7 @@ package object repositories {
   val DeleteMarkerField = "delete-marker"
   val UploadIdField = "upload-id"
   val PartNumberField = "part-number"
-  val NonVersionId: String = 0.toVersionId
+  val NonVersionId: UUID => String = objectId => createVersionId(objectId, 0)
   val ContentFileName = "content"
 
   implicit class LongOps(src: Long) {

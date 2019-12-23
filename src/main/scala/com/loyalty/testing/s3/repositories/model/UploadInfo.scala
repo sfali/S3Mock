@@ -15,18 +15,22 @@ case class UploadInfo(bucketName: String,
                       eTag: String,
                       contentMd5: String,
                       contentLength: Long) {
-  def toObjectKey: ObjectKey = ObjectKey(
-    id = createObjectId(bucketName, key),
-    bucketName = bucketName,
-    key = key,
-    index = versionIndex,
-    version = version,
-    versionId = versionIndex.toVersionId,
-    eTag = eTag,
-    contentMd5 = contentMd5,
-    contentLength = contentLength,
-    objectPath = toObjectDir(bucketName, key, version, versionIndex.toVersionId)
-  )
+  def toObjectKey: ObjectKey = {
+    val objectId = createObjectId(bucketName, key)
+    val versionId = createVersionId(objectId, versionIndex)
+    ObjectKey(
+      id = objectId,
+      bucketName = bucketName,
+      key = key,
+      index = versionIndex,
+      version = version,
+      versionId = versionId,
+      eTag = eTag,
+      contentMd5 = contentMd5,
+      contentLength = contentLength,
+      objectPath = toObjectDir(bucketName, key, version, versionId)
+    )
+  }
 }
 
 object UploadInfo {
