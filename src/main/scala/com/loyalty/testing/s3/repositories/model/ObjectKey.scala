@@ -19,8 +19,7 @@ case class ObjectKey(id: UUID,
                      objectPath: String,
                      lastModifiedTime: OffsetDateTime,
                      deleteMarker: Option[Boolean],
-                     uploadId: Option[String],
-                     prefixes: List[String]) {
+                     uploadId: Option[String]) {
   def actualVersionId: Option[String] =
     version match {
       case BucketVersioning.Enabled => Some(versionId)
@@ -41,8 +40,7 @@ object ObjectKey {
             objectPath: String,
             lastModifiedTime: OffsetDateTime = OffsetDateTime.now,
             deleteMarker: Option[Boolean] = None,
-            uploadId: Option[String] = None,
-            prefixes: List[String] = Nil): ObjectKey =
+            uploadId: Option[String] = None): ObjectKey =
     new ObjectKey(
       id,
       bucketName,
@@ -56,8 +54,7 @@ object ObjectKey {
       objectPath,
       lastModifiedTime,
       deleteMarker,
-      uploadId,
-      prefixes
+      uploadId
     )
 
   def apply(doc: Document): ObjectKey =
@@ -74,7 +71,6 @@ object ObjectKey {
       objectPath = doc.getString(PathField),
       lastModifiedTime = doc.getLastModifiedTime.toOffsetDateTime,
       deleteMarker = doc.getOptionalBoolean(DeleteMarkerField),
-      uploadId = doc.getOptionalString(UploadIdField),
-      prefixes = doc.getListField(PrefixField)
+      uploadId = doc.getOptionalString(UploadIdField)
     )
 }

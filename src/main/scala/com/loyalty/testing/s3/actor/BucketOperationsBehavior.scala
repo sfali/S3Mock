@@ -125,7 +125,7 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
 
       case ListBucket(params, replyTo) =>
         val command =
-          Try(listBucket(bucket.bucketName, params)(database, context.log)) match {
+          Try(listObjects(bucket.bucketName, params)(database, context.log)) match {
             case Failure(ex) =>
               context.log.error(s"Unable to get bucket content for bucket: ${bucket.bucketName} with params: $params", ex)
               // TODO: reply properly

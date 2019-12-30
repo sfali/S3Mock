@@ -84,20 +84,4 @@ package object repositories {
       )
   }
 
-  def createPrefixes(key: String): util.ArrayList[String] = {
-    val delimiterIndex = key.lastIndexOf('/')
-    val paths = if (delimiterIndex >= 0) key.substring(0, delimiterIndex).split("/").toList else Nil
-    val ls = new util.ArrayList[String]()
-    if (paths.nonEmpty) {
-      ls.add(s"${paths.head}/")
-      paths.tail.foreach {
-        path =>
-          val last = ls.get(ls.size() - 1)
-          ls.add(s"$last$path/")
-      }
-    }
-    ls
-  }
-
-
 }

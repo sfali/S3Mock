@@ -45,7 +45,6 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
         .put(VersionField, version.entryName)
         .put(VersionIdField, objectKey.versionId)
         .put(DeleteMarkerField, null)
-        .put(PrefixField, createPrefixes(key))
     )
 
     val updatedDocument = doc
@@ -85,15 +84,8 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
 
   private[repositories] def findAll(objectId: UUID): List[ObjectKey] = findAllById(objectId).map(ObjectKey(_))
 
-  private[repositories] def findAll(bucketName: String, prefix: Option[String] = None): List[ObjectKey] = {
-    val bucketNameFilter = feq(BucketNameField, bucketName)
-    val filter =
-      prefix match {
-        case Some(prefix) => and(bucketNameFilter, elemMatch(PrefixField, feq("$", prefix)))
-        case None => bucketNameFilter
-      }
-    collection.find(filter).toScalaList.map(ObjectKey(_))
-  }
+  private[repositories] def findAll(bucketName: String): List[ObjectKey] =
+    collection.find(feq(BucketNameField, bucketName)).toScalaList.map(ObjectKey(_))
 
   private def findAllById(objectId: UUID): List[Document] =
     collection.find(feq(IdField, objectId.toString), FindOptions.sort(VersionIndexField, SortOrder.Ascending)).toScalaList
