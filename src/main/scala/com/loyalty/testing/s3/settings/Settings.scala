@@ -1,7 +1,7 @@
 package com.loyalty.testing.s3.settings
 
 import java.net.URI
-import java.nio.file.Path
+import java.nio.file.{Files, Path}
 
 import com.loyalty.testing.s3._
 import com.typesafe.config.Config
@@ -16,17 +16,21 @@ trait Settings {
 
   val enableNotification: Boolean = config.getBoolean("app.enable-notification")
 
-  val initialDataPath: Option[Path] =
-    config.getOptionalString("app.bootstrap.initial-data-path") match {
-      case Some(path) => Some(path.toPath -> "initial.json")
-      case None => None
-    }
-
   val dataDirectory: Path =
     config.getOptionalString("app.bootstrap.data-directory") match {
       case Some(path) => path.toPath
       case None => UserDir -> ".s3mock"
     }
+
+  val initialDataPath: Option[Path] = {
+    val path =
+      config.getOptionalString("app.bootstrap.initial-data-file") match {
+        case Some(fileName) => dataDirectory -> fileName
+        case None => dataDirectory -> "initial.json"
+      }
+    Some(path).filter(Files.exists(_))
+  }
+
 
   val awsSettings: AwsSettings = new AwsSettings {
     override val region: Region = Region.of(config.getString("app.aws.region"))
