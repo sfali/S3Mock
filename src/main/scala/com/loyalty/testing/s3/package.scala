@@ -68,7 +68,7 @@ package object s3 {
   def toBase16FromRandomUUID: String = toBase16(UUID.randomUUID().toString)
 
   implicit class StringOps(s: String) {
-    def decode: String = URLDecoder.decode(s, UTF_8.toString).replaceAll(" ", "+")
+    def decode: String = URLDecoder.decode(s, UTF_8.toString)
 
     def encode: String = URLEncoder.encode(s, UTF_8.toString)
 
