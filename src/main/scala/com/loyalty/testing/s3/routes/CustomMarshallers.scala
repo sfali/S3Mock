@@ -106,7 +106,7 @@ trait CustomMarshallers
     xmlResponseMarshallers(`text/xml(UTF-8)`)
 
   implicit val ListBucketResultMarshallers: ToEntityMarshaller[ListBucketResult] =
-    xmlResponseMarshallers(`application/octet-stream`)
+    xmlResponseMarshallers(`text/xml(UTF-8)`)
 
   implicit val BucketAlreadyExistsMarshallers: ToEntityMarshaller[BucketAlreadyExistsResponse] =
     xmlResponseMarshallers(`application/octet-stream`)
