@@ -75,7 +75,7 @@ object Dependencies {
     val ScalaTestVersion = "3.2.0-M1"
     val ScalacheckVersion = "1.14.2"
     val ScalamockVersion = "4.4.0"
-    val NitriteVersion = "3.2.0"
+    val NitriteVersion = "3.3.0"
     val ScalaXmlVersion = "2.0.0-M1"
   }
 

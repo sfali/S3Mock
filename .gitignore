@@ -7,6 +7,10 @@
 .idea/**
 s3/initial.json
 .s3mock/
+**/data/**
+**/uploads/**
+**/uploads-staging/**
+**/s3mock.db
 password.txt
 null/**
 

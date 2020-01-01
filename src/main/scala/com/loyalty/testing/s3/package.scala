@@ -1,7 +1,7 @@
 package com.loyalty.testing
 
 import java.io.IOException
-import java.net.{URI, URLDecoder, URLEncoder}
+import java.net.{URI, URLEncoder}
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
@@ -19,6 +19,7 @@ import com.loyalty.testing.s3.repositories.NitriteDatabase
 import com.loyalty.testing.s3.repositories.model.Bucket
 import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo}
 import com.loyalty.testing.s3.response.{CompleteMultipartUploadResult, InvalidNotificationConfigurationException}
+import com.loyalty.testing.s3.utils.StringUtils
 import com.typesafe.config.Config
 import io.circe.generic.auto._
 import io.circe.parser._
@@ -34,8 +35,6 @@ import scala.util.{Failure, Success, Try}
 import scala.xml.{Node, NodeSeq}
 
 package object s3 {
-
-  type JavaFuture[V] = java.util.concurrent.Future[V]
 
   val defaultRegion: String = "us-east-1"
   val UserDir: Path = System.getProperty("user.dir").toPath
@@ -68,7 +67,7 @@ package object s3 {
   def toBase16FromRandomUUID: String = toBase16(UUID.randomUUID().toString)
 
   implicit class StringOps(s: String) {
-    def decode: String = URLDecoder.decode(s, UTF_8.toString).replaceAll(" ", "+")
+    def decode: String = StringUtils.decode(s, UTF_8.toString)
 
     def encode: String = URLEncoder.encode(s, UTF_8.toString)
 
@@ -303,7 +302,7 @@ package object s3 {
                      key: String,
                      version: BucketVersioning,
                      versionIndex: Int): String =
-    toBase64(s"upload-$bucketName-$key-${version.entryName}-$versionIndex".toUUID.toString)
+    toBase16(s"upload-$bucketName-$key-${version.entryName}-$versionIndex".toUUID.toString)
 
   def createVersionId(objectId: UUID, versionIndex: Int): String =
     toBase16(s"${objectId.toString}-$versionIndex".toUUID.toString)

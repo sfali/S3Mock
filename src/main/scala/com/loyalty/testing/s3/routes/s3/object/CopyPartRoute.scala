@@ -28,13 +28,14 @@ object CopyPartRoute extends CustomMarshallers {
             timeout: Timeout): Route =
     (parameter("partNumber".as[Int]) & parameter("uploadId") &
       headerValueByType[`x-amz-copy-source`](()) & optionalHeaderValueByType[`x-amz-copy-source-range`](())) {
-      (partNumber, uploadId, copySource, maybeCopySourceRange) =>
+      (partNumber, rawUploadId, copySource, maybeCopySourceRange) =>
         val sourceBucketName = copySource.bucketName
         val sourceKey = copySource.key
         val maybeSourceVersionId = copySource.maybeVersionId
         val sourceBucketId = sourceBucketName.toUUID
         val targetBucketId = bucketName.toUUID
         val maybeRange = maybeCopySourceRange.map(_.range)
+        val uploadId = rawUploadId.decode.trim
         val eventualEvent =
           Source
             .single("")

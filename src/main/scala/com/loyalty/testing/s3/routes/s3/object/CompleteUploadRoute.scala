@@ -25,7 +25,7 @@ object CompleteUploadRoute extends CustomMarshallers {
            (implicit system: ActorSystem[_],
             timeout: Timeout): Route =
     (extractRequest & parameter("uploadId")) { (request, rawUploadId) =>
-      val uploadId = rawUploadId.decode
+      val uploadId = rawUploadId.decode.trim
       val eventualEvent =
         extractRequestTo(request)
           .map(Option.apply)

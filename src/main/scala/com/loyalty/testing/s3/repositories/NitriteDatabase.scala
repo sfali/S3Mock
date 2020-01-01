@@ -42,8 +42,7 @@ class NitriteDatabase(rootPath: Path,
 
   def findBucket(id: UUID): Option[Bucket] = bucketCollection.findBucket(id)
 
-  def getAllObjects(bucketName: String,
-                    prefix: Option[String] = None): List[ObjectKey] = objectCollection.findAll(bucketName, prefix)
+  def getAllObjects(bucketName: String): List[ObjectKey] = objectCollection.findAll(bucketName)
 
   def createBucket(bucket: Bucket): Bucket = bucketCollection.createBucket(bucket)
 
