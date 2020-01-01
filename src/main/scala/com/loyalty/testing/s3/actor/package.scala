@@ -13,7 +13,7 @@ package object actor {
                   log: Logger): List[BucketContent] = {
     val maybePrefix = params.maybePrefix
     val maybeDelimiter = params.maybeDelimiter
-    val objects = database.getAllObjects(bucketName)
+    val objects = database.getAllObjects(bucketName).filter(_.deleteMarker.isEmpty)
     val filteredObjects =
       maybePrefix match {
         case None => objects
