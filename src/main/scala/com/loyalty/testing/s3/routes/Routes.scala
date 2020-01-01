@@ -36,7 +36,7 @@ trait Routes {
           bucketRoutes
         } ~ path(RemainingPath) {
           key =>
-            val objectName = key.toString().decode
+            val objectName = key.toString().decode.trim
             put {
               CopyPartRoute(bucketName, objectName, copyActorRef) ~
                 UploadPartRoute(bucketName, objectName, bucketOperationsActorRef) ~

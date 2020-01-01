@@ -27,7 +27,7 @@ object UploadPartRoute extends CustomMarshallers {
             timeout: Timeout): Route =
     (extractRequest & parameter("partNumber".as[Int]) & parameter("uploadId")) {
       (request, partNumber, rawUploadId) =>
-        val uploadId = rawUploadId.decode
+        val uploadId = rawUploadId.decode.trim
         system.log.info("Upload part: bucket_name={}, key={}, upload_id={}, part_number={}", bucketName, key, uploadId,
           partNumber)
         val eventualEvent =
