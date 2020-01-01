@@ -1,12 +1,12 @@
 package com.loyalty.testing.s3.response
 
 import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.file.Paths
 import java.time.Instant
 
 import akka.util.ByteString
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.repositories.model.ObjectKey
+
 import scala.xml.Elem
 
 trait XmlResponse {
@@ -105,7 +105,7 @@ case class CompleteMultipartUploadResult(bucketName: String,
                                          eTag: String,
                                          contentLength: Long,
                                          versionId: Option[String] = None) extends XmlResponse {
-  val location = s"http://s3.amazonaws.com/${Paths.get(bucketName, key.decode).toString}"
+  val location = s"http://s3.amazonaws.com/$bucketName/${key.decode}.toString}"
 
   override def toXml: Elem =
   // @formatter:off
