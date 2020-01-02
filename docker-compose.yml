@@ -1,0 +1,20 @@
+version: "3.7"
+
+services:
+  sns:
+    image: s12v/sns:latest
+    ports:
+      - "9911:9911"
+    volumes:
+      - ${PWD}/config/db.json:/etc/sns/db.json
+    container_name: sns
+    depends_on:
+      - sqs
+
+  sqs:
+    image: softwaremill/elasticmq:latest
+    ports:
+      - "9324:9324"
+    volumes:
+      - ${PWD}/config/elasticmq.conf:/opt/elasticmq.conf
+    container_name: sqs

@@ -1,0 +1,14 @@
+version: "3.7"
+
+services:
+  s3:
+    image: sfali23/s3mock:1.1.0-SNAPSHOT
+    ports:
+      - "9090:9090"
+    volumes:
+      - ${PWD}/.s3mock:/opt/docker/.s3mock
+    environment:
+      - ENABLE_NOTIFICATION=true
+      - SQS_END_POINT=http://192.168.61.129:9324
+      - SNS_END_POINT=http://192.168.61.129:9911
+    container_name: s3

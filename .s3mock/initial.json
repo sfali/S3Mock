@@ -17,6 +17,14 @@
       "destinationType":"Sqs",
       "destinationName":"local-queue-1",
       "bucketName":"local-bucket-1"
+    },
+    {
+      "name":"ec6bb0f5-4934-43e4-b427-88fb9e591869",
+      "notificationType":"ObjectCreated",
+      "operationType":  "*",
+      "destinationType":"Sns",
+      "destinationName":"local-sns-1",
+      "bucketName":"local-bucket-2"
     }
   ]
 }
