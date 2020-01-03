@@ -25,4 +25,65 @@ Following operations have been implemented:
 
 ## Setup
 
-`S3Mock` can be integrated to send `S3` notifications to either of `SQS` or `SNS` 
+`S3Mock` uses persistent storage to store data, for persistence storage `S3Mock` uses [Nitrite databse](...) internally.
+Upon first time initialization the database and necessary directory structures will be created, by default `.s3mock` 
+directory will be used in user home directory for storage, this can be configured by using `DATA_DIRECTORY` environment 
+variable. Following is the directory structure within the `DATA_DIRECTORY`:
+
+* _data_ (contains actual data)
+* _uploads_ (contains parts related to multi-part uploads)
+* _uploads-staging_ (contains intimidatory parts for multi-part uploads)
+* _s3mock.db_ (database file)
+
+**NOTE:** Do not remove any file from the `DATA_DIRECTORY`, application is not tested for such behavior.
+
+`S3Mock` supports versioning subresource and can be integrated to send `S3` notifications to `SQS` or `SNS`. By default 
+notification integration is disabled and it can be enabled by using `ENABLE_NOTIFICATION` environment variable. In order 
+to integrate with mock `SQS` and/or `SNS`, environment variables `SQS_END_POINT` and `SNS_END_POINT` can be configured. 
+It is possible to integrate with _real_ `SQS` and `SNS`, set environment variable `AWS_CREDENTIAL_PROVIDER` to value 
+`default` and make sure to provide proper environment variable(s) for the `AWS` provider chain, please consult `AWS` 
+documentation for how to setup proper provider chain.
+
+In real world scenario bucket(s), required to run application(s), to be pre-created, in order to support that `S3Mock` 
+can be configured to create bucket(s) at the start up, in order to achieve this `S3Mock` following _json_ format for 
+initialization:
+
+```json
+{
+  "initialBuckets":[
+    {
+      "bucketName":"local-bucket-1",
+      "enableVersioning":true
+    },
+    {
+      "bucketName":"local-bucket-2",
+      "enableVersioning":false
+    }
+  ],
+  "notifications":[
+    {
+      "name":"53dba44f-9326-46b1-9b46-37efc5893a79",
+      "notificationType":"ObjectCreated",
+      "operationType":  "*",
+      "destinationType":"Sqs",
+      "destinationName":"local-queue-1",
+      "bucketName":"local-bucket-1"
+    },
+    {
+      "name":"ec6bb0f5-4934-43e4-b427-88fb9e591869",
+      "notificationType":"ObjectCreated",
+      "operationType":  "*",
+      "destinationType":"Sns",
+      "destinationName":"local-sns-1",
+      "bucketName":"local-bucket-2"
+    }
+  ]
+}
+```
+
+`S3Mock` supports following notification types and operations within each types:
+
+* ObjectCreated (Put, Post, Copy, CompleteMultipartUpload)
+* ObjectRemoved (Delete, DeleteMarkerCreated)
+
+**NOTE:** Use _*_ to enable all operations for that type.
