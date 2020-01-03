@@ -49,10 +49,6 @@ object DeleteObjectRoute extends CustomMarshallers {
               index = 0,
               version = version,
               versionId = maybeVersionId.getOrElse(""),
-              eTag = "",
-              contentMd5 = "",
-              contentLength = 0,
-              objectPath = ".",
               lastModifiedTime = OffsetDateTime.now,
               deleteMarker = Some(deleteMarker)
             )

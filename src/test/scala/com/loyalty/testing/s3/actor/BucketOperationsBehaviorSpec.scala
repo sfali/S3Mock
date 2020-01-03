@@ -471,7 +471,7 @@ class BucketOperationsBehaviorSpec
 
     actorRef ! Copy(defaultBucketName, key, bucket2, key, None, probe.ref)
     val copyObjectInfo = probe.receiveMessage().asInstanceOf[CopyObjectInfo]
-    copyObjectInfo.objectKey.eTag mustEqual etagDigest1
+    copyObjectInfo.objectKey.eTag.get mustEqual etagDigest1
     copyObjectInfo.sourceVersionId mustBe empty
 
     testKit.stop(objectActorRef)
@@ -541,7 +541,7 @@ class BucketOperationsBehaviorSpec
     val parts = PartInfo(1, partInfo1.uploadInfo.eTag) :: PartInfo(2, partInfo2.uploadInfo.eTag) ::
       PartInfo(3, partInfo3.uploadInfo.eTag) :: Nil
     bucketOperationsActorRef ! ShardingEnvelope(bucket2UUID, CompleteUploadWrapper(key, uploadId, parts, probe.ref))
-    val actualObjectKey = probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey.copy(contentMd5 = "")
+    val actualObjectKey = probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey.copy(contentMd5 = None)
 
     bucketOperationsActorRef ! ShardingEnvelope(defaultBucketNameUUID, GetObjectWrapper(key, replyTo = probe.ref))
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]

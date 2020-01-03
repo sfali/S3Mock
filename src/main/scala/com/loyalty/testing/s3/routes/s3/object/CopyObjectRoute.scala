@@ -47,7 +47,7 @@ object CopyObjectRoute extends CustomMarshallers {
         case Success(ObjectInfo(objectKey)) if objectKey.deleteMarker.contains(true) =>
           complete(HttpResponse(NotFound).withHeaders(createResponseHeaders(objectKey)))
         case Success(CopyObjectInfo(objectKey, sourceVersionId)) =>
-          complete(CopyObjectResult(objectKey.eTag, objectKey.actualVersionId, sourceVersionId))
+          complete(CopyObjectResult(objectKey.eTag.getOrElse(""), objectKey.actualVersionId, sourceVersionId))
         case Success(ObjectInfo(_)) =>
           system.log.warn("CopyObjectRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
           complete(InternalServiceResponse(s"$bucketName/$key"))

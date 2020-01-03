@@ -27,7 +27,7 @@ package object data {
       new ObjectInfo(bucketName, key, eTag, contentLength, versionId)
 
     def apply(objectKey: ObjectKey): ObjectInfo =
-      ObjectInfo(objectKey.bucketName, objectKey.key, objectKey.eTag, objectKey.contentLength, objectKey.actualVersionId)
+      ObjectInfo(objectKey.bucketName, objectKey.key, objectKey.eTag.getOrElse(""), objectKey.contentLength, objectKey.actualVersionId)
   }
 
 }

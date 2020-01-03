@@ -40,7 +40,7 @@ object CompleteUploadRoute extends CustomMarshallers {
           ).runWith(Sink.head)
       onComplete(eventualEvent) {
         case Success(ObjectInfo(objectKey)) =>
-          val result = CompleteMultipartUploadResult(bucketName, key, objectKey.eTag, objectKey.contentLength,
+          val result = CompleteMultipartUploadResult(bucketName, key, objectKey.eTag.getOrElse(""), objectKey.contentLength,
             objectKey.actualVersionId)
           complete(result)
         case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))

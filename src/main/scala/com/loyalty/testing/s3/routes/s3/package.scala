@@ -13,7 +13,7 @@ package object s3 {
   def createResponseHeaders(objectKey: ObjectKey): List[HttpHeader] =
     Nil +
       (CONTENT_MD5, objectKey.contentMd5) +
-      (ETAG, s""""${objectKey.eTag}"""") +
+      (ETAG, objectKey.eTag.map(etag => s""""$etag"""")) +
       (VersionIdHeader, objectKey.actualVersionId) +
       (DeleteMarkerHeader, objectKey.deleteMarker.filter(_ == true).map(_.toString))
 

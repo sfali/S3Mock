@@ -115,7 +115,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
                       DatabaseError // TODO: retry
                   }
                 case Some(_) =>
-                  ReplyToSender(ObjectInfo(objectKey.copy(eTag = "", contentMd5 = "", contentLength = 0,
+                  ReplyToSender(ObjectInfo(objectKey.copy(eTag = None, contentMd5 = None, contentLength = 0,
                     deleteMarker = Some(true))), replyTo)
               }
           }
@@ -221,7 +221,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
           val objectKey = maybeObjectKey.get
           val bucketName = objectKey.bucketName
           val notificationData = NotificationData(bucketName, objectKey.key,
-            objectKey.contentLength, objectKey.eTag, maybeOperation.get, objectKey.actualVersionId)
+            objectKey.contentLength, objectKey.eTag.getOrElse(""), maybeOperation.get, objectKey.actualVersionId)
           notificationActorRef ! ShardingEnvelope(bucketName.toUUID.toString, SendNotification(notificationData))
         }
         objects =

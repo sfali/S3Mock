@@ -57,7 +57,8 @@ case class BucketContent(expand: Boolean,
 object BucketContent {
   def apply(expand: Boolean,
             key: String,
-            size: Long, eTag: String,
+            size: Long,
+            eTag: String,
             lastModifiedDate: Instant = Instant.now(),
             storageClass: String = "STANDARD"): BucketContent =
     new BucketContent(expand, key, size, eTag, lastModifiedDate, storageClass)
@@ -67,7 +68,7 @@ object BucketContent {
       expand = true,
       objectKey.key,
       objectKey.contentLength,
-      objectKey.eTag,
+      objectKey.eTag.getOrElse(""),
       objectKey.lastModifiedTime.toInstant
     )
 }
