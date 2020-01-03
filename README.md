@@ -25,7 +25,7 @@ Following operations have been implemented:
 
 ## Setup
 
-`S3Mock` uses persistent storage to store data, for persistence storage `S3Mock` uses [Nitrite databse](...) internally.
+`S3Mock` uses persistent storage to store data, for persistence storage `S3Mock` uses [Nitrite databse](https://www.dizitart.org/nitrite-database.html) internally.
 Upon first time initialization the database and necessary directory structures will be created, by default `.s3mock` 
 directory will be used in user home directory for storage, this can be configured by using `DATA_DIRECTORY` environment 
 variable. Following is the directory structure within the `DATA_DIRECTORY`:
@@ -83,7 +83,23 @@ initialization:
 
 `S3Mock` supports following notification types and operations within each types:
 
-* ObjectCreated (Put, Post, Copy, CompleteMultipartUpload)
-* ObjectRemoved (Delete, DeleteMarkerCreated)
+* ObjectCreated (Put, Post, Copy, CompleteMultipartUpload, *)
+* ObjectRemoved (Delete, DeleteMarkerCreated, *)
 
 **NOTE:** Use _*_ to enable all operations for that type.
+
+Initial data file can be configured by setting environment variable `INITIAL_DATA_FILE` to path to the file.
+
+## Running application in docker environment 
+
+**Build and create docker image:**
+
+```shell script
+./scripts/publish-local.sh
+```
+
+**Run Docker compose**
+
+```shell script
+docker-compose up
+```
