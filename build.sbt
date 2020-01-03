@@ -1,6 +1,8 @@
 import sbtrelease.ReleaseStateTransformations._
 import Dependencies._
 
+import scala.util.Properties
+
 name := "s3mock"
 scalaVersion := Versions.Scala213
 crossScalaVersions := Seq(Versions.Scala212, Versions.Scala213)
@@ -55,5 +57,8 @@ releaseProcess := Seq[ReleaseStep](
   pushChanges
 )
 
+lazy val devVersion = Properties.propOrNone("devVersion")
+packageName in Docker := devVersion.map(_ => s"${name.value}-dev").getOrElse(name.value)
+version in Docker := devVersion.getOrElse(version.value)
 dockerRepository := Some("sfali23")
 dockerBaseImage := "openjdk:8-jre-slim"

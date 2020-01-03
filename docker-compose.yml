@@ -18,3 +18,20 @@ services:
     volumes:
       - ${PWD}/config/elasticmq.conf:/opt/elasticmq.conf
     container_name: sqs
+
+  s3:
+    image: sfali23/s3mock-dev:1.0.0-SNAPSHOT
+    ports:
+      - "9090:9090"
+    volumes:
+      - ${PWD}/target/.s3mock/local:/opt/docker/.s3mock
+      - ${PWD}/config/initial.json:/opt/docker/initial.json
+    environment:
+      - ENABLE_NOTIFICATION=true
+      - INITIAL_DATA_FILE=/opt/docker/initial.json
+      - SQS_END_POINT=http://192.168.114.129:9324
+      - SNS_END_POINT=http://192.168.114.129:9911
+    container_name: s3
+    depends_on:
+      - sqs
+      - sns
