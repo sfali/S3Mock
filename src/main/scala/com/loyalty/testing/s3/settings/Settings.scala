@@ -25,7 +25,7 @@ trait Settings {
   val initialDataPath: Option[Path] = {
     val path =
       config.getOptionalString("app.bootstrap.initial-data-file") match {
-        case Some(fileName) => dataDirectory -> fileName
+        case Some(fileName) => fileName.toPath
         case None => dataDirectory -> "initial.json"
       }
     Some(path).filter(Files.exists(_))
