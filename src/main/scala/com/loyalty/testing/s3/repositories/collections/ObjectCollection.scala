@@ -45,6 +45,7 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
         .put(VersionField, version.entryName)
         .put(VersionIdField, objectKey.versionId)
         .put(DeleteMarkerField, objectKey.deleteMarker.map(_.toString).orNull)
+        .put(StatusField, objectKey.status.entryName)
     )
 
     val updatedDocument = doc

@@ -16,6 +16,7 @@ package object repositories {
   val IdField = "id"
   val RegionField = "region"
   val VersionField = "version"
+  val StatusField = "status"
   val NotificationNameField = "notification-name"
   val NotificationTypeField = "notification-type"
   val OperationTypeField = "operation-type"
