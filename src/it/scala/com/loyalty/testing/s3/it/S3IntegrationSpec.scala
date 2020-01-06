@@ -329,41 +329,59 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     println(actualResult) // TODO: validate
   }
 
-  it should "set delete marker on an object" in {
+  it should "delete an object from non-version bucket" in {
     val key = "sample.txt"
     val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(defaultBucketName, key).futureValue
     maybeDeleteMarker mustBe empty
     maybeVersionId mustBe empty
   }
 
-  it should "result in 404(NotFound) when attempt to get an item which is flag with delete marker" in {
+  it should "get NoSuchKey when attempt to GET a deleted object" in {
     val key = "sample.txt"
     val ex = s3Client.getObject(defaultBucketName, key).failed.futureValue
     extractErrorResponse(ex).statusCode mustEqual 404
   }
 
-  it should "permanently delete an object" in {
+  it should "set delete marker on an object in versioned bucket" in {
     val key = "sample.txt"
-    val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(defaultBucketName, key).futureValue
-    maybeDeleteMarker mustBe Some(true)
-    maybeVersionId mustBe empty
-  }
-
-  it should "set delete marker on latest object on a versioned bucket" in {
-    val key = "sample.txt"
-    val versionId = createVersionId(createObjectId(versionedBucketName, key), 2)
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), 3)
     val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(versionedBucketName, key).futureValue
     maybeDeleteMarker mustBe empty
     maybeVersionId mustBe Some(versionId)
   }
 
-  it should "set delete marker on by version id" in {
+  it should "get 404(NotFound) with delete marker header set if GET is called on an object which is a delete marker" in {
     val key = "sample.txt"
-    val index = 1
-    val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
+    val ex = s3Client.getObject(versionedBucketName, key).failed.futureValue
+    extractErrorResponse(ex).statusCode mustEqual 404
+  }
+
+  it should "remove delete marker, will make object re-appear" in {
+    val key = "sample.txt"
+    var versionId = createVersionId(createObjectId(versionedBucketName, key), 3)
+    val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(versionedBucketName, key, Some(versionId)).futureValue
+    maybeDeleteMarker mustBe Some(true)
+    maybeVersionId mustBe Some(versionId)
+
+    val path = resourcePath -> "sample1.txt"
+    val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+    versionId = createVersionId(createObjectId(versionedBucketName, key), 2)
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, Some(etagDigest1), Files.size(path),
+      versionId = Some(versionId))
+    val (actualContent, actualObjectInfo) = s3Client.getObject(versionedBucketName, key).futureValue
+    actualContent mustEqual expectedContent
+    actualObjectInfo mustEqual expectedObjectInfo
+  }
+
+  it should "delete an object with versionId provided" in {
+    val key = "sample.txt"
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), 1)
     val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(versionedBucketName, key, Some(versionId)).futureValue
     maybeDeleteMarker mustBe empty
     maybeVersionId mustBe Some(versionId)
+
+    val ex = s3Client.getObject(versionedBucketName, key, Some(versionId)).failed.futureValue
+    extractErrorResponse(ex).statusCode mustEqual 404
   }
 
   @scala.annotation.tailrec
