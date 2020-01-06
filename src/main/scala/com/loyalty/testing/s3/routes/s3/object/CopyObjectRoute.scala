@@ -44,7 +44,7 @@ object CopyObjectRoute extends CustomMarshallers {
             )
           ).runWith(Sink.head)
       onComplete(eventualEvent) {
-        case Success(ObjectInfo(objectKey)) if objectKey.deleteMarker.contains(true) =>
+        case Success(ObjectInfo(objectKey)) if objectKey.isDeleted =>
           complete(HttpResponse(NotFound).withHeaders(createResponseHeaders(objectKey)))
         case Success(CopyObjectInfo(objectKey, sourceVersionId)) =>
           complete(CopyObjectResult(objectKey.eTag.getOrElse(""), objectKey.actualVersionId, sourceVersionId))

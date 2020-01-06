@@ -4,7 +4,6 @@ import java.util.UUID
 
 import com.loyalty.testing.s3.repositories._
 import com.loyalty.testing.s3.repositories.model.ObjectKey
-import com.loyalty.testing.s3.request.BucketVersioning
 import com.loyalty.testing.s3.utils.DateTimeProvider
 import org.dizitart.no2._
 import org.dizitart.no2.filters.Filters.{eq => feq, _}
@@ -28,24 +27,21 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
     collection.createIndex(VersionIdField, indexOptions(NonUnique))
   }
 
-  private[repositories] def createObject(objectKey: ObjectKey): ObjectKey = {
+  private[repositories] def createOrUpdateObject(objectKey: ObjectKey): ObjectKey = {
     val bucketName = objectKey.bucketName
     val key = objectKey.key
-    log.info("Request to create object, key={}, bucket={}", key, bucketName)
-    val version = objectKey.version
-    val versionEnabled = version == BucketVersioning.Enabled
+    val versionId = objectKey.versionId
+    val status = objectKey.status
+    log.info("Request to create object, key={}, bucket={}, version_id={}, status={}", key, bucketName, versionId, status)
     val objectId = objectKey.id
-
-    val maybeDoc = if (versionEnabled) None else findAllById(objectId).headOption
+    val maybeDoc = findById(objectId, Some(versionId)).headOption
     val doc = maybeDoc.getOrElse(
       createDocument(IdField, objectId.toString)
         .put(BucketNameField, bucketName)
         .put(KeyField, key)
         .put(VersionIndexField, objectKey.index)
-        .put(VersionField, version.entryName)
-        .put(VersionIdField, objectKey.versionId)
-        .put(DeleteMarkerField, objectKey.deleteMarker.map(_.toString).orNull)
-        .put(StatusField, objectKey.status.entryName)
+        .put(VersionField, objectKey.version.entryName)
+        .put(VersionIdField, versionId)
     )
 
     val updatedDocument = doc
@@ -54,6 +50,7 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
       .put(ContentLengthField, objectKey.contentLength)
       .put(UploadIdField, objectKey.uploadId.orNull)
       .put(PathField, objectKey.objectPath.orNull)
+      .put(StatusField, status.entryName)
 
     Try(collection.update(updatedDocument, true)) match {
       case Failure(ex) =>
@@ -63,25 +60,12 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
         val docId = writeResult.iterator().asScala.toList.headOption
         if (docId.isEmpty) throw DatabaseAccessException(s"unable to get document id for $bucketName/$key")
         else {
-          log.info("Object created/updated, key={}, bucket={}, version_id={}, doc_id={}", key, bucketName, objectKey.versionId,
+          log.info("Object created/updated, key={}, bucket={}, version_id={}, doc_id={}", key, bucketName, versionId,
             docId.get.getIdValue)
           objectKey.copy(lastModifiedTime = dateTimeProvider.currentOffsetDateTime)
         }
     }
   }
-
-  private[repositories] def deleteObject(objectId: UUID,
-                                         maybeVersionId: Option[String],
-                                         permanentDelete: Boolean): Int =
-    findById(objectId, maybeVersionId) match {
-      case Nil => throw NoSuchId(objectId)
-      case document :: Nil =>
-        val result =
-          if (permanentDelete) collection.remove(document)
-          else collection.update(document.put(DeleteMarkerField, "true"))
-        result.getAffectedCount
-      case _ => throw new IllegalStateException(s"Multiple documents found for $objectId")
-    }
 
   private[repositories] def findAll(objectId: UUID): List[ObjectKey] = findAllById(objectId).map(ObjectKey(_))
 

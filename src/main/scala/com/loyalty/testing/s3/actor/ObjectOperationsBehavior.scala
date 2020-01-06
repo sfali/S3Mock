@@ -9,12 +9,13 @@ import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity, EntityType
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.NotificationBehavior.{SendNotification, Command => NotificationCommand}
 import com.loyalty.testing.s3.actor.model.`object`._
-import com.loyalty.testing.s3.actor.model.{DeleteInfo, InternalError, InvalidAccess, InvalidPart, InvalidPartOrder, MultiPartUploadedInitiated, NoSuchKeyExists, NoSuchUpload, ObjectContent, ObjectInfo, PartUploaded}
+import com.loyalty.testing.s3.actor.model.{InternalError, InvalidAccess, InvalidPart, InvalidPartOrder, MultiPartUploadedInitiated, NoSuchKeyExists, NoSuchUpload, ObjectContent, ObjectInfo, PartUploaded}
 import com.loyalty.testing.s3.notification.{NotificationData, OperationType}
 import com.loyalty.testing.s3.repositories.collections.NoSuchId
-import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
+import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, ObjectStatus, UploadInfo}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.BucketVersioning
+import com.loyalty.testing.s3.request.BucketVersioning.Enabled
 import com.loyalty.testing.s3.service._
 import com.loyalty.testing.s3.settings.Settings
 
@@ -100,13 +101,16 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
         Behaviors.same
 
       case GetObject(bucket, key, maybeVersionId, maybeRange, replyTo) =>
-        val maybeObjectKey = getObject(sanitizeVersionId(bucket, maybeVersionId))
+        val maybeString = sanitizeVersionId(bucket, maybeVersionId)
+        val maybeObjectKey = getObject(maybeString)
+        println(s"${getClass.getSimpleName}: $maybeVersionId, $maybeString, $maybeObjectKey")
+        println(objects)
         val command =
           maybeObjectKey match {
             case None => ReplyToSender(NoSuchKeyExists(bucket.bucketName, key), replyTo)
             case Some(objectKey) =>
-              objectKey.deleteMarker match {
-                case None =>
+              objectKey.status match {
+                case ObjectStatus.Active =>
                   Try(objectService.getObject(objectKey, maybeRange)) match {
                     case Success((updatedObjectKey, source)) =>
                       ReplyToSender(ObjectContent(updatedObjectKey, source), replyTo)
@@ -114,36 +118,54 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
                       context.log.error("unable to download object", ex)
                       DatabaseError // TODO: retry
                   }
-                case Some(_) =>
-                  ReplyToSender(ObjectInfo(objectKey.copy(eTag = None, contentMd5 = None, contentLength = 0,
-                    deleteMarker = Some(true))), replyTo)
+                case ObjectStatus.DeleteMarker => ReplyToSender(ObjectInfo(objectKey.copy(deleteMarker = Some(true))), replyTo)
+                case _ => ReplyToSender(NoSuchKeyExists(bucket.bucketName, key), replyTo)
               }
           }
         context.self ! command
         Behaviors.same
 
       case DeleteObject(bucket, key, maybeVersionId, replyTo) =>
-        val maybeObjectKey = getObject(sanitizeVersionId(bucket, maybeVersionId))
-        context.pipeToSelf(objectService.deleteObject(maybeObjectKey)) {
-          case Failure(_: NoSuchKeyException.type) =>
+        val maybeSanitizedVersionId = sanitizeVersionId(bucket, maybeVersionId)
+        getObject(maybeSanitizedVersionId) match {
+          case Some(objectKey) =>
+            (maybeSanitizedVersionId, bucket.version) match {
+              case (None, Enabled) =>
+                // sets delete marker
+                versionIndex = versionIndex + 1
+                val deleteMarkerObjectKey = ObjectKey(
+                  id = objectId,
+                  bucketName = bucket.bucketName,
+                  key = key,
+                  index = versionIndex,
+                  version = Enabled,
+                  versionId = createVersionId(objectId, versionIndex),
+                  status = ObjectStatus.DeleteMarker
+                )
+                context.pipeToSelf(objectService.createOrUpdateObject(deleteMarkerObjectKey)) {
+                  case Failure(ex) =>
+                    context.log.error(s"unable to save object: ${bucket.bucketName}/$key", ex)
+                    DatabaseError // TODO
+                  case Success(finalObjectKey) =>
+                    ReplyToSender(ObjectInfo(finalObjectKey), replyTo, Some(finalObjectKey), Some(DeleteMarkerCreated))
+                }
+
+              case (_, _) =>
+                // virtual delete
+                context.pipeToSelf(objectService.virtualDeleteObject(objectKey)) {
+                  case Failure(_: NoSuchKeyException.type) =>
+                    ReplyToSender(NoSuchKeyExists(bucket.bucketName, key), replyTo)
+                  case Failure(ex) =>
+                    context.log.error(s"unable to virtual delete object: ${bucket.bucketName}/$key", ex)
+                    DatabaseError // TODO
+                  case Success(finalObjectKey) =>
+                    ReplyToSender(ObjectInfo(finalObjectKey), replyTo, Some(finalObjectKey), Some(Delete))
+                }
+            }
+          case None =>
             context.log.warn("unable to delete, reason=NoSuchKey, bucket_name={}, key={}, version_id={}",
               bucket.bucketName, key, maybeVersionId.getOrElse("None"))
-            ReplyToSender(NoSuchKeyExists(bucket.bucketName, key), replyTo)
-          case Failure(ex) =>
-            context.log.error(
-              s"""unable to delete object: bucket_name=${bucket.bucketName}, key=$key,
-                 | version_id=${maybeVersionId.getOrElse("None")}""".stripMargin.replaceNewLine, ex)
-            DatabaseError // TODO: retry
-          case Success(objectKey) =>
-            val deleteMarker = objectKey.deleteMarker
-            val deleteInfo = DeleteInfo(deleteMarker.getOrElse(false), objectKey.version,
-              objectKey.actualVersionId)
-            val operationType =
-              deleteMarker match {
-                case Some(value) => if (value) Some(Delete) else Some(DeleteMarkerCreated)
-                case None => None
-              }
-            ReplyToSender(deleteInfo, replyTo, Some(objectKey), operationType)
+            context.self ! ReplyToSender(NoSuchKeyExists(bucket.bucketName, key), replyTo)
         }
         Behaviors.same
 
@@ -248,7 +270,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
   private def getObject(maybeVersionId: Option[String]) =
     maybeVersionId match {
       case Some(versionId) => objects.filter(_.versionId == versionId).lastOption
-      case None => objects.lastOption
+      case None => objects.filterNot(_.status == ObjectStatus.DeleteMarkerDeleted).lastOption
     }
 
 }

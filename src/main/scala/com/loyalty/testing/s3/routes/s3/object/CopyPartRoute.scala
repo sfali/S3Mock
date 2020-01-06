@@ -47,7 +47,7 @@ object CopyPartRoute extends CustomMarshallers {
               )
             ).runWith(Sink.head)
         onComplete(eventualEvent) {
-          case Success(ObjectInfo(objectKey)) if objectKey.deleteMarker.contains(true) =>
+          case Success(ObjectInfo(objectKey)) if objectKey.isDeleted =>
             complete(HttpResponse(NotFound).withHeaders(createResponseHeaders(objectKey)))
           case Success(CopyPartInfo(uploadInfo, sourceVersionId)) =>
             val objectKey = uploadInfo.toObjectKey

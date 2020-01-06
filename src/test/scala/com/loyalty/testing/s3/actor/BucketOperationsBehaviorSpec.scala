@@ -17,7 +17,7 @@ import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.actor.model.bucket._
 import com.loyalty.testing.s3.{data, _}
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
-import com.loyalty.testing.s3.repositories.model.Bucket
+import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectStatus}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo, VersioningConfiguration}
 import com.loyalty.testing.s3.service.NotificationService
@@ -197,7 +197,7 @@ class BucketOperationsBehaviorSpec
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest, Files.size(path))
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest), Files.size(path))
     val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
     actualObjectInfo mustEqual expectedObjectInfo
 
@@ -214,7 +214,7 @@ class BucketOperationsBehaviorSpec
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! GetObjectMetaWrapper(key, probe.ref)
 
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest, Files.size(path))
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest), Files.size(path))
     val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
     actualObjectInfo mustEqual expectedObjectInfo
 
@@ -231,7 +231,7 @@ class BucketOperationsBehaviorSpec
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, Files.size(path))
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), Files.size(path))
     val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
     actualObjectInfo mustEqual expectedObjectInfo
 
@@ -250,7 +250,7 @@ class BucketOperationsBehaviorSpec
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! PutObjectWrapper(key, contentSource, copy = false, probe.ref)
 
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest, Files.size(path))
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest), Files.size(path))
     val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
     actualObjectInfo mustEqual expectedObjectInfo
 
@@ -270,7 +270,7 @@ class BucketOperationsBehaviorSpec
 
     val index = 1
     val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
-    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, Files.size(path), Some(versionId))
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, Some(etagDigest), Files.size(path), versionId = Some(versionId))
     val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
     actualObjectInfo mustEqual expectedObjectInfo
 
@@ -289,7 +289,7 @@ class BucketOperationsBehaviorSpec
 
     val index = 2
     val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
-    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest1, Files.size(path), Some(versionId))
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, Some(etagDigest1), Files.size(path), versionId = Some(versionId))
     val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
     actualObjectInfo mustEqual expectedObjectInfo
 
@@ -301,7 +301,7 @@ class BucketOperationsBehaviorSpec
     val key = "sample.txt"
     val path = resourcePath -> "sample1.txt"
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length)
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -321,7 +321,7 @@ class BucketOperationsBehaviorSpec
   it should "get object with range between two positions from the start of file" in {
     val key = "sample.txt"
     val expectedContent = "1. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length)
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -341,7 +341,7 @@ class BucketOperationsBehaviorSpec
   it should "get object with range between two positions from the middle of file" in {
     val key = "sample.txt"
     val expectedContent = "6. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length)
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -361,7 +361,7 @@ class BucketOperationsBehaviorSpec
   it should "get object with suffix range" in {
     val key = "sample.txt"
     val expectedContent = "8. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length)
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -381,7 +381,7 @@ class BucketOperationsBehaviorSpec
   it should "get object with range with offset" in {
     val key = "sample.txt"
     val expectedContent = "8. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length)
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -404,7 +404,7 @@ class BucketOperationsBehaviorSpec
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 2
     val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
-    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest1, expectedContent.length, Some(versionId))
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, Some(etagDigest1), expectedContent.length, versionId = Some(versionId))
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -427,7 +427,7 @@ class BucketOperationsBehaviorSpec
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 1
     val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
-    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, expectedContent.length, Some(versionId))
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, Some(etagDigest), expectedContent.length, versionId = Some(versionId))
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -497,7 +497,7 @@ class BucketOperationsBehaviorSpec
     actorRef ! CompleteUploadWrapper(key, uploadId, parts, probe.ref)
     val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
     val (etag, contentLength) = calculateETagAndLength(partBoundaries)
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etag, contentLength)
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etag), contentLength)
     actualObjectInfo mustEqual expectedObjectInfo
 
     testKit.stop(objectActorRef)
@@ -566,31 +566,46 @@ class BucketOperationsBehaviorSpec
     testKit.stop(actorRef)
   }
 
-  it should "set delete marker on an object" in {
+  it should "delete an object from non-version bucket" in {
     val key = "sample.txt"
-
-    val expected = DeleteInfo(deleteMarker = false, NotExists)
+    val expected = data.ObjectInfo(defaultBucketName, key, status = ObjectStatus.Deleted)
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
     actorRef ! DeleteObjectWrapper(key, replyTo = probe.ref)
-    val actual = probe.receiveMessage().asInstanceOf[DeleteInfo]
+    val actual = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
     expected mustEqual actual
 
     testKit.stop(objectActorRef)
     testKit.stop(actorRef)
   }
 
-  it should "delete an object" in {
+  it should "set delete marker on an object in versioned bucket" in {
     val key = "sample.txt"
-
-    val expected = DeleteInfo(deleteMarker = true, NotExists)
+    val index = 3
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
+    val expected = data.ObjectInfo(versionedBucketName, key, status = ObjectStatus.DeleteMarker, versionId = Some(versionId))
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
-    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
     actorRef ! DeleteObjectWrapper(key, replyTo = probe.ref)
-    val actual = probe.receiveMessage().asInstanceOf[DeleteInfo]
-    actual mustEqual expected
+    val actual = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
+    expected mustEqual actual
+
+    testKit.stop(objectActorRef)
+    testKit.stop(actorRef)
+  }
+
+  it should "Get the object which is a delete marker" in {
+    val key = "sample.txt"
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), 3)
+    val expected = data.ObjectInfo(versionedBucketName, key, status = ObjectStatus.DeleteMarker, versionId = Some(versionId))
+    val probe = testKit.createTestProbe[Event]()
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), versionedBucketNameUUID)
+    actorRef ! GetObjectWrapper(key, replyTo = probe.ref)
+    val actual = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
+    expected mustEqual actual
 
     testKit.stop(objectActorRef)
     testKit.stop(actorRef)

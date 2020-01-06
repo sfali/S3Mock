@@ -1,7 +1,7 @@
 package com.loyalty.testing.s3
 
 import com.loyalty.testing.s3.notification.Notification
-import com.loyalty.testing.s3.repositories.model.ObjectKey
+import com.loyalty.testing.s3.repositories.model.{ObjectKey, ObjectStatus}
 
 package object data {
 
@@ -14,20 +14,23 @@ package object data {
 
   case class ObjectInfo(bucketName: String,
                         key: String,
-                        eTag: String,
+                        eTag: Option[String],
                         contentLength: Long,
+                        status: ObjectStatus,
                         versionId: Option[String] = None)
 
   object ObjectInfo {
     def apply(bucketName: String,
               key: String,
-              eTag: String,
-              contentLength: Long,
+              eTag: Option[String] = None,
+              contentLength: Long = 0L,
+              status: ObjectStatus = ObjectStatus.Active,
               versionId: Option[String] = None): ObjectInfo =
-      new ObjectInfo(bucketName, key, eTag, contentLength, versionId)
+      new ObjectInfo(bucketName, key, eTag, contentLength, status, versionId)
 
     def apply(objectKey: ObjectKey): ObjectInfo =
-      ObjectInfo(objectKey.bucketName, objectKey.key, objectKey.eTag.getOrElse(""), objectKey.contentLength, objectKey.actualVersionId)
+      ObjectInfo(objectKey.bucketName, objectKey.key, objectKey.eTag, objectKey.contentLength, objectKey.status,
+        objectKey.actualVersionId)
   }
 
 }

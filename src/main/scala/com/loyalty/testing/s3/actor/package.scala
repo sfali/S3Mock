@@ -1,6 +1,7 @@
 package com.loyalty.testing.s3
 
 import com.loyalty.testing.s3.repositories.NitriteDatabase
+import com.loyalty.testing.s3.repositories.model.ObjectStatus
 import com.loyalty.testing.s3.request.ListBucketParams
 import com.loyalty.testing.s3.response.BucketContent
 import org.slf4j.Logger
@@ -13,7 +14,7 @@ package object actor {
                   log: Logger): List[BucketContent] = {
     val maybePrefix = params.maybePrefix
     val maybeDelimiter = params.maybeDelimiter
-    val objects = database.getAllObjects(bucketName).filter(_.deleteMarker.isEmpty)
+    val objects = database.getAllObjects(bucketName).filter(_.status == ObjectStatus.Active) // TODO: get only active objects
     val filteredObjects =
       maybePrefix match {
         case None => objects

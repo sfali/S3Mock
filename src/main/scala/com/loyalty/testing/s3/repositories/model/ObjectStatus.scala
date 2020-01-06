@@ -13,4 +13,6 @@ object ObjectStatus extends Enum[ObjectStatus] with CirceEnum[ObjectStatus] {
   case object DeleteMarker extends ObjectStatus
 
   case object Deleted extends ObjectStatus
+
+  case object DeleteMarkerDeleted extends ObjectStatus
 }

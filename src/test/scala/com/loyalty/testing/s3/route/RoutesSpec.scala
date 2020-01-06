@@ -211,6 +211,7 @@ class RoutesSpec
       status mustEqual OK
       getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest1""""))
       getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, md5Digest1))
+      getHeader(headers, DeleteMarkerHeader) mustBe empty
       response.entity.contentLengthOption mustBe Some(Files.size(path))
       expectedContent mustEqual getContent(response)
     }
@@ -224,6 +225,7 @@ class RoutesSpec
       status mustEqual OK
       getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest1""""))
       getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, md5Digest1))
+      getHeader(headers, DeleteMarkerHeader) mustBe empty
       response.entity.contentLengthOption mustBe Some(53)
       expectedContent mustEqual getContent(response)
     }
@@ -393,6 +395,59 @@ class RoutesSpec
     completeMultipartUpload(bucket2, key, uploadId, partInfos)
   }
 
+  it should "delete an object from non-version bucket" in {
+    val key = "sample.txt"
+    Delete(s"/$defaultBucketName/$key") ~> routes ~> check {
+      status mustEqual NoContent
+      getHeader(headers, DeleteMarkerHeader) mustBe empty
+    }
+  }
+
+  it should "get NoSuchKey when attempt to GET a deleted object" in {
+    val key = "sample.txt"
+    Get(s"/$defaultBucketName/$key") ~> routes ~> check {
+      status mustEqual NotFound
+      responseAs[NoSuchKeyResponse] mustEqual NoSuchKeyResponse(defaultBucketName, key)
+      getHeader(headers, DeleteMarkerHeader) mustBe empty
+    }
+  }
+
+  it should "set delete marker on an object in versioned bucket" in {
+    val key = "sample.txt"
+    Delete(s"/$versionedBucketName/$key") ~> routes ~> check {
+      status mustEqual NoContent
+      getHeader(headers, DeleteMarkerHeader) mustBe empty
+      val versionId = createVersionId(createObjectId(versionedBucketName, key), 3)
+      getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, versionId))
+    }
+  }
+
+  it should "get 404(NotFound) with delete marker header set if GET is called on an object which is a delete marker" in {
+    val key = "sample.txt"
+    Get(s"/$versionedBucketName/$key") ~> routes ~> check {
+      status mustEqual NotFound
+      getHeader(headers, DeleteMarkerHeader) mustBe Some(RawHeader(DeleteMarkerHeader, "true"))
+      val versionId = createVersionId(createObjectId(versionedBucketName, key), 3)
+      getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, versionId))
+    }
+  }
+
+  it should "remove delete marker, will make object re-appear" in {
+    val key = "sample.txt"
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), 3)
+    Delete(s"/$versionedBucketName/$key?versionId=$versionId") ~> routes ~> check {
+      status mustEqual NoContent
+      getHeader(headers, DeleteMarkerHeader) mustBe Some(RawHeader(DeleteMarkerHeader, "true"))
+      getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, versionId))
+    }
+    Get(s"/$versionedBucketName/$key") ~> routes ~> check {
+      status mustEqual OK
+      val versionId = createVersionId(createObjectId(versionedBucketName, key), 2)
+      getHeader(headers, DeleteMarkerHeader) mustBe empty
+      getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, versionId))
+    }
+  }
+
   private def initiateMultiPartUpload(bucketName: String,
                                       key: String,
                                       version: BucketVersioning = BucketVersioning.NotExists,
@@ -463,30 +518,6 @@ class RoutesSpec
     Post(s"/$bucketName/$key?uploadId=$uploadId", HttpEntity(xmlContentType, xml)) ~> routes ~> check {
       status mustEqual OK
       responseAs[CompleteMultipartUploadResult] mustEqual expectedResult
-    }
-  }
-
-  it should "set delete marker on an object" in {
-    val key: String = "sample.txt"
-    Delete(s"/$defaultBucketName/$key") ~> routes ~> check {
-      status mustEqual NoContent
-      getHeader(headers, DeleteMarkerHeader) mustBe empty
-    }
-  }
-
-  it should "result in 404(NotFound) when attempt to get an item which is flag with delete marker" in {
-    val key = "sample.txt"
-    Get(s"/$defaultBucketName/$key") ~> routes ~> check {
-      status mustEqual NotFound
-      getHeader(headers, DeleteMarkerHeader) mustBe Some(RawHeader(DeleteMarkerHeader, "true"))
-    }
-  }
-
-  it should "permanently delete an object" in {
-    val key: String = "sample.txt"
-    Delete(s"/$defaultBucketName/$key") ~> routes ~> check {
-      status mustEqual NoContent
-      getHeader(headers, DeleteMarkerHeader) mustBe Some(RawHeader(DeleteMarkerHeader, "true"))
     }
   }
 

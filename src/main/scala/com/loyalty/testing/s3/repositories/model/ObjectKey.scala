@@ -19,13 +19,15 @@ case class ObjectKey(id: UUID,
                      contentLength: Long,
                      objectPath: Option[String],
                      lastModifiedTime: OffsetDateTime,
-                     deleteMarker: Option[Boolean],
-                     uploadId: Option[String]) {
+                     uploadId: Option[String],
+                     deleteMarker: Option[Boolean] = None) {
   def actualVersionId: Option[String] =
     version match {
       case BucketVersioning.Enabled => Some(versionId)
       case _ => None
     }
+
+  def isDeleted: Boolean = status == ObjectStatus.Deleted || status == ObjectStatus.DeleteMarkerDeleted
 }
 
 object ObjectKey {
@@ -41,8 +43,8 @@ object ObjectKey {
             contentLength: Long = 0L,
             objectPath: Option[String] = None,
             lastModifiedTime: OffsetDateTime = OffsetDateTime.now,
-            deleteMarker: Option[Boolean] = None,
-            uploadId: Option[String] = None): ObjectKey =
+            uploadId: Option[String] = None,
+            deleteMarker: Option[Boolean] = None): ObjectKey =
     new ObjectKey(
       id,
       bucketName,
@@ -56,8 +58,8 @@ object ObjectKey {
       contentLength,
       objectPath,
       lastModifiedTime,
-      deleteMarker,
-      uploadId
+      uploadId,
+      deleteMarker
     )
 
   def apply(doc: Document): ObjectKey =
@@ -74,7 +76,6 @@ object ObjectKey {
       contentLength = doc.getLong(ContentLengthField),
       objectPath = doc.getOptionalString(PathField),
       lastModifiedTime = doc.getLastModifiedTime.toOffsetDateTime,
-      deleteMarker = doc.getOptionalBoolean(DeleteMarkerField),
       uploadId = doc.getOptionalString(UploadIdField)
     )
 }

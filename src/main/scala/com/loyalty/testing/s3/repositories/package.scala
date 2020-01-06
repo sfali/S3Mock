@@ -31,7 +31,6 @@ package object repositories {
   val ContentLengthField = "content-length"
   val VersionIndexField = "version-index"
   val VersionIdField = "version-id"
-  val DeleteMarkerField = "delete-marker"
   val UploadIdField = "upload-id"
   val PartNumberField = "part-number"
   val NonVersionId: UUID => String = objectId => createVersionId(objectId, 0)

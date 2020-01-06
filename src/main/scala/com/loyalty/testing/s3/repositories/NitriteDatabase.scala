@@ -61,13 +61,7 @@ class NitriteDatabase(rootPath: Path,
   def getAllObjects(objectId: UUID): Future[List[ObjectKey]] =
     Future.successful(objectCollection.findAll(objectId))
 
-  def createObject(objectKey: ObjectKey): Future[ObjectKey] = Future.successful(objectCollection.createObject(objectKey))
-
-  def deleteObject(objectId: UUID, maybeVersionId: Option[String], permanentDelete: Boolean): Future[Done] =
-    Try(objectCollection.deleteObject(objectId, maybeVersionId, permanentDelete)) match {
-      case Failure(ex) => Future.failed(ex)
-      case Success(_) => Future.successful(Done)
-    }
+  def createOrUpdateObject(objectKey: ObjectKey): Future[ObjectKey] = Future.successful(objectCollection.createOrUpdateObject(objectKey))
 
   def findUploads: Future[List[UploadInfo]] = Future.successful(uploadStagingCollection.findAll)
 
@@ -94,6 +88,18 @@ class NitriteDatabase(rootPath: Path,
     Try(uploadStagingCollection.deleteUpload(uploadId, partNumber)) match {
       case Failure(ex) => Future.failed(ex)
       case Success(_) => Future.successful(Done)
+    }
+
+  def deleteUpload(maybeUploadId: Option[String]): Future[Int] =
+    maybeUploadId match {
+      case Some(uploadId) =>
+        Try(uploadCollection.deleteAll(uploadId)) match {
+          case Failure(ex) =>
+            log.error(s"Unable to delete upload: $uploadId", ex)
+            Future.successful(0)
+          case Success(value) => Future.successful(value)
+        }
+      case None => Future.successful(0)
     }
 
   def findNotifications(bucketName: String): List[Notification] = notificationCollection.findNotifications(bucketName)
