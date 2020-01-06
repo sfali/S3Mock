@@ -35,7 +35,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
 
   private implicit val ec: ExecutionContext = context.system.executionContext
   private var versionIndex = 0
-  private var objects: List[ObjectKey] = Nil
+  private val holder = ObjectKeyHolder()
   private var uploadInfo: Option[UploadInfo] = None
   private var uploadParts: Map[String, Set[UploadInfo]] = Map.empty
   private val objectId = UUID.fromString(context.self.path.name)
@@ -56,10 +56,8 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
         Behaviors.same
 
       case ObjectResult(objects, uploads) =>
-        val tuples = objects.map(ok => (ok.index, ok.versionId))
-        context.log.info("Current values: {} for {}", tuples, objectId)
-        versionIndex = tuples.lastOption.map(_._1).getOrElse(0)
-        this.objects = objects
+        versionIndex = objects.lastOption.map(_.index).getOrElse(0)
+        this.holder.addAll(objects)
         val uploadsMap = uploads.groupBy(_.uploadId)
         if (uploadsMap.nonEmpty) {
           val ls = uploadsMap.head._2
@@ -101,10 +99,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
         Behaviors.same
 
       case GetObject(bucket, key, maybeVersionId, maybeRange, replyTo) =>
-        val maybeString = sanitizeVersionId(bucket, maybeVersionId)
-        val maybeObjectKey = getObject(maybeString)
-        println(s"${getClass.getSimpleName}: $maybeVersionId, $maybeString, $maybeObjectKey")
-        println(objects)
+        val maybeObjectKey = holder.getObject(sanitizeVersionId(bucket, maybeVersionId))
         val command =
           maybeObjectKey match {
             case None => ReplyToSender(NoSuchKeyExists(bucket.bucketName, key), replyTo)
@@ -127,7 +122,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
 
       case DeleteObject(bucket, key, maybeVersionId, replyTo) =>
         val maybeSanitizedVersionId = sanitizeVersionId(bucket, maybeVersionId)
-        getObject(maybeSanitizedVersionId) match {
+        holder.getObject(maybeSanitizedVersionId) match {
           case Some(objectKey) =>
             (maybeSanitizedVersionId, bucket.version) match {
               case (None, Enabled) =>
@@ -232,7 +227,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
         Behaviors.same
 
       case GetObjectMeta(bucket, key, replyTo) =>
-        val maybeObjectKey = objects.find(_.id == objectId)
+        val maybeObjectKey = holder.objects.find(_.id == objectId)
         val event = maybeObjectKey.map(ObjectInfo.apply).getOrElse(NoSuchKeyExists(bucket.bucketName, key))
         context.self ! ReplyToSender(event, replyTo)
         Behaviors.same
@@ -246,17 +241,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
             objectKey.contentLength, objectKey.eTag.getOrElse(""), maybeOperation.get, objectKey.actualVersionId)
           notificationActorRef ! ShardingEnvelope(bucketName.toUUID.toString, SendNotification(notificationData))
         }
-        objects =
-          maybeObjectKey match {
-            case Some(objectKey) =>
-              objectKey.version match {
-                case BucketVersioning.Enabled => objects :+ objectKey
-                case _ =>
-                  val _objs = objects.filterNot(_.id == objectKey.id)
-                  (_objs :+ objectKey).sortBy(_.index)
-              }
-            case None => objects
-          }
+        if (maybeObjectKey.isDefined) holder.add(maybeObjectKey.get)
         replyTo ! reply
         Behaviors.same
 
@@ -265,12 +250,6 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
       case other =>
         context.log.warn("unhandled message: {}", other)
         Behaviors.unhandled
-    }
-
-  private def getObject(maybeVersionId: Option[String]) =
-    maybeVersionId match {
-      case Some(versionId) => objects.filter(_.versionId == versionId).lastOption
-      case None => objects.filterNot(_.status == ObjectStatus.DeleteMarkerDeleted).lastOption
     }
 
 }

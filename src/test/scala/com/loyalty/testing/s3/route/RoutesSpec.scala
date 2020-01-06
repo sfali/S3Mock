@@ -448,6 +448,21 @@ class RoutesSpec
     }
   }
 
+  it should "delete an object with versionId provided" in {
+    val key = "sample.txt"
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), 1)
+    val uri = s"/$versionedBucketName/$key?versionId=$versionId"
+    Delete(uri) ~> routes ~> check {
+      status mustEqual NoContent
+      getHeader(headers, DeleteMarkerHeader) mustBe empty
+      getHeader(headers, VersionIdHeader) mustBe Some(RawHeader(VersionIdHeader, versionId))
+    }
+    Get(uri) ~> routes ~> check {
+      status mustEqual NotFound
+      responseAs[NoSuchKeyResponse] mustEqual NoSuchKeyResponse(versionedBucketName, key)
+    }
+  }
+
   private def initiateMultiPartUpload(bucketName: String,
                                       key: String,
                                       version: BucketVersioning = BucketVersioning.NotExists,
