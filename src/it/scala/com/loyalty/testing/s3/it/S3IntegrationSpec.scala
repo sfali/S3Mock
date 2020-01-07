@@ -112,7 +112,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val key = "sample.txt"
     val path = resourcePath -> key
     val actualObjectInfo = s3Client.putObject(defaultBucketName, key, path).futureValue
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest, Files.size(path))
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest), Files.size(path))
     actualObjectInfo mustEqual expectedObjectInfo
   }
 
@@ -120,7 +120,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val key = "sample.txt"
     val path = resourcePath -> "sample1.txt"
     val actualObjectInfo = s3Client.putObject(defaultBucketName, key, path).futureValue
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, Files.size(path))
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), Files.size(path))
     actualObjectInfo mustEqual expectedObjectInfo
   }
 
@@ -129,7 +129,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val key = s"input/$fileName"
     val path = resourcePath -> fileName
     val actualObjectInfo = s3Client.putObject(defaultBucketName, key, path).futureValue
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest, Files.size(path))
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest), Files.size(path))
     actualObjectInfo mustEqual expectedObjectInfo
   }
 
@@ -147,7 +147,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val index = 1
     val actualObjectKey = s3Client.putObject(versionedBucketName, key, path).futureValue
     val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
-    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, Files.size(path), Some(versionId))
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, Some(etagDigest), Files.size(path), versionId = Some(versionId))
     actualObjectKey mustEqual expectedObjectInfo
   }
 
@@ -157,7 +157,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val index = 2
     val actualObjectInfo = s3Client.putObject(versionedBucketName, key, path).futureValue
     val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
-    val expectedObjectKey = data.ObjectInfo(versionedBucketName, key, etagDigest1, Files.size(path), Some(versionId))
+    val expectedObjectKey = data.ObjectInfo(versionedBucketName, key, Some(etagDigest1), Files.size(path), versionId = Some(versionId))
     actualObjectInfo mustEqual expectedObjectKey
   }
 
@@ -165,7 +165,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val key = "sample.txt"
     val path = resourcePath -> "sample1.txt"
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, Files.size(path))
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), Files.size(path))
     val (actualContent, actualObjectInfo) = s3Client.getObject(defaultBucketName, key).futureValue
     actualContent mustEqual expectedContent
     actualObjectInfo mustEqual expectedObjectInfo
@@ -174,7 +174,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
   it should "get object with range between two positions from the start of file" in {
     val key = "sample.txt"
     val expectedContent = "1. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length)
     val range = ByteRange(0, 53)
     val (actualContent, actualObjectKey) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
     actualContent mustEqual expectedContent
@@ -184,7 +184,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
   it should "get object with range between two positions from the middle of file" in {
     val key = "sample.txt"
     val expectedContent = "6. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length)
     val range = ByteRange(265, 318)
     val (actualContent, actualObjectInfo) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
     actualContent mustEqual expectedContent
@@ -194,7 +194,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
   it should "get object with suffix range" in {
     val key = "sample.txt"
     val expectedContent = "8. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length)
     val range = ByteRange.suffix(53)
     val (actualContent, actualObjectInfo) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
     actualContent mustEqual expectedContent
@@ -204,7 +204,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
   it should "get object with range with offset" in {
     val key = "sample.txt"
     val expectedContent = "8. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, etagDigest1, expectedContent.length)
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length)
     val range = ByteRange.fromOffset(371)
     val (actualContent, actualObjectInfo) = s3Client.getObject(defaultBucketName, key, maybeRange = Some(range)).futureValue
     actualContent mustEqual expectedContent
@@ -217,7 +217,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 2
     val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
-    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest1, expectedContent.length, Some(versionId))
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, Some(etagDigest1), expectedContent.length, versionId = Some(versionId))
     val (actualContent, actualObjectKey) = s3Client.getObject(versionedBucketName, key).futureValue
     actualContent mustEqual expectedContent
     actualObjectKey mustEqual expectedObjectInfo
@@ -229,7 +229,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
     val index = 1
     val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
-    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, etagDigest, expectedContent.length, Some(versionId))
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, Some(etagDigest), expectedContent.length, versionId = Some(versionId))
     val (actualContent, actualObjectInfo) = s3Client.getObject(versionedBucketName, key, maybeVersionId = Some(versionId)).futureValue
     actualContent mustEqual expectedContent
     actualObjectInfo mustEqual expectedObjectInfo
@@ -329,41 +329,59 @@ abstract class S3IntegrationSpec(resourceBasename: String)
     println(actualResult) // TODO: validate
   }
 
-  it should "set delete marker on an object" in {
+  it should "delete an object from non-version bucket" in {
     val key = "sample.txt"
     val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(defaultBucketName, key).futureValue
     maybeDeleteMarker mustBe empty
     maybeVersionId mustBe empty
   }
 
-  it should "result in 404(NotFound) when attempt to get an item which is flag with delete marker" in {
+  it should "get NoSuchKey when attempt to GET a deleted object" in {
     val key = "sample.txt"
     val ex = s3Client.getObject(defaultBucketName, key).failed.futureValue
     extractErrorResponse(ex).statusCode mustEqual 404
   }
 
-  it should "permanently delete an object" in {
+  it should "set delete marker on an object in versioned bucket" in {
     val key = "sample.txt"
-    val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(defaultBucketName, key).futureValue
-    maybeDeleteMarker mustBe Some(true)
-    maybeVersionId mustBe empty
-  }
-
-  it should "set delete marker on latest object on a versioned bucket" in {
-    val key = "sample.txt"
-    val versionId = createVersionId(createObjectId(versionedBucketName, key), 2)
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), 3)
     val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(versionedBucketName, key).futureValue
     maybeDeleteMarker mustBe empty
     maybeVersionId mustBe Some(versionId)
   }
 
-  it should "set delete marker on by version id" in {
+  it should "get 404(NotFound) with delete marker header set if GET is called on an object which is a delete marker" in {
     val key = "sample.txt"
-    val index = 1
-    val versionId = createVersionId(createObjectId(versionedBucketName, key), index)
+    val ex = s3Client.getObject(versionedBucketName, key).failed.futureValue
+    extractErrorResponse(ex).statusCode mustEqual 404
+  }
+
+  it should "remove delete marker, will make object re-appear" in {
+    val key = "sample.txt"
+    var versionId = createVersionId(createObjectId(versionedBucketName, key), 3)
+    val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(versionedBucketName, key, Some(versionId)).futureValue
+    maybeDeleteMarker mustBe Some(true)
+    maybeVersionId mustBe Some(versionId)
+
+    val path = resourcePath -> "sample1.txt"
+    val expectedContent = FileIO.fromPath(path).map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+    versionId = createVersionId(createObjectId(versionedBucketName, key), 2)
+    val expectedObjectInfo = data.ObjectInfo(versionedBucketName, key, Some(etagDigest1), Files.size(path),
+      versionId = Some(versionId))
+    val (actualContent, actualObjectInfo) = s3Client.getObject(versionedBucketName, key).futureValue
+    actualContent mustEqual expectedContent
+    actualObjectInfo mustEqual expectedObjectInfo
+  }
+
+  it should "delete an object with versionId provided" in {
+    val key = "sample.txt"
+    val versionId = createVersionId(createObjectId(versionedBucketName, key), 1)
     val (maybeDeleteMarker, maybeVersionId) = s3Client.deleteObject(versionedBucketName, key, Some(versionId)).futureValue
     maybeDeleteMarker mustBe empty
     maybeVersionId mustBe Some(versionId)
+
+    val ex = s3Client.getObject(versionedBucketName, key, Some(versionId)).failed.futureValue
+    extractErrorResponse(ex).statusCode mustEqual 404
   }
 
   @scala.annotation.tailrec

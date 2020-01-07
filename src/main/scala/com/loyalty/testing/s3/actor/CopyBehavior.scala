@@ -154,7 +154,7 @@ object CopyBehavior {
           replyTo ! CopyPartInfo(uploadInfo, sourceVersionId)
           Behaviors.same
 
-        case EventWrapper(ObjectInfo(objectKey)) if objectKey.deleteMarker.contains(true) =>
+        case EventWrapper(ObjectInfo(objectKey)) if objectKey.isDeleted =>
           replyTo ! ObjectInfo(objectKey)
           Behaviors.same
 

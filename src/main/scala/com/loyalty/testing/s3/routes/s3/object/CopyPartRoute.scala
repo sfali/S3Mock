@@ -47,11 +47,11 @@ object CopyPartRoute extends CustomMarshallers {
               )
             ).runWith(Sink.head)
         onComplete(eventualEvent) {
-          case Success(ObjectInfo(objectKey)) if objectKey.deleteMarker.contains(true) =>
+          case Success(ObjectInfo(objectKey)) if objectKey.isDeleted =>
             complete(HttpResponse(NotFound).withHeaders(createResponseHeaders(objectKey)))
           case Success(CopyPartInfo(uploadInfo, sourceVersionId)) =>
             val objectKey = uploadInfo.toObjectKey
-            complete(CopyPartResult(objectKey.eTag, objectKey.actualVersionId, sourceVersionId))
+            complete(CopyPartResult(objectKey.eTag.getOrElse(""), objectKey.actualVersionId, sourceVersionId))
           case Success(ObjectInfo(_)) =>
             system.log.warn("CopyPartRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
             complete(InternalServiceResponse(s"$bucketName/$key"))

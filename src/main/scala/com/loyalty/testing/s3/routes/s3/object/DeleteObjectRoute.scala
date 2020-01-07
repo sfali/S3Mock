@@ -1,8 +1,5 @@
 package com.loyalty.testing.s3.routes.s3.`object`
 
-import java.time.OffsetDateTime
-import java.util.UUID
-
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.http.scaladsl.model.HttpResponse
@@ -13,9 +10,8 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.typed.scaladsl.ActorFlow
 import akka.util.Timeout
 import com.loyalty.testing.s3._
-import com.loyalty.testing.s3.actor.model.bucket.{Command, DeleteObjectWrapper}
 import com.loyalty.testing.s3.actor.model._
-import com.loyalty.testing.s3.repositories.model.ObjectKey
+import com.loyalty.testing.s3.actor.model.bucket.{Command, DeleteObjectWrapper}
 import com.loyalty.testing.s3.response.{InternalServiceResponse, NoSuchBucketResponse, NoSuchKeyResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
@@ -41,22 +37,8 @@ object DeleteObjectRoute extends CustomMarshallers {
               )
             ).runWith(Sink.head)
         onComplete(eventualEvent) {
-          case Success(DeleteInfo(deleteMarker, version, maybeVersionId)) =>
-            val objectKey = ObjectKey(
-              id = UUID.randomUUID(),
-              bucketName = bucketName,
-              key = key,
-              index = 0,
-              version = version,
-              versionId = maybeVersionId.getOrElse(""),
-              eTag = "",
-              contentMd5 = "",
-              contentLength = 0,
-              objectPath = ".",
-              lastModifiedTime = OffsetDateTime.now,
-              deleteMarker = Some(deleteMarker)
-            )
-            complete(HttpResponse(NoContent).withHeaders(createResponseHeaders(objectKey)))
+          case Success(ObjectInfo(objectKey)) => complete(HttpResponse(NoContent)
+            .withHeaders(createResponseHeaders(objectKey)))
           case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
           case Success(NoSuchKeyExists(bucketName, key)) => complete(NoSuchKeyResponse(bucketName, key))
           case Success(InvalidAccess) =>

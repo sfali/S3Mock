@@ -1,6 +1,7 @@
 package com.loyalty.testing.s3
 
 import com.loyalty.testing.s3.repositories.NitriteDatabase
+import com.loyalty.testing.s3.repositories.model.{ObjectKey, ObjectStatus}
 import com.loyalty.testing.s3.request.ListBucketParams
 import com.loyalty.testing.s3.response.BucketContent
 import org.slf4j.Logger
@@ -13,7 +14,7 @@ package object actor {
                   log: Logger): List[BucketContent] = {
     val maybePrefix = params.maybePrefix
     val maybeDelimiter = params.maybeDelimiter
-    val objects = database.getAllObjects(bucketName).filter(_.deleteMarker.isEmpty)
+    val objects = database.getAllObjects(bucketName).filter(_.status == ObjectStatus.Active) // TODO: get only active objects
     val filteredObjects =
       maybePrefix match {
         case None => objects
@@ -45,4 +46,27 @@ package object actor {
       }
     bucketContents.toSet.toList.take(params.maxKeys)
   }
+
+  class ObjectKeyHolder {
+    private var _buffer: Map[String, ObjectKey] = Map.empty
+
+    def addAll(ls: List[ObjectKey]): Unit = _buffer = ls.map(objectKey => objectKey.versionId -> objectKey).toMap
+
+    def add(objectKey: ObjectKey): Unit = _buffer += (objectKey.versionId -> objectKey)
+
+    def getObject(maybeVersionId: Option[String]): Option[ObjectKey] = {
+      val objects = this.objects
+      maybeVersionId match {
+        case Some(versionId) => objects.filter(_.versionId == versionId).lastOption
+        case None => objects.filterNot(_.status == ObjectStatus.DeleteMarkerDeleted).lastOption
+      }
+    }
+
+    def objects: List[ObjectKey] = _buffer.values.toList.sortBy(_.index)
+  }
+
+  object ObjectKeyHolder {
+    def apply(): ObjectKeyHolder = new ObjectKeyHolder()
+  }
+
 }

@@ -16,6 +16,7 @@ package object repositories {
   val IdField = "id"
   val RegionField = "region"
   val VersionField = "version"
+  val StatusField = "status"
   val NotificationNameField = "notification-name"
   val NotificationTypeField = "notification-type"
   val OperationTypeField = "operation-type"
@@ -30,7 +31,6 @@ package object repositories {
   val ContentLengthField = "content-length"
   val VersionIndexField = "version-index"
   val VersionIdField = "version-id"
-  val DeleteMarkerField = "delete-marker"
   val UploadIdField = "upload-id"
   val PartNumberField = "part-number"
   val NonVersionId: UUID => String = objectId => createVersionId(objectId, 0)

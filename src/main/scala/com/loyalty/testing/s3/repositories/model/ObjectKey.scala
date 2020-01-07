@@ -13,18 +13,21 @@ case class ObjectKey(id: UUID,
                      index: Int,
                      version: BucketVersioning,
                      versionId: String,
-                     eTag: String,
-                     contentMd5: String,
+                     status: ObjectStatus,
+                     eTag: Option[String],
+                     contentMd5: Option[String],
                      contentLength: Long,
-                     objectPath: String,
+                     objectPath: Option[String],
                      lastModifiedTime: OffsetDateTime,
-                     deleteMarker: Option[Boolean],
-                     uploadId: Option[String]) {
+                     uploadId: Option[String],
+                     deleteMarker: Option[Boolean] = None) {
   def actualVersionId: Option[String] =
     version match {
       case BucketVersioning.Enabled => Some(versionId)
       case _ => None
     }
+
+  def isDeleted: Boolean = status == ObjectStatus.Deleted || status == ObjectStatus.DeleteMarkerDeleted
 }
 
 object ObjectKey {
@@ -34,13 +37,14 @@ object ObjectKey {
             index: Int,
             version: BucketVersioning,
             versionId: String,
-            eTag: String,
-            contentMd5: String,
-            contentLength: Long,
-            objectPath: String,
+            status: ObjectStatus = ObjectStatus.Active,
+            eTag: Option[String] = None,
+            contentMd5: Option[String] = None,
+            contentLength: Long = 0L,
+            objectPath: Option[String] = None,
             lastModifiedTime: OffsetDateTime = OffsetDateTime.now,
-            deleteMarker: Option[Boolean] = None,
-            uploadId: Option[String] = None): ObjectKey =
+            uploadId: Option[String] = None,
+            deleteMarker: Option[Boolean] = None): ObjectKey =
     new ObjectKey(
       id,
       bucketName,
@@ -48,13 +52,14 @@ object ObjectKey {
       index,
       version,
       versionId,
+      status,
       eTag,
       contentMd5,
       contentLength,
       objectPath,
       lastModifiedTime,
-      deleteMarker,
-      uploadId
+      uploadId,
+      deleteMarker
     )
 
   def apply(doc: Document): ObjectKey =
@@ -65,12 +70,12 @@ object ObjectKey {
       index = doc.getInt(VersionIndexField),
       version = BucketVersioning.withName(doc.getString(VersionField)),
       versionId = doc.getString(VersionIdField),
-      eTag = doc.getString(ETagField),
-      contentMd5 = doc.getString(ContentMd5Field),
+      status = ObjectStatus.withName(doc.getString(StatusField)),
+      eTag = doc.getOptionalString(ETagField),
+      contentMd5 = doc.getOptionalString(ContentMd5Field),
       contentLength = doc.getLong(ContentLengthField),
-      objectPath = doc.getString(PathField),
+      objectPath = doc.getOptionalString(PathField),
       lastModifiedTime = doc.getLastModifiedTime.toOffsetDateTime,
-      deleteMarker = doc.getOptionalBoolean(DeleteMarkerField),
       uploadId = doc.getOptionalString(UploadIdField)
     )
 }

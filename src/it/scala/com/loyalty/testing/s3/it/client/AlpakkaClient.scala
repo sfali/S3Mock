@@ -50,7 +50,7 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
           data.ObjectInfo(
             bucketName = bucketName,
             key = key,
-            eTag = objectMetadata.eTag.getOrElse(""),
+            eTag = objectMetadata.eTag,
             contentLength = contentLength,
             versionId = objectMetadata.versionId,
           )
@@ -81,7 +81,7 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
           val objectKey = data.ObjectInfo(
             bucketName = bucketName,
             key = key,
-            eTag = objectMetadata.eTag.getOrElse(""),
+            eTag = objectMetadata.eTag,
             contentLength = objectMetadata.getContentLength,
             versionId = objectMetadata.versionId
           )
@@ -112,7 +112,7 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
       .map(result => data.ObjectInfo(
         bucketName = result.bucket,
         key = result.key,
-        eTag = result.etag,
+        eTag = Some(result.etag),
         contentLength = 0,
         versionId = result.versionId
       ))

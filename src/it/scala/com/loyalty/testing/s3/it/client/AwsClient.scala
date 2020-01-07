@@ -10,7 +10,7 @@ import akka.http.scaladsl.model.headers.ByteRange.{FromOffset, Slice, Suffix}
 import com.github.matsluni.akkahttpspi.AkkaHttpClient
 import com.loyalty.testing.s3.{data, _}
 import com.loyalty.testing.s3.it._
-import com.loyalty.testing.s3.repositories.model.Bucket
+import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectStatus}
 import com.loyalty.testing.s3.request.BucketVersioning
 import com.loyalty.testing.s3.response.{CopyObjectResult, CopyPartResult}
 import software.amazon.awssdk.core.async.AsyncRequestBody
@@ -87,7 +87,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
           data.ObjectInfo(
             bucketName = bucketName,
             key = key,
-            eTag = response.eTag().drop(1).dropRight(1),
+            eTag = Option(response.eTag().drop(1).dropRight(1)),
             contentLength = contentLength,
             versionId = Option(response.versionId()),
           )
@@ -107,7 +107,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
           val objectInfo = data.ObjectInfo(
             bucketName = bucketName,
             key = key,
-            eTag = response.eTag().drop(1).dropRight(1),
+            eTag = Option(response.eTag().drop(1).dropRight(1)),
             contentLength = bytesResponse.asUtf8String().length,
             versionId = Option(response.versionId())
           )
@@ -127,8 +127,9 @@ class AwsClient(override protected val awsSettings: AwsSettings)
           data.ObjectInfo(
             bucketName,
             key,
-            response.eTag().drop(1).dropRight(1),
+            Option(response.eTag().drop(1).dropRight(1)),
             response.contentLength(),
+            ObjectStatus.Active,
             Option(response.versionId())
           )
       }
@@ -206,8 +207,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
           data.ObjectInfo(
             bucketName = response.bucket(),
             key = response.key(),
-            eTag = response.eTag().drop(1).dropRight(1),
-            contentLength = 0,
+            eTag = Option(response.eTag().drop(1).dropRight(1)),
             versionId = Option(response.versionId())
           )
       }
@@ -256,7 +256,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
       objectInfo <- completedMultipartUpload(targetBucketName, targetKey, uploadId, completedParts)
     } yield objectInfo)
       .map {
-        objectInfo => CopyPartResult(objectInfo.eTag, objectInfo.versionId)
+        objectInfo => CopyPartResult(objectInfo.eTag.get, objectInfo.versionId)
       }
   }
 

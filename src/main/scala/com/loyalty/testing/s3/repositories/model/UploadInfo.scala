@@ -25,10 +25,10 @@ case class UploadInfo(bucketName: String,
       index = versionIndex,
       version = version,
       versionId = versionId,
-      eTag = eTag,
-      contentMd5 = contentMd5,
+      eTag = Some(eTag),
+      contentMd5 = Some(contentMd5),
       contentLength = contentLength,
-      objectPath = toObjectDir(bucketName, key, version, versionId)
+      objectPath = Some(toObjectDir(bucketName, key, version, versionId))
     )
   }
 }

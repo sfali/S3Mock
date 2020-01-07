@@ -1,7 +1,6 @@
 package com.loyalty.testing.s3.repositories
 
 import java.nio.file.{Files, Path}
-import java.time.OffsetDateTime
 import java.util.UUID
 
 import akka.Done
@@ -48,11 +47,10 @@ class ObjectIO(root: Path, fileStream: FileStream) {
               index = versionIndex,
               version = bucket.version,
               versionId = versionId,
-              eTag = digestInfo.etag,
-              contentMd5 = digestInfo.md5,
+              eTag = Some(digestInfo.etag),
+              contentMd5 = Some(digestInfo.md5),
               contentLength = digestInfo.length,
-              objectPath = objectPath.getParent.getFileName.toString,
-              lastModifiedTime = OffsetDateTime.now()
+              objectPath = Some(objectPath.getParent.getFileName.toString)
             ))
       }
   }
@@ -110,11 +108,10 @@ class ObjectIO(root: Path, fileStream: FileStream) {
               index = uploadInfo.versionIndex,
               version = uploadInfo.version,
               versionId = versionId,
-              eTag = finalETag,
-              contentMd5 = digestInfo.md5,
+              eTag = Some(finalETag),
+              contentMd5 = Some(digestInfo.md5),
               contentLength = digestInfo.length,
-              objectPath = objectPath.getParent.getFileName.toString,
-              lastModifiedTime = OffsetDateTime.now(),
+              objectPath = Some(objectPath.getParent.getFileName.toString),
               uploadId = Some(uploadInfo.uploadId)
             ))
       }
