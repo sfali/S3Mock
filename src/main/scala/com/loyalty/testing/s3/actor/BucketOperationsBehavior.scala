@@ -133,7 +133,7 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
             case Failure(ex) =>
               context.log.error(s"unable to delete bucket: $bucketName", ex)
               Shutdown // TODO: reply properly
-            case Success(_) => ReplyToSender(BucketDeleted, replyTo)
+            case Success(_) => ReplyToSender(BucketDeleted(bucketName), replyTo)
           }
         context.self ! command
         Behaviors.same

@@ -643,6 +643,18 @@ class BucketOperationsBehaviorSpec
     testKit.stop(actorRef)
   }
 
+  it should "delete empty bucket" in {
+    val probe = testKit.createTestProbe[Event]()
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
+    actorRef ! DeleteBucket(probe.ref)
+    val event = probe.receiveMessage().asInstanceOf[BucketDeleted]
+    BucketDeleted(defaultBucketName) mustEqual event
+
+    testKit.stop(objectActorRef)
+    testKit.stop(actorRef)
+  }
+
   private def verifyUploadPart(key: String,
                                uploadId: String,
                                partNumber: Int,

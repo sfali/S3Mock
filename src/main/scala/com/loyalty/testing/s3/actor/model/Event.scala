@@ -22,7 +22,7 @@ case object NotificationsCreated extends Event
 
 final case class BucketInfo(bucket: Bucket) extends Event
 
-case object BucketDeleted extends Event
+final case class BucketDeleted(bucketName: String) extends Event
 
 final case class NotificationsInfo(notifications: List[Notification]) extends Event
 

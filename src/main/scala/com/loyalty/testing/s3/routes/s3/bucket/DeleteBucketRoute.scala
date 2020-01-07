@@ -35,7 +35,7 @@ object DeleteBucketRoute extends CustomMarshallers {
           )
           .runWith(Sink.head)
       onComplete(eventualEvent) {
-        case Success(BucketDeleted) => complete(HttpResponse(NoContent))
+        case Success(BucketDeleted(_)) => complete(HttpResponse(NoContent))
         case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
         case Success(BucketNotEmpty(_)) => complete(BucketNotEmptyResponse(bucketName))
         case Success(event: Event) =>
