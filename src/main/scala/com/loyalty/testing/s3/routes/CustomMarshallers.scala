@@ -26,6 +26,12 @@ trait CustomMarshallers
       case x => BucketAlreadyExistsResponse((x \ "Resource").text)
     }
 
+  implicit val BucketNotEmptyUnmarshaller: FromEntityUnmarshaller[BucketNotEmptyResponse] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x => BucketNotEmptyResponse((x \ "Resource").text)
+    }
+
   implicit val NoSuchBucketUnmarshaller: FromEntityUnmarshaller[NoSuchBucketResponse] =
     nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
       case NodeSeq.Empty => throw Unmarshaller.NoContentException
@@ -111,6 +117,9 @@ trait CustomMarshallers
   implicit val BucketAlreadyExistsMarshallers: ToEntityMarshaller[BucketAlreadyExistsResponse] =
     xmlResponseMarshallers(`application/octet-stream`)
 
+  implicit val BucketNotEmptyMarshallers: ToEntityMarshaller[BucketNotEmptyResponse] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
   implicit val NoSuchBucketMarshallers: ToEntityMarshaller[NoSuchBucketResponse] =
     xmlResponseMarshallers(`application/octet-stream`)
 
@@ -147,6 +156,9 @@ trait CustomMarshallers
 
   implicit val BucketAlreadyExistsResponseMarshaller: ToResponseMarshaller[BucketAlreadyExistsResponse] =
     fromToEntityMarshaller[BucketAlreadyExistsResponse](BadRequest)
+
+  implicit val BucketNotEmptyResponseMarshaller: ToResponseMarshaller[BucketNotEmptyResponse] =
+    fromToEntityMarshaller[BucketNotEmptyResponse](Conflict)
 
   implicit val NoSuchBucketResponseMarshaller: ToResponseMarshaller[NoSuchBucketResponse] =
     fromToEntityMarshaller[NoSuchBucketResponse](NotFound)

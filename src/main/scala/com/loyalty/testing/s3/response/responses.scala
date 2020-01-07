@@ -145,6 +145,12 @@ case class BucketAlreadyExistsResponse(bucketName: String) extends ErrorResponse
   override val resource: String = bucketName
 }
 
+case class BucketNotEmptyResponse(bucketName: String) extends ErrorResponse {
+  override val code: String = BucketAlreadyExists
+  override val message: String = "The bucket you tried to delete is not empty"
+  override val resource: String = bucketName
+}
+
 case class NoSuchBucketResponse(bucketName: String) extends ErrorResponse {
   override val code: String = NoSuchBucket
   override val message: String = "The specified bucket does not exist"

@@ -475,6 +475,13 @@ class RoutesSpec
     }
   }
 
+  it should "not delete non-empty bucket" in {
+    Delete(s"/$defaultBucketName") ~> routes ~> check {
+      status mustEqual Conflict
+      responseAs[BucketNotEmptyResponse] mustEqual BucketNotEmptyResponse(defaultBucketName)
+    }
+  }
+
   private def initiateMultiPartUpload(bucketName: String,
                                       key: String,
                                       version: BucketVersioning = BucketVersioning.NotExists,
