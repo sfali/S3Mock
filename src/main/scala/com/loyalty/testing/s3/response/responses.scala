@@ -114,6 +114,72 @@ case class CompleteMultipartUploadResult(bucketName: String,
   // @formatter:on
 }
 
+case class DeletedObject(key: Option[String] = None,
+                         versionId: Option[String] = None,
+                         deleteMarker: Option[Boolean] = None,
+                         deleteMarkerVersionId: Option[String] = None) extends XmlResponse {
+  override def toXml: Elem = {
+
+    val keyElem =
+      key match {
+        case Some(value) =>
+          // @formatter:off
+           <Key>{value}</Key>
+          // @formatter:on
+        case None => <Key/>
+      }
+    (versionId, deleteMarker, deleteMarkerVersionId) match {
+      case (None, None, None) =>
+        // @formatter:off
+        <Deleted>{keyElem}</Deleted>
+        // @formatter:on
+      case (Some(value1), None, None) =>
+        // @formatter:off
+        <Deleted>{keyElem}<VersionId>{value1}</VersionId></Deleted>
+        // @formatter:on
+      case (None, Some(value2), None) =>
+        // @formatter:off
+        <Deleted>{keyElem}<DeleteMarker>{value2}</DeleteMarker></Deleted>
+        // @formatter:on
+      case (None, None, Some(value3)) =>
+        // @formatter:off
+        <Deleted>{keyElem}<DeleteMarkerVersionId>{value3}</DeleteMarkerVersionId></Deleted>
+       // @formatter:on
+      case (Some(value1), Some(value2), None) =>
+        // @formatter:off
+        <Deleted>{keyElem}<VersionId>{value1}</VersionId><DeleteMarker>{value2}</DeleteMarker></Deleted>
+        // @formatter:on
+      case (Some(value1), None, Some(value3)) =>
+        // @formatter:off
+        <Deleted>{keyElem}<VersionId>{value1}</VersionId><DeleteMarkerVersionId>{value3}</DeleteMarkerVersionId></Deleted>
+        // @formatter:on
+      case (Some(value1), Some(value2), Some(value3)) =>
+        // @formatter:off
+        <Deleted>{keyElem}<VersionId>{value1}</VersionId><DeleteMarker>{value2}</DeleteMarker><DeleteMarkerVersionId>{value3}</DeleteMarkerVersionId></Deleted>
+        // @formatter:on
+      case (None, Some(value2), Some(value3)) =>
+        // @formatter:off
+        <Deleted>{keyElem}<DeleteMarker>{value2}</DeleteMarker><DeleteMarkerVersionId>{value3}</DeleteMarkerVersionId></Deleted>
+        // @formatter:on
+    }
+  }
+}
+
+case class DeleteError(key: String, code: String, message: String) extends XmlResponse {
+  override def toXml: Elem =
+  // @formatter:off
+    <Error><Key>{key}</Key><Code>{code}</Code><Message>{message}</Message></Error>
+  // @formatter:on
+}
+
+case class DeleteResult(deleted: List[DeletedObject] = Nil,
+                        errors: List[DeleteError] = Nil) extends XmlResponse {
+  override def toXml: Elem =
+    // @formatter:off
+    <DeleteResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">{deleted.map(_.toXml)}{errors.map(_.toXml)}</DeleteResult>
+    // @formatter:on
+}
+
 object ErrorCodes {
   val NoSuchBucket: String = "NoSuchBucket"
   val BucketAlreadyExists: String = "BucketAlreadyExists"
