@@ -298,6 +298,8 @@ package object s3 {
 
   def createObjectId(bucketName: String, key: String): UUID = s"$bucketName-$key".toUUID
 
+  def entityId(bucket: Bucket, key: String): String = createObjectId(bucket.bucketName, key).toString
+
   def createUploadId(bucketName: String,
                      key: String,
                      version: BucketVersioning,

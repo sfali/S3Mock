@@ -15,15 +15,16 @@ import com.loyalty.testing.s3.actor.CopyBehavior.{Copy, CopyPart}
 import com.loyalty.testing.s3.actor.NotificationBehavior.{CreateBucketNotifications, GetBucketNotifications}
 import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.actor.model.bucket._
-import com.loyalty.testing.s3.{data, _}
 import com.loyalty.testing.s3.notification.{DestinationType, Notification, NotificationType, OperationType}
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectStatus}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
-import com.loyalty.testing.s3.request.{BucketVersioning, PartInfo, VersioningConfiguration}
+import com.loyalty.testing.s3.request.{BucketVersioning, ObjectIdentifier, PartInfo, VersioningConfiguration}
+import com.loyalty.testing.s3.response.{DeleteError, DeletedObject}
 import com.loyalty.testing.s3.service.NotificationService
 import com.loyalty.testing.s3.settings.Settings
 import com.loyalty.testing.s3.streams.FileStream
 import com.loyalty.testing.s3.test._
+import com.loyalty.testing.s3.{data, _}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
@@ -619,9 +620,24 @@ class BucketOperationsBehaviorSpec
     val event = probe.receiveMessage().asInstanceOf[BucketNotEmpty]
     BucketNotEmpty(defaultBucketName) mustEqual event
 
-    actorRef ! ListBucket(replyTo = probe.ref)
-    val contents = probe.receiveMessage().asInstanceOf[ListBucketContent].contents
-    println(contents)
+    testKit.stop(objectActorRef)
+    testKit.stop(actorRef)
+  }
+
+  it should "delete multiple objects from bucket" in {
+    val probe = testKit.createTestProbe[Event]()
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
+
+    val objects = ObjectIdentifier("input/sample.txt") ::
+      ObjectIdentifier("big-sample.txt") ::
+      ObjectIdentifier("unknown.txt") :: Nil
+    actorRef ! DeleteObjects(objects, replyTo = probe.ref)
+    val actualResult = probe.receiveMessage().asInstanceOf[DeleteObjectsResult]
+    val expectedDeleted = DeletedObject(Some("input/sample.txt")) :: DeletedObject(Some("big-sample.txt")) :: Nil
+    val expectedErrors = DeleteError("unknown.txt", "NoSuchKey", "The resource you requested does not exist") :: Nil
+    expectedDeleted mustEqual actualResult.result.deleted
+    expectedErrors mustEqual actualResult.result.errors
 
     testKit.stop(objectActorRef)
     testKit.stop(actorRef)

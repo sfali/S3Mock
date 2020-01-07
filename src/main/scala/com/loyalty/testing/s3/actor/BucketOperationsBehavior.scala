@@ -8,6 +8,7 @@ import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity, EntityTypeKey}
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model._
+import com.loyalty.testing.s3.actor.DeleteObjectsBehavior.{DeleteInput, Command => DeleteObjectsCommand}
 import com.loyalty.testing.s3.actor.model.`object`.{CompleteUpload, DeleteObject, GetObject, GetObjectMeta, InitiateMultiPartUpload, PutObject, UploadPart, Command => ObjectCommand}
 import com.loyalty.testing.s3.actor.model.bucket._
 import com.loyalty.testing.s3.repositories.NitriteDatabase
@@ -149,6 +150,10 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         context.self ! command
         Behaviors.same
 
+      case DeleteObjects(objects, verbose, replyTo) =>
+        spawnDeleteObjectsActor ! DeleteInput(bucket, objects, verbose, replyTo)
+        Behaviors.same
+
       case PutObjectWrapper(key, contentSource, copy, replyTo) =>
         objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), PutObject(bucket, key, contentSource, copy, replyTo))
         Behaviors.same
@@ -188,7 +193,11 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         Behaviors.unhandled
     }
 
-  private def entityId(bucket: Bucket, key: String) = createObjectId(bucket.bucketName, key).toString
+  private def spawnDeleteObjectsActor: ActorRef[DeleteObjectsCommand] =
+    context.child(bucketId.toString) match {
+      case Some(actorRef) => actorRef.unsafeUpcast[DeleteObjectsCommand]
+      case None => context.spawn(DeleteObjectsBehavior(objectOperationsActorRef), bucketId.toString)
+    }
 }
 
 object BucketOperationsBehavior {
