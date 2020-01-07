@@ -611,6 +611,22 @@ class BucketOperationsBehaviorSpec
     testKit.stop(actorRef)
   }
 
+  it should "not delete non-empty bucket" in {
+    val probe = testKit.createTestProbe[Event]()
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
+    actorRef ! DeleteBucket(probe.ref)
+    val event = probe.receiveMessage().asInstanceOf[BucketNotEmpty]
+    BucketNotEmpty(defaultBucketName) mustEqual event
+
+    actorRef ! ListBucket(replyTo = probe.ref)
+    val contents = probe.receiveMessage().asInstanceOf[ListBucketContent].contents
+    println(contents)
+
+    testKit.stop(objectActorRef)
+    testKit.stop(actorRef)
+  }
+
   private def verifyUploadPart(key: String,
                                uploadId: String,
                                partNumber: Int,

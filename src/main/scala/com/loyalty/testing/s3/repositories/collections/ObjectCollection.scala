@@ -3,7 +3,7 @@ package com.loyalty.testing.s3.repositories.collections
 import java.util.UUID
 
 import com.loyalty.testing.s3.repositories._
-import com.loyalty.testing.s3.repositories.model.ObjectKey
+import com.loyalty.testing.s3.repositories.model.{ObjectKey, ObjectStatus}
 import com.loyalty.testing.s3.utils.DateTimeProvider
 import org.dizitart.no2._
 import org.dizitart.no2.filters.Filters.{eq => feq, _}
@@ -67,10 +67,16 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
     }
   }
 
+  private[repositories] def deleteAll(bucketName: String): Int =
+    collection.remove(feq(BucketNameField, bucketName)).getAffectedCount
+
   private[repositories] def findAll(objectId: UUID): List[ObjectKey] = findAllById(objectId).map(ObjectKey(_))
 
   private[repositories] def findAll(bucketName: String): List[ObjectKey] =
     collection.find(feq(BucketNameField, bucketName)).toScalaList.map(ObjectKey(_))
+
+  private[repositories] def hasObjects(bucketName: String): Boolean =
+    findAll(bucketName).exists(_.status == ObjectStatus.Active)
 
   private def findAllById(objectId: UUID): List[Document] =
     collection.find(feq(IdField, objectId.toString), FindOptions.sort(VersionIndexField, SortOrder.Ascending)).toScalaList

@@ -36,6 +36,8 @@ final case class CreateBucket(bucket: Bucket, replyTo: ActorRef[Event]) extends 
 
 final case class GetBucket(replyTo: ActorRef[Event]) extends CommandWithReply
 
+final case class DeleteBucket(replyTo: ActorRef[Event]) extends CommandWithReply
+
 final case class ListBucket(params: ListBucketParams = ListBucketParams(),
                             replyTo: ActorRef[Event]) extends CommandWithReply
 

@@ -14,11 +14,15 @@ case class NoSuchBucketExists(bucketId: UUID) extends Event
 
 case class NoSuchKeyExists(bucketName: String, key: String) extends Event
 
+case class BucketNotEmpty(bucketName: String) extends Event
+
 case object InvalidAccess extends Event
 
 case object NotificationsCreated extends Event
 
 final case class BucketInfo(bucket: Bucket) extends Event
+
+case object BucketDeleted extends Event
 
 final case class NotificationsInfo(notifications: List[Notification]) extends Event
 

@@ -11,6 +11,7 @@ import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.actor.model.`object`.{CompleteUpload, DeleteObject, GetObject, GetObjectMeta, InitiateMultiPartUpload, PutObject, UploadPart, Command => ObjectCommand}
 import com.loyalty.testing.s3.actor.model.bucket._
 import com.loyalty.testing.s3.repositories.NitriteDatabase
+import com.loyalty.testing.s3.repositories.collections.BucketNotEmptyException
 import com.loyalty.testing.s3.repositories.model.Bucket
 
 import scala.concurrent.duration._
@@ -121,6 +122,19 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
 
       case GetBucket(replyTo) =>
         context.self ! ReplyToSender(BucketInfo(bucket), replyTo)
+        Behaviors.same
+
+      case DeleteBucket(replyTo) =>
+        val bucketName = bucket.bucketName
+        val command =
+          Try(database.deleteBucket(bucketName)) match {
+            case Failure(_: BucketNotEmptyException) => ReplyToSender(BucketNotEmpty(bucketName), replyTo)
+            case Failure(ex) =>
+              context.log.error(s"unable to delete bucket: $bucketName", ex)
+              Shutdown // TODO: reply properly
+            case Success(_) => ReplyToSender(BucketDeleted, replyTo)
+          }
+        context.self ! command
         Behaviors.same
 
       case ListBucket(params, replyTo) =>
