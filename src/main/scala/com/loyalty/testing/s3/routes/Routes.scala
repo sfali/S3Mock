@@ -10,7 +10,7 @@ import com.loyalty.testing.s3.actor.CopyBehavior.{Command => CopyCommand}
 import com.loyalty.testing.s3.actor.NotificationBehavior.{Command => NotificationCommand}
 import com.loyalty.testing.s3.actor.model.bucket.{Command => BucketCommand}
 import com.loyalty.testing.s3.routes.s3.`object`._
-import com.loyalty.testing.s3.routes.s3.bucket.{CreateBucketRoute, ListBucketRoute, SetBucketNotificationRoute, SetBucketVersioningRoute}
+import com.loyalty.testing.s3.routes.s3.bucket.{CreateBucketRoute, HeadBucketRoute, ListBucketRoute, SetBucketNotificationRoute, SetBucketVersioningRoute}
 
 trait Routes {
 
@@ -25,6 +25,7 @@ trait Routes {
       bucketName =>
         val bucketRoutes =
           concat(
+            HeadBucketRoute(bucketName, bucketOperationsActorRef),
             SetBucketVersioningRoute(bucketName, bucketOperationsActorRef),
             SetBucketNotificationRoute(bucketName, notificationActorRef),
             CreateBucketRoute(bucketName, bucketOperationsActorRef),

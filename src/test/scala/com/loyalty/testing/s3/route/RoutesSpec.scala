@@ -292,6 +292,18 @@ class RoutesSpec
     }
   }
 
+  it should "check bucket(s) exists" in {
+    Head(s"/$defaultBucketName") ~> routes ~> check {
+      status mustEqual OK
+    }
+    Head(s"/$bucket2") ~> routes ~> check {
+      status mustEqual OK
+    }
+    Head(s"/$nonExistentBucketName") ~> routes ~> check {
+      status mustEqual NotFound
+    }
+  }
+
   it should "copy object between versioned buckets" in {
     val key = "sample.txt"
     val copySourceHeader = RawHeader("x-amz-copy-source", s"/$versionedBucketName/$key")
