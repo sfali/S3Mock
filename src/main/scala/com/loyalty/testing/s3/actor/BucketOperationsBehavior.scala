@@ -8,9 +8,11 @@ import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity, EntityTypeKey}
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model._
+import com.loyalty.testing.s3.actor.DeleteObjectsBehavior.{DeleteInput, Command => DeleteObjectsCommand}
 import com.loyalty.testing.s3.actor.model.`object`.{CompleteUpload, DeleteObject, GetObject, GetObjectMeta, InitiateMultiPartUpload, PutObject, UploadPart, Command => ObjectCommand}
 import com.loyalty.testing.s3.actor.model.bucket._
 import com.loyalty.testing.s3.repositories.NitriteDatabase
+import com.loyalty.testing.s3.repositories.collections.BucketNotEmptyException
 import com.loyalty.testing.s3.repositories.model.Bucket
 
 import scala.concurrent.duration._
@@ -123,6 +125,19 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         context.self ! ReplyToSender(BucketInfo(bucket), replyTo)
         Behaviors.same
 
+      case DeleteBucket(replyTo) =>
+        val bucketName = bucket.bucketName
+        val command =
+          Try(database.deleteBucket(bucketName)) match {
+            case Failure(_: BucketNotEmptyException) => ReplyToSender(BucketNotEmpty(bucketName), replyTo)
+            case Failure(ex) =>
+              context.log.error(s"unable to delete bucket: $bucketName", ex)
+              Shutdown // TODO: reply properly
+            case Success(_) => ReplyToSender(BucketDeleted(bucketName), replyTo)
+          }
+        context.self ! command
+        Behaviors.same
+
       case ListBucket(params, replyTo) =>
         val command =
           Try(listObjects(bucket.bucketName, params)(database, context.log)) match {
@@ -133,6 +148,10 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
             case Success(contents) => ReplyToSender(ListBucketContent(contents), replyTo)
           }
         context.self ! command
+        Behaviors.same
+
+      case DeleteObjects(objects, verbose, replyTo) =>
+        spawnDeleteObjectsActor ! DeleteInput(bucket, objects, verbose, replyTo)
         Behaviors.same
 
       case PutObjectWrapper(key, contentSource, copy, replyTo) =>
@@ -174,7 +193,11 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         Behaviors.unhandled
     }
 
-  private def entityId(bucket: Bucket, key: String) = createObjectId(bucket.bucketName, key).toString
+  private def spawnDeleteObjectsActor: ActorRef[DeleteObjectsCommand] =
+    context.child(bucketId.toString) match {
+      case Some(actorRef) => actorRef.unsafeUpcast[DeleteObjectsCommand]
+      case None => context.spawn(DeleteObjectsBehavior(objectOperationsActorRef), bucketId.toString)
+    }
 }
 
 object BucketOperationsBehavior {

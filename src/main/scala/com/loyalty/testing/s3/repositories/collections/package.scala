@@ -13,6 +13,8 @@ package object collections {
 
   case class BucketAlreadyExistsException(bucketName: String) extends Exception(s"Bucket $bucketName already exists")
 
+  case class BucketNotEmptyException(bucketName: String) extends Exception(s"Bucket $bucketName is not empty")
+
   case class NoSuchId(id: UUID) extends Exception(s"Specified id `$id` does not exists")
 
 }

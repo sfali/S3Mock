@@ -292,6 +292,18 @@ class RoutesSpec
     }
   }
 
+  it should "check bucket(s) exists" in {
+    Head(s"/$defaultBucketName") ~> routes ~> check {
+      status mustEqual OK
+    }
+    Head(s"/$bucket2") ~> routes ~> check {
+      status mustEqual OK
+    }
+    Head(s"/$nonExistentBucketName") ~> routes ~> check {
+      status mustEqual NotFound
+    }
+  }
+
   it should "copy object between versioned buckets" in {
     val key = "sample.txt"
     val copySourceHeader = RawHeader("x-amz-copy-source", s"/$versionedBucketName/$key")
@@ -460,6 +472,43 @@ class RoutesSpec
     Get(uri) ~> routes ~> check {
       status mustEqual NotFound
       responseAs[NoSuchKeyResponse] mustEqual NoSuchKeyResponse(versionedBucketName, key)
+    }
+  }
+
+  it should "not delete non-empty bucket" in {
+    Delete(s"/$defaultBucketName") ~> routes ~> check {
+      status mustEqual Conflict
+      responseAs[BucketNotEmptyResponse] mustEqual BucketNotEmptyResponse(defaultBucketName)
+    }
+  }
+
+  it should "delete multiple objects from bucket" in {
+    val xml =
+      """<Delete xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+        |<Object>
+        |<Key>input/sample.txt</Key>
+        |</Object>
+        |<Object>
+        |<Key>big-sample.txt</Key>
+        |</Object>
+        |<Object>
+        |<Key>unknown.txt</Key>
+        |</Object>
+        |</Delete>""".stripMargin.replaceNewLine
+    val entity = HttpEntity(xmlContentType, xml)
+    val expectedDeleted = (DeletedObject("input/sample.txt") :: DeletedObject("big-sample.txt") :: Nil).sortBy(_.key)
+    val expectedErrors = (DeleteError("unknown.txt", "NoSuchKey", "The resource you requested does not exist") :: Nil).sortBy(_.key)
+    Post(s"/$defaultBucketName?delete", entity) ~> routes ~> check {
+      status mustEqual OK
+      val result = responseAs[DeleteResult]
+      result.deleted.sortBy(_.key) mustEqual expectedDeleted
+      result.errors.sortBy(_.key) mustEqual expectedErrors
+    }
+  }
+
+  it should "delete empty bucket" in {
+    Delete(s"/$defaultBucketName") ~> routes ~> check {
+      status mustEqual NoContent
     }
   }
 

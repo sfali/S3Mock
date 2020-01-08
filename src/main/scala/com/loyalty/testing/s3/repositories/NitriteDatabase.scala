@@ -5,7 +5,7 @@ import java.util.UUID
 
 import akka.Done
 import com.loyalty.testing.s3.notification.Notification
-import com.loyalty.testing.s3.repositories.collections.{BucketCollection, NotificationCollection, ObjectCollection, UploadCollection}
+import com.loyalty.testing.s3.repositories.collections._
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
 import com.loyalty.testing.s3.request.{BucketVersioning, VersioningConfiguration}
 import com.loyalty.testing.s3.settings.Settings
@@ -45,6 +45,15 @@ class NitriteDatabase(rootPath: Path,
   def getAllObjects(bucketName: String): List[ObjectKey] = objectCollection.findAll(bucketName)
 
   def createBucket(bucket: Bucket): Bucket = bucketCollection.createBucket(bucket)
+
+  def deleteBucket(bucketName: String): Unit = {
+    if (objectCollection.hasObjects(bucketName)) throw BucketNotEmptyException(bucketName)
+    else {
+      objectCollection.deleteAll(bucketName)
+      bucketCollection.deleteBucket(bucketName)
+      ()
+    }
+  }
 
   def setBucketVersioning(bucketId: UUID,
                           versioningConfiguration: VersioningConfiguration): Option[Bucket] = {

@@ -6,7 +6,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, UploadInfo}
-import com.loyalty.testing.s3.response.BucketContent
+import com.loyalty.testing.s3.response.{BucketContent, DeleteResult}
 
 sealed trait Event
 
@@ -14,11 +14,15 @@ case class NoSuchBucketExists(bucketId: UUID) extends Event
 
 case class NoSuchKeyExists(bucketName: String, key: String) extends Event
 
+case class BucketNotEmpty(bucketName: String) extends Event
+
 case object InvalidAccess extends Event
 
 case object NotificationsCreated extends Event
 
 final case class BucketInfo(bucket: Bucket) extends Event
+
+final case class BucketDeleted(bucketName: String) extends Event
 
 final case class NotificationsInfo(notifications: List[Notification]) extends Event
 
@@ -35,6 +39,8 @@ final case class MultiPartUploadedInitiated(uploadId: String) extends Event
 final case class PartUploaded(uploadInfo: UploadInfo) extends Event
 
 final case class ListBucketContent(contents: List[BucketContent]) extends Event
+
+final case class DeleteObjectsResult(result: DeleteResult) extends Event
 
 case object NoSuchUpload extends Event
 

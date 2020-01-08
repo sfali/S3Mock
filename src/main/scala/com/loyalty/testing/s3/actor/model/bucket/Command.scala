@@ -6,7 +6,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.loyalty.testing.s3.actor.model.{CborSerializable, Event}
 import com.loyalty.testing.s3.repositories.model.Bucket
-import com.loyalty.testing.s3.request.{ListBucketParams, PartInfo, VersioningConfiguration}
+import com.loyalty.testing.s3.request.{ListBucketParams, ObjectIdentifier, PartInfo, VersioningConfiguration}
 
 sealed trait Command extends CborSerializable
 
@@ -36,6 +36,8 @@ final case class CreateBucket(bucket: Bucket, replyTo: ActorRef[Event]) extends 
 
 final case class GetBucket(replyTo: ActorRef[Event]) extends CommandWithReply
 
+final case class DeleteBucket(replyTo: ActorRef[Event]) extends CommandWithReply
+
 final case class ListBucket(params: ListBucketParams = ListBucketParams(),
                             replyTo: ActorRef[Event]) extends CommandWithReply
 
@@ -57,6 +59,10 @@ final case class GetObjectWrapper(key: String,
 final case class DeleteObjectWrapper(key: String,
                                      maybeVersionId: Option[String] = None,
                                      replyTo: ActorRef[Event]) extends CommandWithReply
+
+final case class DeleteObjects(objects: List[ObjectIdentifier],
+                               verbose: Boolean = true,
+                               replyTo: ActorRef[Event]) extends CommandWithReply
 
 final case class InitiateMultiPartUploadWrapper(key: String,
                                                 replyTo: ActorRef[Event]) extends CommandWithReply

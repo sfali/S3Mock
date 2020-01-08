@@ -32,6 +32,9 @@ class BucketCollection(db: Nitrite) {
       case _ => throw BucketAlreadyExistsException(bucket.bucketName)
     }
 
+  private[repositories] def deleteBucket(bucketName: String): Int =
+    collection.remove(feq(BucketNameField, bucketName)).getAffectedCount
+
   private[repositories] def setBucketVersioning(bucketId: UUID,
                                                 bucketVersioning: BucketVersioning): Option[Bucket] =
     findById(bucketId) match {

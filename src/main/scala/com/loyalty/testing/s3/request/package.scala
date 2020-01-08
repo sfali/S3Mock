@@ -61,6 +61,40 @@ package object request {
       } else None
   }
 
+  case class ObjectIdentifier(key: String, versionId: Option[String])
+
+  object ObjectIdentifier {
+    def apply(key: String, versionId: Option[String] = None): ObjectIdentifier = new ObjectIdentifier(key, versionId)
+
+    def apply(node: NodeSeq): ObjectIdentifier = {
+      val key = (node \ "Key").text.trim
+      val versionId =
+        Try((node \ "VersionId").text.trim).toOption match {
+          case Some(value) => if (value.isEmpty) None else Some(value)
+          case None => None
+        }
+      ObjectIdentifier(key, versionId)
+    }
+  }
+
+  case class Delete(objects: List[ObjectIdentifier], verbose: Boolean)
+
+  object Delete {
+    def apply(objects: List[ObjectIdentifier], verbose: Boolean = true): Delete = new Delete(objects, verbose)
+
+    def apply(maybeXml: Option[String]): Delete =
+      if (maybeXml.getOrElse("").trim.nonEmpty) {
+        val node = scala.xml.XML.loadString(maybeXml.get.trim)
+        val objects = (node \ "Object").map(ObjectIdentifier(_)).toList
+        val verbose =
+          Try((node \ "Quite").text.trim).toOption match {
+            case Some(value) => if (value.isEmpty) true else value.toBooleanOption.getOrElse(true)
+            case None => true
+          }
+        Delete(objects, verbose)
+      } else throw new RuntimeException("invalid xml")
+  }
+
   sealed trait BucketVersioning extends EnumEntry
 
   object BucketVersioning extends Enum[BucketVersioning] with CirceEnum[BucketVersioning] {

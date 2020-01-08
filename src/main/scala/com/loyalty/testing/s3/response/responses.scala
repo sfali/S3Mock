@@ -7,7 +7,7 @@ import akka.util.ByteString
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.repositories.model.ObjectKey
 
-import scala.xml.Elem
+import scala.xml.{Elem, NodeSeq}
 
 trait XmlResponse {
   def toXml: Elem
@@ -114,6 +114,92 @@ case class CompleteMultipartUploadResult(bucketName: String,
   // @formatter:on
 }
 
+case class DeletedObject(key: String,
+                         versionId: Option[String] = None,
+                         deleteMarker: Option[Boolean] = None,
+                         deleteMarkerVersionId: Option[String] = None) extends XmlResponse {
+  override def toXml: Elem = {
+
+    val keyElem = <Key>{key}</Key>
+    (versionId, deleteMarker, deleteMarkerVersionId) match {
+      case (None, None, None) =>
+        // @formatter:off
+        <Deleted>{keyElem}</Deleted>
+        // @formatter:on
+      case (Some(value1), None, None) =>
+        // @formatter:off
+        <Deleted>{keyElem}<VersionId>{value1}</VersionId></Deleted>
+        // @formatter:on
+      case (None, Some(value2), None) =>
+        // @formatter:off
+        <Deleted>{keyElem}<DeleteMarker>{value2}</DeleteMarker></Deleted>
+        // @formatter:on
+      case (None, None, Some(value3)) =>
+        // @formatter:off
+        <Deleted>{keyElem}<DeleteMarkerVersionId>{value3}</DeleteMarkerVersionId></Deleted>
+       // @formatter:on
+      case (Some(value1), Some(value2), None) =>
+        // @formatter:off
+        <Deleted>{keyElem}<VersionId>{value1}</VersionId><DeleteMarker>{value2}</DeleteMarker></Deleted>
+        // @formatter:on
+      case (Some(value1), None, Some(value3)) =>
+        // @formatter:off
+        <Deleted>{keyElem}<VersionId>{value1}</VersionId><DeleteMarkerVersionId>{value3}</DeleteMarkerVersionId></Deleted>
+        // @formatter:on
+      case (Some(value1), Some(value2), Some(value3)) =>
+        // @formatter:off
+        <Deleted>{keyElem}<VersionId>{value1}</VersionId><DeleteMarker>{value2}</DeleteMarker><DeleteMarkerVersionId>{value3}</DeleteMarkerVersionId></Deleted>
+        // @formatter:on
+      case (None, Some(value2), Some(value3)) =>
+        // @formatter:off
+        <Deleted>{keyElem}<DeleteMarker>{value2}</DeleteMarker><DeleteMarkerVersionId>{value3}</DeleteMarkerVersionId></Deleted>
+        // @formatter:on
+    }
+  }
+}
+
+object DeletedObject {
+  def apply(key: String,
+            versionId: Option[String] = None,
+            deleteMarker: Option[Boolean] = None,
+            deleteMarkerVersionId: Option[String] = None): DeletedObject =
+    new DeletedObject(key, versionId, deleteMarker, deleteMarkerVersionId)
+
+  def apply(nodeSeq: NodeSeq): DeletedObject = {
+    val key = Option(nodeSeq \ "Key").map(_.text.trim).getOrElse("")
+    val versionId = Option(nodeSeq \ "VersionId").map(_.text.trim).flatMap(_.toOption)
+    val deleteMarker = Option(nodeSeq \ "DeleteMarker").map(_.text.trim).flatMap(_.toBooleanOption)
+    val deleteMarkerVersionId = Option(nodeSeq \ "DeleteMarkerVersionId").map(_.text.trim).flatMap(_.toOption)
+    DeletedObject(key, versionId, deleteMarker, deleteMarkerVersionId)
+  }
+}
+
+case class DeleteError(key: String, code: String, message: String) extends XmlResponse {
+  override def toXml: Elem =
+  // @formatter:off
+    <Error><Key>{key}</Key><Code>{code}</Code><Message>{message}</Message></Error>
+  // @formatter:on
+}
+
+object DeleteError {
+  def apply(key: String, code: String, message: String): DeleteError = new DeleteError(key, code, message)
+
+  def apply(nodeSeq: NodeSeq): DeleteError = {
+    val key = Option(nodeSeq \ "Key").map(_.text.trim).getOrElse("")
+    val code = Option(nodeSeq \ "Code").map(_.text.trim).getOrElse("")
+    val message = Option(nodeSeq \ "Message").map(_.text.trim).getOrElse("")
+    DeleteError(key, code, message)
+  }
+}
+
+case class DeleteResult(deleted: List[DeletedObject] = Nil,
+                        errors: List[DeleteError] = Nil) extends XmlResponse {
+  override def toXml: Elem =
+  // @formatter:off
+    <DeleteResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">{deleted.map(_.toXml)}{errors.map(_.toXml)}</DeleteResult>
+    // @formatter:on
+}
+
 object ErrorCodes {
   val NoSuchBucket: String = "NoSuchBucket"
   val BucketAlreadyExists: String = "BucketAlreadyExists"
@@ -142,6 +228,12 @@ import com.loyalty.testing.s3.response.ErrorCodes._
 case class BucketAlreadyExistsResponse(bucketName: String) extends ErrorResponse {
   override val code: String = BucketAlreadyExists
   override val message: String = "The specified bucket already exist"
+  override val resource: String = bucketName
+}
+
+case class BucketNotEmptyResponse(bucketName: String) extends ErrorResponse {
+  override val code: String = BucketAlreadyExists
+  override val message: String = "The bucket you tried to delete is not empty"
   override val resource: String = bucketName
 }
 
