@@ -114,20 +114,13 @@ case class CompleteMultipartUploadResult(bucketName: String,
   // @formatter:on
 }
 
-case class DeletedObject(key: Option[String] = None,
+case class DeletedObject(key: String,
                          versionId: Option[String] = None,
                          deleteMarker: Option[Boolean] = None,
                          deleteMarkerVersionId: Option[String] = None) extends XmlResponse {
   override def toXml: Elem = {
 
-    val keyElem =
-      key match {
-        case Some(value) =>
-          // @formatter:off
-           <Key>{value}</Key>
-          // @formatter:on
-        case None => <Key/>
-      }
+    val keyElem = <Key>{key}</Key>
     (versionId, deleteMarker, deleteMarkerVersionId) match {
       case (None, None, None) =>
         // @formatter:off
@@ -166,14 +159,14 @@ case class DeletedObject(key: Option[String] = None,
 }
 
 object DeletedObject {
-  def apply(key: Option[String] = None,
+  def apply(key: String,
             versionId: Option[String] = None,
             deleteMarker: Option[Boolean] = None,
             deleteMarkerVersionId: Option[String] = None): DeletedObject =
     new DeletedObject(key, versionId, deleteMarker, deleteMarkerVersionId)
 
   def apply(nodeSeq: NodeSeq): DeletedObject = {
-    val key = Option(nodeSeq \ "Key").map(_.text.trim).flatMap(_.toOption)
+    val key = Option(nodeSeq \ "Key").map(_.text.trim).getOrElse("")
     val versionId = Option(nodeSeq \ "VersionId").map(_.text.trim).flatMap(_.toOption)
     val deleteMarker = Option(nodeSeq \ "DeleteMarker").map(_.text.trim).flatMap(_.toBooleanOption)
     val deleteMarkerVersionId = Option(nodeSeq \ "DeleteMarkerVersionId").map(_.text.trim).flatMap(_.toOption)

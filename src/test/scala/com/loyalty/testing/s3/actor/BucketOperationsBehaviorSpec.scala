@@ -634,7 +634,7 @@ class BucketOperationsBehaviorSpec
       ObjectIdentifier("unknown.txt") :: Nil
     actorRef ! DeleteObjects(objects, replyTo = probe.ref)
     val actualResult = probe.receiveMessage().asInstanceOf[DeleteObjectsResult]
-    val expectedDeleted = DeletedObject(Some("input/sample.txt")) :: DeletedObject(Some("big-sample.txt")) :: Nil
+    val expectedDeleted = DeletedObject("input/sample.txt") :: DeletedObject("big-sample.txt") :: Nil
     val expectedErrors = DeleteError("unknown.txt", "NoSuchKey", "The resource you requested does not exist") :: Nil
     expectedDeleted mustEqual actualResult.result.deleted
     expectedErrors mustEqual actualResult.result.errors

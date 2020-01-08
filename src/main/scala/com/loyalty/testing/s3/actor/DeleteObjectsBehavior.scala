@@ -76,7 +76,7 @@ class DeleteObjectsBehavior(context: ActorContext[Command],
           else None
 
         val deletedObject = DeletedObject(
-          key = Some(objectKey.key),
+          key = objectKey.key,
           versionId = versionId,
           deleteMarker = deleteMarker,
           deleteMarkerVersionId = deleteMarkerVersionId)

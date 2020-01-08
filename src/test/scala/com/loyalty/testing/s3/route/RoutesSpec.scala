@@ -496,12 +496,13 @@ class RoutesSpec
         |</Object>
         |</Delete>""".stripMargin.replaceNewLine
     val entity = HttpEntity(xmlContentType, xml)
-    val expectedDeleted = DeletedObject(Some("input/sample.txt")) :: DeletedObject(Some("big-sample.txt")) :: Nil
-    val expectedErrors = DeleteError("unknown.txt", "NoSuchKey", "The resource you requested does not exist") :: Nil
-    val expected = DeleteResult(expectedDeleted, expectedErrors)
+    val expectedDeleted = (DeletedObject("input/sample.txt") :: DeletedObject("big-sample.txt") :: Nil).sortBy(_.key)
+    val expectedErrors = (DeleteError("unknown.txt", "NoSuchKey", "The resource you requested does not exist") :: Nil).sortBy(_.key)
     Post(s"/$defaultBucketName?delete", entity) ~> routes ~> check {
       status mustEqual OK
-      responseAs[DeleteResult] mustEqual expected
+      val result = responseAs[DeleteResult]
+      result.deleted.sortBy(_.key) mustEqual expectedDeleted
+      result.errors.sortBy(_.key) mustEqual expectedErrors
     }
   }
 
