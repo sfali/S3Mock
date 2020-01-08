@@ -7,6 +7,14 @@
     {
       "bucketName":"local-bucket-2",
       "enableVersioning":false
+    },
+    {
+      "bucketName": "my-test-us-east-1",
+      "enableVersioning": false
+    },
+    {
+      "bucketName": "my.test.frankfurt",
+      "enableVersioning": false
     }
   ],
   "notifications":[
