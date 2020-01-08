@@ -27,6 +27,7 @@ trait Routes {
           concat(
             HeadBucketRoute(bucketName, bucketOperationsActorRef),
             DeleteBucketRoute(bucketName, bucketOperationsActorRef),
+            DeleteObjectsRoute(bucketName, bucketOperationsActorRef),
             SetBucketVersioningRoute(bucketName, bucketOperationsActorRef),
             SetBucketNotificationRoute(bucketName, notificationActorRef),
             CreateBucketRoute(bucketName, bucketOperationsActorRef),

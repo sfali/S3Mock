@@ -82,7 +82,7 @@ package object request {
   object Delete {
     def apply(objects: List[ObjectIdentifier], verbose: Boolean = true): Delete = new Delete(objects, verbose)
 
-    def apply(maybeXml: Option[String]): Option[Delete] =
+    def apply(maybeXml: Option[String]): Delete =
       if (maybeXml.getOrElse("").trim.nonEmpty) {
         val node = scala.xml.XML.loadString(maybeXml.get.trim)
         val objects = (node \ "Object").map(ObjectIdentifier(_)).toList
@@ -91,8 +91,8 @@ package object request {
             case Some(value) => if (value.isEmpty) true else value.toBooleanOption.getOrElse(true)
             case None => true
           }
-        Some(Delete(objects, verbose))
-      } else None
+        Delete(objects, verbose)
+      } else throw new RuntimeException("invalid xml")
   }
 
   sealed trait BucketVersioning extends EnumEntry

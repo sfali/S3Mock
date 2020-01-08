@@ -77,6 +77,15 @@ trait CustomMarshallers
         InitiateMultipartUploadResult(bucketName, key, uploadId)
     }
 
+  implicit val DeleteResultUnmarshaller: FromEntityUnmarshaller[DeleteResult] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x =>
+        val deleted = Option(x \ "Deleted").map(_.map(DeletedObject(_))).getOrElse(Seq.empty).toList
+        val errors = Option(x \ "Error").map(_.map(DeleteError(_))).getOrElse(Seq.empty).toList
+        DeleteResult(deleted, errors)
+    }
+
   implicit val CompleteMultipartUploadResultUnmarshaller: FromEntityUnmarshaller[CompleteMultipartUploadResult] =
     nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
       case NodeSeq.Empty => throw Unmarshaller.NoContentException
@@ -103,6 +112,9 @@ trait CustomMarshallers
     xmlResponseMarshallers(`application/octet-stream`)
 
   implicit val CopyObjectResultMarshallers: ToEntityMarshaller[CopyObjectResult] =
+    xmlResponseMarshallers(`text/xml(UTF-8)`)
+
+  implicit val DeleteResultMarshallers: ToEntityMarshaller[DeleteResult] =
     xmlResponseMarshallers(`text/xml(UTF-8)`)
 
   implicit val CopyPartResultMarshallers: ToEntityMarshaller[CopyPartResult] =
@@ -153,6 +165,9 @@ trait CustomMarshallers
 
   implicit val InitiateMultipartUploadResultResponse: ToResponseMarshaller[InitiateMultipartUploadResult] =
     fromToEntityMarshaller[InitiateMultipartUploadResult](OK)
+
+  implicit val DeleteResultResponse: ToResponseMarshaller[DeleteResult] =
+    fromToEntityMarshaller[DeleteResult](OK)
 
   implicit val BucketAlreadyExistsResponseMarshaller: ToResponseMarshaller[BucketAlreadyExistsResponse] =
     fromToEntityMarshaller[BucketAlreadyExistsResponse](BadRequest)
