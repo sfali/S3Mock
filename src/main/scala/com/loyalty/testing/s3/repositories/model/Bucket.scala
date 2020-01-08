@@ -20,6 +20,9 @@ object Bucket {
             version: BucketVersioning): Bucket =
     new Bucket(id, bucketName, region, version)
 
+  def apply(bucketName: String): Bucket =
+    Bucket(bucketName.toUUID, bucketName, defaultRegion, BucketVersioning.NotExists)
+
   def apply(bucketName: String,
             region: String,
             version: BucketVersioning): Bucket =
