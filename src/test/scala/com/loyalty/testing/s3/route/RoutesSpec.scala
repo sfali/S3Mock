@@ -482,6 +482,35 @@ class RoutesSpec
     }
   }
 
+  it should "delete multiple objects from bucket" in {
+    val xml =
+      """<Delete xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+        |<Object>
+        |<Key>input/sample.txt</Key>
+        |</Object>
+        |<Object>
+        |<Key>big-sample.txt</Key>
+        |</Object>
+        |<Object>
+        |<Key>unknown.txt</Key>
+        |</Object>
+        |</Delete>""".stripMargin.replaceNewLine
+    val entity = HttpEntity(xmlContentType, xml)
+    val expectedDeleted = DeletedObject(Some("input/sample.txt")) :: DeletedObject(Some("big-sample.txt")) :: Nil
+    val expectedErrors = DeleteError("unknown.txt", "NoSuchKey", "The resource you requested does not exist") :: Nil
+    val expected = DeleteResult(expectedDeleted, expectedErrors)
+    Post(s"/$defaultBucketName?delete", entity) ~> routes ~> check {
+      status mustEqual OK
+      responseAs[DeleteResult] mustEqual expected
+    }
+  }
+
+  it should "delete empty bucket" in {
+    Delete(s"/$defaultBucketName") ~> routes ~> check {
+      status mustEqual NoContent
+    }
+  }
+
   private def initiateMultiPartUpload(bucketName: String,
                                       key: String,
                                       version: BucketVersioning = BucketVersioning.NotExists,

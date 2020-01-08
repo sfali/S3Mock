@@ -173,10 +173,10 @@ object DeletedObject {
     new DeletedObject(key, versionId, deleteMarker, deleteMarkerVersionId)
 
   def apply(nodeSeq: NodeSeq): DeletedObject = {
-    val key = Option(nodeSeq \ "Key").map(_.text.trim)
-    val versionId = Option(nodeSeq \ "VersionId").map(_.text.trim)
+    val key = Option(nodeSeq \ "Key").map(_.text.trim).flatMap(_.toOption)
+    val versionId = Option(nodeSeq \ "VersionId").map(_.text.trim).flatMap(_.toOption)
     val deleteMarker = Option(nodeSeq \ "DeleteMarker").map(_.text.trim).flatMap(_.toBooleanOption)
-    val deleteMarkerVersionId = Option(nodeSeq \ "DeleteMarkerVersionId").map(_.text.trim)
+    val deleteMarkerVersionId = Option(nodeSeq \ "DeleteMarkerVersionId").map(_.text.trim).flatMap(_.toOption)
     DeletedObject(key, versionId, deleteMarker, deleteMarkerVersionId)
   }
 }
