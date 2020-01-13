@@ -31,6 +31,8 @@ case class UploadInfo(bucketName: String,
       objectPath = Some(toObjectDir(bucketName, key, version, versionId))
     )
   }
+
+  def toUploadObjectKey: ObjectKey = toObjectKey.copy(objectPath = Some(uploadPath))
 }
 
 object UploadInfo {

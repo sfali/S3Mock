@@ -163,7 +163,7 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         Behaviors.same
 
       case GetObjectWrapper(key, maybeVersionId, maybeRange, replyTo) =>
-        objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), GetObject(bucket, key, maybeVersionId, maybeRange, replyTo))
+        objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), GetObject(bucket, key, maybeVersionId, maybeRange, None, replyTo))
         Behaviors.same
 
       case DeleteObjectWrapper(key, maybeVersionId, replyTo) =>

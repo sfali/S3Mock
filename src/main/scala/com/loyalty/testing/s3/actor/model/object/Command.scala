@@ -55,6 +55,7 @@ final case class GetObject(bucket: Bucket,
                            key: String,
                            maybeVersionId: Option[String],
                            maybeRange: Option[ByteRange],
+                           maybePartNumber: Option[Int],
                            replyTo: ActorRef[Event]) extends ObjectInput
 
 final case class DeleteObject(bucket: Bucket,

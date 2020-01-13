@@ -132,8 +132,11 @@ class ObjectIO(root: Path, fileStream: FileStream) {
   }
 
   def getObject(objectKey: ObjectKey,
+                partNumber: Int,
                 maybeRange: Option[ByteRange] = None): (ObjectKey, Source[ByteString, Future[IOResult]]) = {
-    val objectPath = getObjectPath(objectKey.bucketName, objectKey.key, objectKey.version, objectKey.versionId)
+    val objectPath =
+      if (partNumber > 0) getUploadPath(objectKey.objectPath.get, partNumber, staging = false)
+      else getObjectPath(objectKey.bucketName, objectKey.key, objectKey.version, objectKey.versionId)
     val (downloadRange, source) = fileStream.downloadFile(objectPath, maybeRange = maybeRange)
     (objectKey.copy(contentLength = downloadRange.capacity), source)
   }

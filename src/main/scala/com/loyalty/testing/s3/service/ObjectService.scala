@@ -40,8 +40,11 @@ class ObjectService(objectIO: ObjectIO, database: NitriteDatabase) {
   def createOrUpdateObject(objectKey: ObjectKey): Future[ObjectKey] = database.createOrUpdateObject(objectKey)
 
   def getObject(objectKey: ObjectKey,
-                maybeRange: Option[ByteRange] = None): (ObjectKey, Source[ByteString, Future[IOResult]]) =
-    objectIO.getObject(objectKey, maybeRange)
+                maybePartNumber: Option[Int] = None,
+                maybeRange: Option[ByteRange] = None): (ObjectKey, Source[ByteString, Future[IOResult]]) = {
+    val (actualObjectKey, partNumber) = database.getObject(objectKey, maybePartNumber)
+    objectIO.getObject(actualObjectKey, partNumber, maybeRange)
+  }
 
   def virtualDeleteObject(objectKey: ObjectKey)
                          (implicit ec: ExecutionContext): Future[ObjectKey] = {

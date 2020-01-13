@@ -70,7 +70,22 @@ class NitriteDatabase(rootPath: Path,
   def getAllObjects(objectId: UUID): Future[List[ObjectKey]] =
     Future.successful(objectCollection.findAll(objectId))
 
-  def createOrUpdateObject(objectKey: ObjectKey): Future[ObjectKey] = Future.successful(objectCollection.createOrUpdateObject(objectKey))
+  def getObject(objectKey: ObjectKey, maybePartNumber: Option[Int] = None): (ObjectKey, Int) =
+    (objectKey.uploadId, maybePartNumber) match {
+      case (Some(uploadId), Some(partNumber)) =>
+        val maybeUploadObjectKey = uploadCollection.getUpload(uploadId, partNumber).map(_.toUploadObjectKey)
+        maybeUploadObjectKey match {
+          case Some(uploadObjectKey) => (uploadObjectKey, partNumber)
+          case None => throw NoSuchPart(objectKey.id, uploadId, partNumber)
+        }
+      case (None, Some(_)) =>
+        // request has part number but this is not uploaded by multipart
+        throw NotMultiPartUpload(objectKey.id)
+      case (_, None) => (objectKey, -1)
+    }
+
+  def createOrUpdateObject(objectKey: ObjectKey): Future[ObjectKey] =
+    Future.successful(objectCollection.createOrUpdateObject(objectKey))
 
   def findUploads: Future[List[UploadInfo]] = Future.successful(uploadStagingCollection.findAll)
 

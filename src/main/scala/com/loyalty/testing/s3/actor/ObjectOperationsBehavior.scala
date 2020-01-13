@@ -9,9 +9,9 @@ import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity, EntityType
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.NotificationBehavior.{SendNotification, Command => NotificationCommand}
 import com.loyalty.testing.s3.actor.model.`object`._
-import com.loyalty.testing.s3.actor.model.{InternalError, InvalidAccess, InvalidPart, InvalidPartOrder, MultiPartUploadedInitiated, NoSuchKeyExists, NoSuchUpload, ObjectContent, ObjectInfo, PartUploaded}
+import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.notification.{NotificationData, OperationType}
-import com.loyalty.testing.s3.repositories.collections.NoSuchId
+import com.loyalty.testing.s3.repositories.collections.{NoSuchId, NoSuchPart, NotMultiPartUpload}
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, ObjectStatus, UploadInfo}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.BucketVersioning
@@ -98,23 +98,28 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
       case DatabaseError =>
         Behaviors.same
 
-      case GetObject(bucket, key, maybeVersionId, maybeRange, replyTo) =>
+      case GetObject(bucket, key, maybeVersionId, maybeRange, maybePartNumber, replyTo) =>
         val maybeObjectKey = holder.getObject(sanitizeVersionId(bucket, maybeVersionId))
+        val bucketName = bucket.bucketName
         val command =
           maybeObjectKey match {
-            case None => ReplyToSender(NoSuchKeyExists(bucket.bucketName, key), replyTo)
+            case None => ReplyToSender(NoSuchKeyExists(bucketName, key), replyTo)
             case Some(objectKey) =>
               objectKey.status match {
                 case ObjectStatus.Active =>
-                  Try(objectService.getObject(objectKey, maybeRange)) match {
+                  Try(objectService.getObject(objectKey, maybePartNumber, maybeRange)) match {
                     case Success((updatedObjectKey, source)) =>
                       ReplyToSender(ObjectContent(updatedObjectKey, source), replyTo)
+                    case Failure(NoSuchPart(_, _, partNumber)) =>
+                      ReplyToSender(InvalidPart(partNumber), replyTo) // TODO: check AWS for response
+                    case Failure(NotMultiPartUpload(_)) =>
+                      ReplyToSender(NoSuchKeyExists(bucketName, key), replyTo) // TODO: check AWS for response
                     case Failure(ex) =>
                       context.log.error("unable to download object", ex)
                       DatabaseError // TODO: retry
                   }
                 case ObjectStatus.DeleteMarker => ReplyToSender(ObjectInfo(objectKey.copy(deleteMarker = Some(true))), replyTo)
-                case _ => ReplyToSender(NoSuchKeyExists(bucket.bucketName, key), replyTo)
+                case _ => ReplyToSender(NoSuchKeyExists(bucketName, key), replyTo)
               }
           }
         context.self ! command
