@@ -505,6 +505,33 @@ class BucketOperationsBehaviorSpec
     testKit.stop(actorRef)
   }
 
+  it should "get object with part number" in {
+    val key = "big-sample.txt"
+
+    val probe = testKit.createTestProbe[Event]()
+    val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
+    val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
+
+    actorRef ! GetObjectWrapper(key, maybePartNumber = Some(2), replyTo = probe.ref)
+    val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
+
+    val actualContent = getContentSource(objectContent.content).futureValue
+    val expectedContent = getContentSource(100001, 100000).futureValue
+    actualContent mustEqual expectedContent
+    val actualObjectInfo = data.ObjectInfo(objectContent.objectKey)
+    val digestInfo = calculateDigest(100001, 100000).futureValue
+    val expectedObjectInfo = data.ObjectInfo(
+      bucketName = defaultBucketName,
+      key = key,
+      eTag = Some(digestInfo.etag),
+      contentLength = digestInfo.length
+    )
+    actualObjectInfo mustEqual expectedObjectInfo
+
+    testKit.stop(objectActorRef)
+    testKit.stop(actorRef)
+  }
+
   it should "multi part copy an object" in {
     val key = "big-sample.txt"
 

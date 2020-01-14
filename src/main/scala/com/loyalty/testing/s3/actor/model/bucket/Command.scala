@@ -54,6 +54,7 @@ final case class GetObjectMetaWrapper(key: String, replyTo: ActorRef[Event]) ext
 final case class GetObjectWrapper(key: String,
                                   maybeVersionId: Option[String] = None,
                                   maybeRange: Option[ByteRange] = None,
+                                  maybePartNumber: Option[Int] = None,
                                   replyTo: ActorRef[Event]) extends CommandWithReply
 
 final case class DeleteObjectWrapper(key: String,

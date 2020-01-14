@@ -33,7 +33,7 @@ object GetObjectRoute extends CustomMarshallers {
             .via(
               ActorFlow.ask(bucketOperationsActorRef)(
                 (_, replyTo: ActorRef[Event]) =>
-                  ShardingEnvelope(bucketName.toUUID.toString, GetObjectWrapper(key, maybeVersionId, maybeRange, replyTo))
+                  ShardingEnvelope(bucketName.toUUID.toString, GetObjectWrapper(key, maybeVersionId, maybeRange, None, replyTo))
               )
             ).runWith(Sink.head)
         onComplete(eventualEvent) {

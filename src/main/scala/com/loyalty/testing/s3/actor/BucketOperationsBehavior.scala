@@ -162,8 +162,9 @@ class BucketOperationsBehavior private(context: ActorContext[Command],
         objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), GetObjectMeta(bucket, key, replyTo))
         Behaviors.same
 
-      case GetObjectWrapper(key, maybeVersionId, maybeRange, replyTo) =>
-        objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), GetObject(bucket, key, maybeVersionId, maybeRange, None, replyTo))
+      case GetObjectWrapper(key, maybeVersionId, maybeRange, maybePartNumber, replyTo) =>
+        val command = GetObject(bucket, key, maybeVersionId, maybeRange, maybePartNumber, replyTo)
+        objectOperationsActorRef ! ShardingEnvelope(entityId(bucket, key), command)
         Behaviors.same
 
       case DeleteObjectWrapper(key, maybeVersionId, replyTo) =>

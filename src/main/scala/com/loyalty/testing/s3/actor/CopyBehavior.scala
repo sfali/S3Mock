@@ -125,7 +125,7 @@ object CopyBehavior {
       Behaviors.receiveMessagePartial {
         case GetObject =>
           bucketOperationsActorRef ! ShardingEnvelope(source.bucketName.toUUID.toString,
-            GetObjectWrapper(source.key, maybeSourceVersionId, maybeRange, eventResponseWrapper))
+            GetObjectWrapper(source.key, maybeSourceVersionId, maybeRange, replyTo = eventResponseWrapper))
           Behaviors.same
 
         case EventWrapper(ObjectContent(objectKey, content)) if partInfo.isDefined =>
