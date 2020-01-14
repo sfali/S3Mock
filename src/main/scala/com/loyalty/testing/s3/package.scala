@@ -82,7 +82,12 @@ package object s3 {
 
     def replaceNewLine: String = s.replaceAll(System.lineSeparator(), "")
 
-    def toOption: Option[String] = if(s.isEmpty) None else Some(s)
+    def toOption: Option[String] = if (s.isEmpty) None else Some(s)
+
+    def parseEtag: String = {
+      val s1 = if (s.startsWith("\"")) s.drop(1) else s
+      if (s1.endsWith("\"")) s1.dropRight(1) else s1
+    }
   }
 
   implicit class PathOps(path: Path) {

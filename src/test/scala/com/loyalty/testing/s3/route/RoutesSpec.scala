@@ -537,7 +537,7 @@ class RoutesSpec
       status mustEqual OK
       val maybeETagHeader = getHeader(headers, ETAG)
       maybeETagHeader mustBe defined
-      maybeETagHeader.get.value().drop(1).dropRight(1) mustEqual etag
+      maybeETagHeader.get.value().parseEtag mustEqual etag
     }
     PartInfo(partNumber, etag)
   }

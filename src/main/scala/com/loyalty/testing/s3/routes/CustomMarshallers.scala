@@ -53,7 +53,7 @@ trait CustomMarshallers
     nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
       case NodeSeq.Empty => throw Unmarshaller.NoContentException
       case x =>
-        val etag = (x \ "ETag").text.drop(1).dropRight(1)
+        val etag = (x \ "ETag").text.parseEtag
         val lastModified = Instant.parse((x \ "LastModified").text)
         CopyObjectResult(etag, lastModifiedDate = lastModified)
     }
@@ -62,7 +62,7 @@ trait CustomMarshallers
     nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
       case NodeSeq.Empty => throw Unmarshaller.NoContentException
       case x =>
-        val etag = (x \ "ETag").text.drop(1).dropRight(1)
+        val etag = (x \ "ETag").text.parseEtag
         val lastModified = Instant.parse((x \ "LastModified").text)
         CopyPartResult(etag, lastModifiedDate = lastModified)
     }
@@ -92,7 +92,7 @@ trait CustomMarshallers
       case x =>
         val bucketName = (x \ "Bucket").text
         val key = (x \ "Key").text
-        val etag = (x \ "ETag").text.drop(1).dropRight(1)
+        val etag = (x \ "ETag").text.parseEtag
         CompleteMultipartUploadResult(bucketName, key, etag, 0L)
     }
 

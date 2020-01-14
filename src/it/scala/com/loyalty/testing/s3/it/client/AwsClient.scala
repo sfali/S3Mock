@@ -87,7 +87,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
           data.ObjectInfo(
             bucketName = bucketName,
             key = key,
-            eTag = Option(response.eTag().drop(1).dropRight(1)),
+            eTag = Option(response.eTag().parseEtag),
             contentLength = contentLength,
             versionId = Option(response.versionId()),
           )
@@ -107,7 +107,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
           val objectInfo = data.ObjectInfo(
             bucketName = bucketName,
             key = key,
-            eTag = Option(response.eTag().drop(1).dropRight(1)),
+            eTag = Option(response.eTag().parseEtag),
             contentLength = bytesResponse.asUtf8String().length,
             versionId = Option(response.versionId())
           )
@@ -127,7 +127,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
           data.ObjectInfo(
             bucketName,
             key,
-            Option(response.eTag().drop(1).dropRight(1)),
+            Option(response.eTag().parseEtag),
             response.contentLength(),
             ObjectStatus.Active,
             Option(response.versionId())
@@ -207,7 +207,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
           data.ObjectInfo(
             bucketName = response.bucket(),
             key = response.key(),
-            eTag = Option(response.eTag().drop(1).dropRight(1)),
+            eTag = Option(response.eTag().parseEtag),
             versionId = Option(response.versionId())
           )
       }
@@ -224,7 +224,7 @@ class AwsClient(override protected val awsSettings: AwsSettings)
       .map {
         response =>
           CopyObjectResult(
-            eTag = response.copyObjectResult().eTag().drop(1).dropRight(1),
+            eTag = response.copyObjectResult().eTag().parseEtag,
             maybeSourceVersionId = Option(response.copySourceVersionId()),
             maybeVersionId = Option(response.versionId())
           )

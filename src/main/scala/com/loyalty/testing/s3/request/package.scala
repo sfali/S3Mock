@@ -42,7 +42,7 @@ package object request {
 
     def apply(node: NodeSeq): PartInfo = {
       val partNumber = (node \ "PartNumber").text.toInt
-      val eTag = (node \ "ETag").text.drop(1).dropRight(1) // remove quotations
+      val eTag = (node \ "ETag").text.parseEtag // remove quotations
       PartInfo(partNumber, eTag)
     }
 
