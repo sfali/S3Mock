@@ -25,15 +25,16 @@ object GetObjectRoute extends CustomMarshallers {
             bucketOperationsActorRef: ActorRef[ShardingEnvelope[Command]])
            (implicit system: ActorSystem[_],
             timeout: Timeout): Route =
-    (parameter("versionId".?) & optionalHeaderValue(extractRange)) {
-      (maybeVersionId, maybeRange) =>
+    (parameter("partNumber".as[Int].?) & parameter("versionId".?) & optionalHeaderValue(extractRange)) {
+      (maybePartNumber, maybeVersionId, maybeRange) =>
         val eventualEvent =
           Source
             .single("")
             .via(
               ActorFlow.ask(bucketOperationsActorRef)(
                 (_, replyTo: ActorRef[Event]) =>
-                  ShardingEnvelope(bucketName.toUUID.toString, GetObjectWrapper(key, maybeVersionId, maybeRange, None, replyTo))
+                  ShardingEnvelope(bucketName.toUUID.toString, GetObjectWrapper(key, maybeVersionId, maybeRange,
+                    maybePartNumber, replyTo))
               )
             ).runWith(Sink.head)
         onComplete(eventualEvent) {

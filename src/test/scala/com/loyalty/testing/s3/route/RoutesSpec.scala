@@ -396,6 +396,14 @@ class RoutesSpec
     completeMultipartUpload(defaultBucketName, key, uploadId, partInfos)
   }
 
+  it should "get object with part number" in {
+    val key = "big-sample.txt"
+    Get(s"/$defaultBucketName/$key?partNumber=2") ~> routes ~> check {
+      status mustEqual OK
+      response.entity.contentLengthOption.getOrElse(0) mustEqual 5242910
+    }
+  }
+
   it should "multi part copy an object" in {
     val key = "big-sample.txt"
     val uploadId = initiateMultiPartUpload(bucket2, key)
