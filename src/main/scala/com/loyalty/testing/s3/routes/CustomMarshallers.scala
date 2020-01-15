@@ -144,6 +144,9 @@ trait CustomMarshallers
   implicit val InvalidPartMarshallers: ToEntityMarshaller[InvalidPartResponse] =
     xmlResponseMarshallers(`application/octet-stream`)
 
+  implicit val InvalidPartNumberMarshallers: ToEntityMarshaller[InvalidPartNumberResponse] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
   implicit val InvalidPartOrderMarshallers: ToEntityMarshaller[InvalidPartOrderResponse] =
     xmlResponseMarshallers(`application/octet-stream`)
 
@@ -189,6 +192,9 @@ trait CustomMarshallers
 
   implicit val InvalidPartResponseMarshaller: ToResponseMarshaller[InvalidPartResponse] =
     fromToEntityMarshaller[InvalidPartResponse](BadRequest)
+
+  implicit val InvalidPartNumberResponseMarshaller: ToResponseMarshaller[InvalidPartNumberResponse] =
+    fromToEntityMarshaller[InvalidPartNumberResponse](BadRequest)
 
   implicit val ListBucketResultResponse: ToResponseMarshaller[ListBucketResult] =
     fromToEntityMarshaller[ListBucketResult](OK)

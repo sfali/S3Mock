@@ -18,6 +18,4 @@ package object collections {
 
   case class NoSuchPart(id: UUID, uploadId: String, partNumber: Int) extends Exception(s"No such part: $id/$uploadId/$partNumber")
 
-  case class NotMultiPartUpload(id: UUID) extends Exception(s"Specified object ($id) is not uploaded by multipart")
-
 }

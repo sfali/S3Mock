@@ -206,6 +206,7 @@ object ErrorCodes {
   val NoSuchKey: String = "NoSuchKey"
   val NoSuchUpload: String = "NoSuchUpload"
   val InvalidPart = "InvalidPart"
+  val InvalidPartNumber = "InvalidPartNumber"
   val InvalidPartOrder = "InvalidPartOrder"
   val InvalidArgument = "InvalidArgument"
   val InvalidRequest = "InvalidRequest"
@@ -266,6 +267,12 @@ case class InvalidPartResponse(bucketName: String, key: String, partNumber: Int,
       |or the specified entity tag might not have matched the part's entity tag.""".stripMargin
       .replaceAll(System.lineSeparator(), "")
   override val resource: String = s"/$bucketName/${key.decode}?partNumber=$partNumber&uploadId=$uploadId"
+}
+
+case class InvalidPartNumberResponse(bucketName: String, key: String, partNumber: Int) extends ErrorResponse {
+  override val code: String = InvalidPartNumber
+  override val message: String = "The requested partnumber is not satisfiable"
+  override val resource: String = s"/$bucketName/${key.decode}?partNumber=$partNumber"
 }
 
 case class InvalidPartOrderResponse(bucketName: String, key: String) extends ErrorResponse {

@@ -8,10 +8,10 @@ import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.cluster.sharding.typed.scaladsl.{ClusterSharding, Entity, EntityTypeKey}
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.NotificationBehavior.{SendNotification, Command => NotificationCommand}
-import com.loyalty.testing.s3.actor.model.`object`._
 import com.loyalty.testing.s3.actor.model._
+import com.loyalty.testing.s3.actor.model.`object`._
 import com.loyalty.testing.s3.notification.{NotificationData, OperationType}
-import com.loyalty.testing.s3.repositories.collections.{NoSuchId, NoSuchPart, NotMultiPartUpload}
+import com.loyalty.testing.s3.repositories.collections.{NoSuchId, NoSuchPart}
 import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, ObjectStatus, UploadInfo}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.BucketVersioning
@@ -111,9 +111,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
                     case Success((updatedObjectKey, source)) =>
                       ReplyToSender(ObjectContent(updatedObjectKey, source), replyTo)
                     case Failure(NoSuchPart(_, _, partNumber)) =>
-                      ReplyToSender(InvalidPart(partNumber), replyTo) // TODO: check AWS for response
-                    case Failure(NotMultiPartUpload(_)) =>
-                      ReplyToSender(NoSuchKeyExists(bucketName, key), replyTo) // TODO: check AWS for response
+                      ReplyToSender(InvalidPart(partNumber), replyTo)
                     case Failure(ex) =>
                       context.log.error("unable to download object", ex)
                       DatabaseError // TODO: retry

@@ -78,10 +78,7 @@ class NitriteDatabase(rootPath: Path,
           case Some(uploadObjectKey) => (uploadObjectKey, partNumber)
           case None => throw NoSuchPart(objectKey.id, uploadId, partNumber)
         }
-      case (None, Some(_)) =>
-        // request has part number but this is not uploaded by multipart
-        throw NotMultiPartUpload(objectKey.id)
-      case (_, None) => (objectKey, -1)
+      case (_, _) => (objectKey, -1)
     }
 
   def createOrUpdateObject(objectKey: ObjectKey): Future[ObjectKey] =
