@@ -455,8 +455,9 @@ class BucketOperationsBehaviorSpec
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
-    actorRef ! GetObjectWrapper(key, maybeVersionId = Some(UUID.randomUUID().toString), replyTo = probe.ref)
-    probe.expectMessage(NoSuchKeyExists(defaultBucketName, key))
+    val versionId = UUID.randomUUID().toString
+    actorRef ! GetObjectWrapper(key, maybeVersionId = Some(versionId), replyTo = probe.ref)
+    probe.expectMessage(NoSuchVersionExists(defaultBucketName, key, versionId))
 
     testKit.stop(objectActorRef)
     testKit.stop(actorRef)
@@ -661,10 +662,10 @@ class BucketOperationsBehaviorSpec
       ObjectIdentifier("unknown.txt") :: Nil
     actorRef ! DeleteObjects(objects, replyTo = probe.ref)
     val actualResult = probe.receiveMessage().asInstanceOf[DeleteObjectsResult]
-    val expectedDeleted = DeletedObject("input/sample.txt") :: DeletedObject("big-sample.txt") :: Nil
-    val expectedErrors = DeleteError("unknown.txt", "NoSuchKey", "The resource you requested does not exist") :: Nil
-    expectedDeleted mustEqual actualResult.result.deleted
-    expectedErrors mustEqual actualResult.result.errors
+    val expectedDeleted = (DeletedObject("input/sample.txt") :: DeletedObject("big-sample.txt") :: Nil).sortBy(_.key)
+    val expectedErrors = (DeleteError("unknown.txt", "NoSuchKey", "The resource you requested does not exist") :: Nil).sortBy(_.key)
+    expectedDeleted mustEqual actualResult.result.deleted.sortBy(_.key)
+    expectedErrors mustEqual actualResult.result.errors.sortBy(_.key)
 
     testKit.stop(objectActorRef)
     testKit.stop(actorRef)

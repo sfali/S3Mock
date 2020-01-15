@@ -50,4 +50,6 @@ final case class InvalidPart(partNumber: Int) extends Event
 
 final case class BucketAlreadyExists(bucket: Bucket) extends Event
 
+final case class NoSuchVersionExists(bucketName: String, key: String, versionId: String) extends Event
+
 case object InternalError extends Event

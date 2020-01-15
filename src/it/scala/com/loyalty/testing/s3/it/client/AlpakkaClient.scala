@@ -113,7 +113,6 @@ class AlpakkaClient(override protected val awsSettings: AwsSettings)
         bucketName = result.bucket,
         key = result.key,
         eTag = Some(result.etag),
-        contentLength = 0,
         versionId = result.versionId
       ))
 

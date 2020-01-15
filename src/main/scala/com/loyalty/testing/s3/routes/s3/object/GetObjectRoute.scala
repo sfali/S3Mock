@@ -12,7 +12,7 @@ import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.actor.model.bucket.{Command, GetObjectWrapper}
-import com.loyalty.testing.s3.response.{InternalServiceResponse, InvalidPartNumberResponse, NoSuchBucketResponse, NoSuchKeyResponse}
+import com.loyalty.testing.s3.response.{InternalServiceResponse, InvalidPartNumberResponse, NoSuchBucketResponse, NoSuchKeyResponse, NoSuchVersionResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
 
@@ -47,6 +47,8 @@ object GetObjectRoute extends CustomMarshallers {
           case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
           case Success(InvalidPart(partNumber)) => complete(InvalidPartNumberResponse(bucketName, key, partNumber))
           case Success(NoSuchKeyExists(bucketName, key)) => complete(NoSuchKeyResponse(bucketName, key))
+          case Success(NoSuchVersionExists(bucketName, key, versionId)) =>
+            complete(NoSuchVersionResponse(bucketName, key, versionId))
           case Success(InvalidAccess) =>
             system.log.warn("GetObjectRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
             complete(InternalServiceResponse(s"$bucketName/$key"))

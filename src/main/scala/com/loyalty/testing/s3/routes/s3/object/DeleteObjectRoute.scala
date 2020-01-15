@@ -12,7 +12,7 @@ import akka.util.Timeout
 import com.loyalty.testing.s3._
 import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.actor.model.bucket.{Command, DeleteObjectWrapper}
-import com.loyalty.testing.s3.response.{InternalServiceResponse, NoSuchBucketResponse, NoSuchKeyResponse}
+import com.loyalty.testing.s3.response.{InternalServiceResponse, NoSuchBucketResponse, NoSuchKeyResponse, NoSuchVersionResponse}
 import com.loyalty.testing.s3.routes.CustomMarshallers
 import com.loyalty.testing.s3.routes.s3._
 
@@ -41,6 +41,8 @@ object DeleteObjectRoute extends CustomMarshallers {
             .withHeaders(createResponseHeaders(objectKey)))
           case Success(NoSuchBucketExists(_)) => complete(NoSuchBucketResponse(bucketName))
           case Success(NoSuchKeyExists(bucketName, key)) => complete(NoSuchKeyResponse(bucketName, key))
+          case Success(NoSuchVersionExists(bucketName, key, versionId)) =>
+            complete(NoSuchVersionResponse(bucketName, key, versionId))
           case Success(InvalidAccess) =>
             system.log.warn("DeleteObjectRoute: invalid access to actor. bucket_name={}, key={}", bucketName, key)
             complete(InternalServiceResponse(s"$bucketName/$key"))

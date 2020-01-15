@@ -12,7 +12,7 @@ import com.loyalty.testing.s3.actor.model._
 import com.loyalty.testing.s3.actor.model.`object`._
 import com.loyalty.testing.s3.notification.{NotificationData, OperationType}
 import com.loyalty.testing.s3.repositories.collections.{NoSuchId, NoSuchPart}
-import com.loyalty.testing.s3.repositories.model.{Bucket, ObjectKey, ObjectStatus, UploadInfo}
+import com.loyalty.testing.s3.repositories.model.{ObjectKey, ObjectStatus, UploadInfo}
 import com.loyalty.testing.s3.repositories.{NitriteDatabase, ObjectIO}
 import com.loyalty.testing.s3.request.BucketVersioning
 import com.loyalty.testing.s3.request.BucketVersioning.Enabled
@@ -99,11 +99,16 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
         Behaviors.same
 
       case GetObject(bucket, key, maybeVersionId, maybeRange, maybePartNumber, replyTo) =>
-        val maybeObjectKey = holder.getObject(sanitizeVersionId(bucket, maybeVersionId))
+        val maybeSanitizedVersionId = sanitizeVersionId(maybeVersionId)
+        val maybeObjectKey = holder.getObject(maybeSanitizedVersionId)
         val bucketName = bucket.bucketName
         val command =
           maybeObjectKey match {
-            case None => ReplyToSender(NoSuchKeyExists(bucketName, key), replyTo)
+            case None =>
+              maybeSanitizedVersionId match {
+                case Some(versionId) => ReplyToSender(NoSuchVersionExists(bucketName, key, versionId), replyTo)
+                case None => ReplyToSender(NoSuchKeyExists(bucketName, key), replyTo)
+              }
             case Some(objectKey) =>
               objectKey.status match {
                 case ObjectStatus.Active =>
@@ -124,7 +129,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
         Behaviors.same
 
       case DeleteObject(bucket, key, maybeVersionId, replyTo) =>
-        val maybeSanitizedVersionId = sanitizeVersionId(bucket, maybeVersionId)
+        val maybeSanitizedVersionId = sanitizeVersionId(maybeVersionId)
         holder.getObject(maybeSanitizedVersionId) match {
           case Some(objectKey) =>
             (maybeSanitizedVersionId, bucket.version) match {
@@ -163,7 +168,12 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
           case None =>
             context.log.warn("unable to delete, reason=NoSuchKey, bucket_name={}, key={}, version_id={}",
               bucket.bucketName, key, maybeVersionId.getOrElse("None"))
-            context.self ! ReplyToSender(NoSuchKeyExists(bucket.bucketName, key), replyTo)
+            val command =
+              maybeSanitizedVersionId match {
+                case Some(versionId) => ReplyToSender(NoSuchVersionExists(bucket.bucketName, key, versionId), replyTo)
+                case None => ReplyToSender(NoSuchKeyExists(bucket.bucketName, key), replyTo)
+              }
+            context.self ! command
         }
         Behaviors.same
 
@@ -279,10 +289,9 @@ object ObjectOperationsBehavior {
           (implicit settings: Settings): ActorRef[ShardingEnvelope[Command]] =
     sharding.init(Entity(TypeKey)(_ => ObjectOperationsBehavior(settings.enableNotification, objectIO, database, notificationActorRef)))
 
-  private def sanitizeVersionId(bucket: Bucket, maybeVersionId: Option[String]): Option[String] =
-    if (BucketVersioning.NotExists == bucket.version && maybeVersionId.isDefined) {
-      // if version id provided and versioning doesn't exists then set some dummy value
-      // so that it results in NoSuckKey
-      Some(UUID.randomUUID().toString)
-    } else maybeVersionId
+  private def sanitizeVersionId(maybeVersionId: Option[String]): Option[String] = {
+    // for non-versioned bucket "null" is valid versionId, convert "null" versionId to "None"
+    if (maybeVersionId.isDefined && maybeVersionId.get == "null") None else maybeVersionId
+  }
+
 }

@@ -201,10 +201,11 @@ case class DeleteResult(deleted: List[DeletedObject] = Nil,
 }
 
 object ErrorCodes {
-  val NoSuchBucket: String = "NoSuchBucket"
-  val BucketAlreadyExists: String = "BucketAlreadyExists"
-  val NoSuchKey: String = "NoSuchKey"
-  val NoSuchUpload: String = "NoSuchUpload"
+  val NoSuchBucket = "NoSuchBucket"
+  val BucketAlreadyExists = "BucketAlreadyExists"
+  val NoSuchKey = "NoSuchKey"
+  val NoSuchUpload = "NoSuchUpload"
+  val NoSuchVersion = "NoSuchVersion"
   val InvalidPart = "InvalidPart"
   val InvalidPartNumber = "InvalidPartNumber"
   val InvalidPartOrder = "InvalidPartOrder"
@@ -248,6 +249,29 @@ case class NoSuchKeyResponse(bucketName: String, key: String) extends ErrorRespo
   override val code: String = NoSuchKey
   override val message: String = "The resource you requested does not exist"
   override val resource: String = s"/$bucketName/$key"
+}
+
+case class NoSuchVersionResponse(bucketName: String, key: String, versionId: String) extends ErrorResponse {
+  override val code: String = NoSuchVersion
+  override val message: String = "The specified version does not exist"
+  override val resource: String = s"/$bucketName/$key?versionId=$versionId"
+}
+
+object NoSuchVersionResponse {
+  def apply(bucketName: String,
+            key: String,
+            versionId: String): NoSuchVersionResponse = new NoSuchVersionResponse(bucketName, key, versionId)
+
+  def apply(nodeSeq: NodeSeq): NoSuchVersionResponse = {
+    val resource = (nodeSeq \ "Resource").text.drop(1) // drop starting '/'
+    val indexOfSeparator = resource.indexOf('/')
+    val bucketName = resource.substring(0, indexOfSeparator)
+    val key = resource.substring(indexOfSeparator + 1)
+    val versionParam = "?versionId="
+    val indexOfVersionParam = resource.indexOf(versionParam)
+    val versionId = resource.substring(indexOfVersionParam + versionParam.length + 1)
+    NoSuchVersionResponse(bucketName, key, versionId)
+  }
 }
 
 case class NoSuchUploadResponse(bucketName: String, key: String) extends ErrorResponse {
