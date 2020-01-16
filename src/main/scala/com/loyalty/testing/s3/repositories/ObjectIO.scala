@@ -95,7 +95,8 @@ class ObjectIO(root: Path, fileStream: FileStream) {
         .foldLeft("") {
           case (agg, etag) => agg + etag
         }
-    val finalETag = s"${toBase16(concatenatedETag)}-${parts.length}"
+    val partsCount = parts.length
+    val finalETag = s"${toBase16(concatenatedETag)}-$partsCount"
     fileStream.mergeFiles(objectPath, partPaths)
       .flatMap {
         digestInfo =>
@@ -112,7 +113,8 @@ class ObjectIO(root: Path, fileStream: FileStream) {
               contentMd5 = Some(digestInfo.md5),
               contentLength = digestInfo.length,
               objectPath = Some(objectPath.getParent.getFileName.toString),
-              uploadId = Some(uploadInfo.uploadId)
+              uploadId = Some(uploadInfo.uploadId),
+              partsCount = Some(partsCount)
             ))
       }
   }

@@ -401,6 +401,7 @@ class RoutesSpec
     Get(s"/$defaultBucketName/$key?partNumber=2") ~> routes ~> check {
       status mustEqual OK
       response.entity.contentLengthOption.getOrElse(0) mustEqual 5242910
+      getPartsCount(headers) mustBe Some(3)
     }
   }
 
@@ -598,6 +599,9 @@ class RoutesSpec
 
   private def getContent(response: HttpResponse) =
     response.entity.dataBytes.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
+
+  private def getPartsCount(headers: Seq[HttpHeader]): Option[Int] =
+    getHeader(headers, PartsCountHeader).map(_.value()).map(_.toInt)
 
   private def createCopyObjectResult(eTag: String, headers: Seq[HttpHeader]) =
     CopyObjectResult(

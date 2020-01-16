@@ -43,6 +43,7 @@ package object s3 {
   val VersionIdHeader = "x-amz-version-id"
   val SourceVersionIdHeader = "x-amz-copy-source-version-id"
   val DeleteMarkerHeader = "x-amz-delete-marker"
+  val PartsCountHeader = "x-amz-mp-parts-count"
 
   private val md = MessageDigest.getInstance("MD5")
 

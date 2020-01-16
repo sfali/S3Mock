@@ -73,9 +73,9 @@ class NitriteDatabase(rootPath: Path,
   def getObject(objectKey: ObjectKey, maybePartNumber: Option[Int] = None): (ObjectKey, Int) =
     (objectKey.uploadId, maybePartNumber) match {
       case (Some(uploadId), Some(partNumber)) =>
-        val maybeUploadObjectKey = uploadCollection.getUpload(uploadId, partNumber).map(_.toUploadObjectKey)
-        maybeUploadObjectKey match {
-          case Some(uploadObjectKey) => (uploadObjectKey, partNumber)
+        val maybeUploadInfo = uploadCollection.getUpload(uploadId, partNumber)
+        maybeUploadInfo match {
+          case Some(uploadInfo) => (objectKey.copy(objectPath = Some(uploadInfo.uploadPath)), partNumber)
           case None => throw NoSuchPart(objectKey.id, uploadId, partNumber)
         }
       case (_, _) => (objectKey, -1)

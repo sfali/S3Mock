@@ -499,7 +499,7 @@ class BucketOperationsBehaviorSpec
     actorRef ! CompleteUploadWrapper(key, uploadId, parts, probe.ref)
     val actualObjectInfo = data.ObjectInfo(probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey)
     val (etag, contentLength) = calculateETagAndLength(partBoundaries)
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etag), contentLength)
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etag), contentLength, partsCount = Some(3))
     actualObjectInfo mustEqual expectedObjectInfo
 
     testKit.stop(objectActorRef)

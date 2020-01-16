@@ -17,6 +17,7 @@ package object data {
                         eTag: Option[String],
                         contentLength: Long,
                         status: ObjectStatus,
+                        partsCount: Option[Int],
                         versionId: Option[String] = None)
 
   object ObjectInfo {
@@ -25,12 +26,13 @@ package object data {
               eTag: Option[String] = None,
               contentLength: Long = 0L,
               status: ObjectStatus = ObjectStatus.Active,
+              partsCount: Option[Int] = None,
               versionId: Option[String] = None): ObjectInfo =
-      new ObjectInfo(bucketName, key, eTag, contentLength, status, versionId)
+      new ObjectInfo(bucketName, key, eTag, contentLength, status, partsCount, versionId)
 
     def apply(objectKey: ObjectKey): ObjectInfo =
       ObjectInfo(objectKey.bucketName, objectKey.key, objectKey.eTag, objectKey.contentLength, objectKey.status,
-        objectKey.actualVersionId)
+        objectKey.partsCount, objectKey.actualVersionId)
   }
 
 }

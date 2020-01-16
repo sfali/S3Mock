@@ -20,6 +20,7 @@ case class ObjectKey(id: UUID,
                      objectPath: Option[String],
                      lastModifiedTime: OffsetDateTime,
                      uploadId: Option[String],
+                     partsCount: Option[Int],
                      deleteMarker: Option[Boolean] = None) {
   def actualVersionId: Option[String] =
     version match {
@@ -44,6 +45,7 @@ object ObjectKey {
             objectPath: Option[String] = None,
             lastModifiedTime: OffsetDateTime = OffsetDateTime.now,
             uploadId: Option[String] = None,
+            partsCount: Option[Int] = None,
             deleteMarker: Option[Boolean] = None): ObjectKey =
     new ObjectKey(
       id,
@@ -59,6 +61,7 @@ object ObjectKey {
       objectPath,
       lastModifiedTime,
       uploadId,
+      partsCount,
       deleteMarker
     )
 
@@ -76,6 +79,7 @@ object ObjectKey {
       contentLength = doc.getLong(ContentLengthField),
       objectPath = doc.getOptionalString(PathField),
       lastModifiedTime = doc.getLastModifiedTime.toOffsetDateTime,
+      partsCount = doc.getOptionalInt(PartsCountField),
       uploadId = doc.getOptionalString(UploadIdField)
     )
 }
