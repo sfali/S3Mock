@@ -78,7 +78,7 @@ class NitriteDatabase(rootPath: Path,
           case Some(uploadInfo) => (objectKey.copy(objectPath = Some(uploadInfo.uploadPath)), partNumber)
           case None => throw NoSuchPart(objectKey.id, uploadId, partNumber)
         }
-      case (_, _) => (objectKey, -1)
+      case (_, _) => (objectKey.copy(partsCount = None), -1)
     }
 
   def createOrUpdateObject(objectKey: ObjectKey): Future[ObjectKey] =
