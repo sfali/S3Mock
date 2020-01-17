@@ -217,7 +217,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
 
       case PartSaved(uploadInfo, replyTo) =>
         val parts = uploadParts.getOrElse(uploadInfo.uploadId, Set.empty[UploadInfo])
-        uploadParts = uploadParts + (uploadInfo.uploadId -> (parts + uploadInfo))
+        uploadParts += uploadInfo.uploadId -> (parts + uploadInfo)
         context.self ! ReplyToSender(PartUploaded(uploadInfo), replyTo)
         Behaviors.same
 
@@ -235,6 +235,7 @@ class ObjectOperationsBehavior(context: ActorContext[Command],
         Behaviors.same
 
       case ResetUploadInfo(objectKey, replyTo) =>
+        uploadParts -= uploadInfo.get.uploadId
         uploadInfo = None
         context.self ! ReplyToSender(ObjectInfo(objectKey), replyTo, Some(objectKey), Some(CompleteMultipartUpload))
         Behaviors.same
