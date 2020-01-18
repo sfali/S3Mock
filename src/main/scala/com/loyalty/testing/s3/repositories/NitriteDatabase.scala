@@ -11,7 +11,7 @@ import com.loyalty.testing.s3.request.{BucketVersioning, VersioningConfiguration
 import com.loyalty.testing.s3.settings.Settings
 import com.loyalty.testing.s3.utils.DateTimeProvider
 import com.loyalty.testing.s3.{DBSettings, _}
-import org.dizitart.no2.Nitrite
+import org.dizitart.no2.{Document, Nitrite}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
@@ -96,7 +96,7 @@ class NitriteDatabase(rootPath: Path,
     val uploadId = objectKey.uploadId.get
     Try {
       if (BucketVersioning.Enabled != objectKey.version) uploadCollection.deleteAll(uploadId)
-      val allUploads = uploadStagingCollection.findAll(uploadId).tail
+      val allUploads = populateContentRange(uploadStagingCollection.findAll(uploadId).tail)
       uploadCollection.insert(allUploads: _*)
       uploadStagingCollection.deleteAll(uploadId)
     } match {
@@ -129,6 +129,27 @@ class NitriteDatabase(rootPath: Path,
 
   def close(): Unit = db.close()
 
+  @scala.annotation.tailrec
+  private def populateContentRange(srcList: List[Document], targetList: List[Document] = Nil): List[Document] =
+    srcList match {
+      case Nil => targetList
+      case document :: _ =>
+        val length = document.getLong(ContentLengthField)
+        val updatedDocument =
+          targetList match {
+            case Nil =>
+              document.put(RangeStartField, 0L)
+              document.put(RangeEndField, length - 1)
+              document
+            case _ =>
+              val lastDocument = targetList.last
+              val last = lastDocument.getLong(RangeEndField)
+              document.put(RangeStartField, last + 1)
+              document.put(RangeEndField, last + length)
+              document
+          }
+        populateContentRange(srcList.tail, targetList :+ updatedDocument)
+    }
 }
 
 object NitriteDatabase {

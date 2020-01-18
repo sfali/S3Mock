@@ -30,6 +30,8 @@ package object repositories {
   val ETagField = "etag"
   val ContentMd5Field = "content-md5"
   val ContentLengthField = "content-length"
+  val RangeStartField = "range-start"
+  val RangeEndField = "range-end"
   val VersionIndexField = "version-index"
   val VersionIdField = "version-id"
   val UploadIdField = "upload-id"
