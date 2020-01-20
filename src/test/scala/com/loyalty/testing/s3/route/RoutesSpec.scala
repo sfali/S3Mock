@@ -220,12 +220,14 @@ class RoutesSpec
   it should "get object with range between two positions from the start of file" in {
     val key = "sample.txt"
     val expectedContent = "1. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val rangeHeader = Range(ByteRange(0, 53))
+    val range = ByteRange(0, 53)
+    val rangeHeader = Range(range)
     Get(s"/$defaultBucketName/$key").withHeaders(rangeHeader :: Nil) ~> routes ~> check {
-      status mustEqual OK
+      status mustEqual PartialContent
       getHeader(headers, ETAG) mustBe Some(RawHeader(ETAG, s""""$etagDigest1""""))
       getHeader(headers, CONTENT_MD5) mustBe Some(RawHeader(CONTENT_MD5, md5Digest1))
       getHeader(headers, DeleteMarkerHeader) mustBe empty
+      validateContentRange(headers, range, 424)
       response.entity.contentLengthOption mustBe Some(53)
       expectedContent mustEqual getContent(response)
     }
@@ -399,9 +401,20 @@ class RoutesSpec
   it should "get object with part number" in {
     val key = "big-sample.txt"
     Get(s"/$defaultBucketName/$key?partNumber=2") ~> routes ~> check {
-      status mustEqual OK
+      status mustEqual PartialContent
       response.entity.contentLengthOption.getOrElse(0) mustEqual 5242910
-      getPartsCount(headers) mustBe Some(3)
+      validatePartsCount(headers)
+      validateContentRange(headers, ByteRange(5242910, 10485820), 11890000)
+    }
+  }
+
+  it should "get object with different part number" in {
+    val key = "big-sample.txt"
+    Get(s"/$defaultBucketName/$key?partNumber=3") ~> routes ~> check {
+      status mustEqual PartialContent
+      response.entity.contentLengthOption.getOrElse(0) mustEqual 1404180
+      validatePartsCount(headers)
+      validateContentRange(headers, ByteRange(10485820, 11890000), 11890000)
     }
   }
 
@@ -600,8 +613,20 @@ class RoutesSpec
   private def getContent(response: HttpResponse) =
     response.entity.dataBytes.map(_.utf8String).runWith(Sink.seq).map(_.mkString("")).futureValue
 
-  private def getPartsCount(headers: Seq[HttpHeader]): Option[Int] =
-    getHeader(headers, PartsCountHeader).map(_.value()).map(_.toInt)
+  private def validatePartsCount(headers: Seq[HttpHeader], expected: Int = 3): Assertion = {
+    val partsCount = getHeader(headers, PartsCountHeader).map(_.value()).map(_.toInt)
+    partsCount mustBe defined
+    partsCount.get mustEqual expected
+  }
+
+  private def validateContentRange(headers: Seq[HttpHeader],
+                                   expected: ByteRange.Slice,
+                                   totalLength: Long) = {
+    val range = getHeader(headers, ContentRangeHeader).map(_.value())
+    range mustBe defined
+    range.get mustEqual s"bytes ${expected.first}-${expected.last - 1}/$totalLength"
+  }
+
 
   private def createCopyObjectResult(eTag: String, headers: Seq[HttpHeader]) =
     CopyObjectResult(

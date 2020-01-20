@@ -40,6 +40,7 @@ package object s3 {
   val UserDir: Path = System.getProperty("user.dir").toPath
   val ETAG = "ETag"
   val CONTENT_MD5 = "Content-MD5"
+  val ContentRangeHeader = "Content-Range"
   val VersionIdHeader = "x-amz-version-id"
   val SourceVersionIdHeader = "x-amz-copy-source-version-id"
   val DeleteMarkerHeader = "x-amz-delete-marker"
@@ -83,7 +84,7 @@ package object s3 {
 
     def replaceNewLine: String = s.replaceAll(System.lineSeparator(), "")
 
-    def toOption: Option[String] = if(s.isEmpty) None else Some(s)
+    def toOption: Option[String] = if (s.isEmpty) None else Some(s)
   }
 
   implicit class PathOps(path: Path) {
@@ -121,7 +122,9 @@ package object s3 {
     CompleteMultipartUploadResult(bucketName, key, eTag, 0L, maybeVersionId)
   }
 
-  case class DownloadRange(startPosition: Long, endPosition: Long, capacity: Long)
+  case class DownloadRange(startPosition: Long, endPosition: Long, capacity: Long) {
+    def toByteRange: Slice = ByteRange(startPosition, endPosition - 1)
+  }
 
   object DownloadRange {
     def apply(path: Path, maybeRange: Option[ByteRange] = None): DownloadRange = {

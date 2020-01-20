@@ -322,7 +322,8 @@ class BucketOperationsBehaviorSpec
   it should "get object with range between two positions from the start of file" in {
     val key = "sample.txt"
     val expectedContent = "1. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length)
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length,
+      contentRange = Some(ByteRange(0, expectedContent.length - 1)))
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -342,12 +343,15 @@ class BucketOperationsBehaviorSpec
   it should "get object with range between two positions from the middle of file" in {
     val key = "sample.txt"
     val expectedContent = "6. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length)
+    val rangeStart = 265
+    val rangeEnd = 318
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length,
+      contentRange = Some(ByteRange(rangeStart, rangeEnd - 1)))
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
-    actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange(265, 318)), replyTo = probe.ref)
+    actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange(rangeStart, rangeEnd)), replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
     val actualObjectInfo = data.ObjectInfo(objectContent.objectKey)
@@ -362,7 +366,10 @@ class BucketOperationsBehaviorSpec
   it should "get object with suffix range" in {
     val key = "sample.txt"
     val expectedContent = "8. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length)
+    val rangeStart = 371
+    val rangeEnd = rangeStart + expectedContent.length - 1
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length,
+      contentRange = Some(ByteRange(rangeStart, rangeEnd)))
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
@@ -382,12 +389,15 @@ class BucketOperationsBehaviorSpec
   it should "get object with range with offset" in {
     val key = "sample.txt"
     val expectedContent = "8. A quick brown fox jumps over the silly lazy dog.\r\n"
-    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length)
+    val rangeStart = 371
+    val rangeEnd = rangeStart + expectedContent.length - 1
+    val expectedObjectInfo = data.ObjectInfo(defaultBucketName, key, Some(etagDigest1), expectedContent.length,
+      contentRange = Some(ByteRange(rangeStart, rangeEnd)))
 
     val probe = testKit.createTestProbe[Event]()
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
-    actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange.fromOffset(371)), replyTo = probe.ref)
+    actorRef ! GetObjectWrapper(key, maybeRange = Some(ByteRange.fromOffset(rangeStart)), replyTo = probe.ref)
 
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
     val actualObjectInfo = data.ObjectInfo(objectContent.objectKey)
@@ -513,6 +523,9 @@ class BucketOperationsBehaviorSpec
     val objectActorRef = shardingObjectOperationsActorRef(testKit, objectIO, database, notificationService)
     val actorRef = testKit.spawn(BucketOperationsBehavior(database, objectActorRef), defaultBucketNameUUID)
 
+    actorRef ! GetObjectMetaWrapper(key, probe.ref)
+    val fullObjectKey = probe.receiveMessage().asInstanceOf[ObjectInfo].objectKey
+
     actorRef ! GetObjectWrapper(key, maybePartNumber = Some(2), replyTo = probe.ref)
     val objectContent = probe.receiveMessage().asInstanceOf[ObjectContent]
 
@@ -524,8 +537,9 @@ class BucketOperationsBehaviorSpec
     val expectedObjectInfo = data.ObjectInfo(
       bucketName = defaultBucketName,
       key = key,
-      eTag = Some(digestInfo.etag),
-      contentLength = digestInfo.length
+      eTag = fullObjectKey.eTag,
+      contentLength = digestInfo.length,
+      contentRange = Some(ByteRange(digestInfo.length, digestInfo.length + expectedContent.length - 1))
     )
     actualObjectInfo mustEqual expectedObjectInfo
 

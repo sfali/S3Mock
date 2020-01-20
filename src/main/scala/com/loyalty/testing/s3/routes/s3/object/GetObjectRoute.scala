@@ -2,7 +2,7 @@ package com.loyalty.testing.s3.routes.s3.`object`
 
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.cluster.sharding.typed.ShardingEnvelope
-import akka.http.scaladsl.model.StatusCodes.{NotFound, OK}
+import akka.http.scaladsl.model.StatusCodes.{NotFound, OK, PartialContent}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
@@ -39,7 +39,12 @@ object GetObjectRoute extends CustomMarshallers {
             ).runWith(Sink.head)
         onComplete(eventualEvent) {
           case Success(ObjectContent(objectKey, content)) =>
-            complete(HttpResponse(OK)
+            val statusCode =
+              objectKey.contentRange match {
+                case Some(_) => PartialContent
+                case None => OK
+              }
+            complete(HttpResponse(statusCode)
               .withEntity(HttpEntity(ContentTypes.`application/octet-stream`, objectKey.contentLength, content))
               .withHeaders(createResponseHeaders(objectKey)))
           case Success(ObjectInfo(objectKey)) => complete(HttpResponse(NotFound)

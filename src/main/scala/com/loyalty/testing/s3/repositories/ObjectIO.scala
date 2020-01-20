@@ -1,6 +1,6 @@
 package com.loyalty.testing.s3.repositories
 
-import java.nio.file.{Files, Path}
+import java.nio.file.{Files, Path, StandardCopyOption}
 import java.util.UUID
 
 import akka.Done
@@ -50,6 +50,7 @@ class ObjectIO(root: Path, fileStream: FileStream) {
               eTag = Some(digestInfo.etag),
               contentMd5 = Some(digestInfo.md5),
               contentLength = digestInfo.length,
+              fullContentLength = digestInfo.length,
               objectPath = Some(objectPath.getParent.getFileName.toString)
             ))
       }
@@ -112,6 +113,7 @@ class ObjectIO(root: Path, fileStream: FileStream) {
               eTag = Some(finalETag),
               contentMd5 = Some(digestInfo.md5),
               contentLength = digestInfo.length,
+              fullContentLength = digestInfo.length,
               objectPath = Some(objectPath.getParent.getFileName.toString),
               uploadId = Some(uploadInfo.uploadId),
               partsCount = Some(partsCount)
@@ -125,7 +127,7 @@ class ObjectIO(root: Path, fileStream: FileStream) {
     val path = getUploadPath(uploadDir, uploadInfo.partNumber, staging = false)
     Try {
       if (BucketVersioning.Enabled != objectKey.version) clean(path) // first clean existing folder, if applicable
-      Files.move(stagingPath, path)
+      Files.move(stagingPath, path, StandardCopyOption.REPLACE_EXISTING)
       clean(getUploadPath(uploadDir, uploadInfo.partNumber, staging = true))
     } match {
       case Failure(ex) => Future.failed(ex)
@@ -140,7 +142,12 @@ class ObjectIO(root: Path, fileStream: FileStream) {
       if (partNumber > 0) getUploadPath(objectKey.objectPath.get, partNumber, staging = false)
       else getObjectPath(objectKey.bucketName, objectKey.key, objectKey.version, objectKey.versionId)
     val (downloadRange, source) = fileStream.downloadFile(objectPath, maybeRange = maybeRange)
-    (objectKey.copy(contentLength = downloadRange.capacity), source)
+    val range =
+      maybeRange match {
+        case Some(_) => Some(downloadRange.toByteRange)
+        case None => objectKey.contentRange
+      }
+    (objectKey.copy(contentLength = downloadRange.capacity, contentRange = range), source) // TODO:
   }
 
   def delete(objectKey: ObjectKey): Unit = {

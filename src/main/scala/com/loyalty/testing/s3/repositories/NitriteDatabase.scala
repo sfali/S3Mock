@@ -75,7 +75,8 @@ class NitriteDatabase(rootPath: Path,
       case (Some(uploadId), Some(partNumber)) =>
         val maybeUploadInfo = uploadCollection.getUpload(uploadId, partNumber)
         maybeUploadInfo match {
-          case Some(uploadInfo) => (objectKey.copy(objectPath = Some(uploadInfo.uploadPath)), partNumber)
+          case Some(uploadInfo) => (objectKey.copy(objectPath = Some(uploadInfo.uploadPath),
+            contentRange = Some(uploadInfo.contentRange)), partNumber)
           case None => throw NoSuchPart(objectKey.id, uploadId, partNumber)
         }
       case (_, _) => (objectKey.copy(partsCount = None), -1)

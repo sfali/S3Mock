@@ -16,7 +16,8 @@ package object s3 {
       (ETAG, objectKey.eTag.map(etag => s""""$etag"""")) +
       (VersionIdHeader, objectKey.actualVersionId) +
       (DeleteMarkerHeader, objectKey.deleteMarker.filter(_ == true).map(_.toString)) +
-      (PartsCountHeader, objectKey.partsCount.map(_.toString))
+      (PartsCountHeader, objectKey.partsCount.map(_.toString)) +
+      (ContentRangeHeader, objectKey.contentRangeValue)
 
   def extractRange: HttpHeader => Option[ByteRange] = {
     case h: Range => h.ranges.headOption

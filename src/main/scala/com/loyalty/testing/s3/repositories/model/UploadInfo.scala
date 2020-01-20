@@ -30,6 +30,7 @@ case class UploadInfo(bucketName: String,
       eTag = Some(eTag),
       contentMd5 = Some(contentMd5),
       contentLength = contentLength,
+      fullContentLength = contentLength,
       objectPath = Some(toObjectDir(bucketName, key, version, versionId))
     )
   }
