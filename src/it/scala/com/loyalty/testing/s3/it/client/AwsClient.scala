@@ -125,12 +125,12 @@ class AwsClient(override protected val awsSettings: AwsSettings)
       .map {
         response =>
           data.ObjectInfo(
-            bucketName,
-            key,
-            Option(response.eTag().parseEtag),
-            response.contentLength(),
-            ObjectStatus.Active,
-            Option(response.versionId())
+            bucketName = bucketName,
+            key = key,
+            eTag = Option(response.eTag().parseEtag),
+            contentLength = response.contentLength(),
+            status = ObjectStatus.Active,
+            versionId = Option(response.versionId())
           )
       }
   }

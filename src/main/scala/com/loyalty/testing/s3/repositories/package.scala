@@ -9,6 +9,7 @@ import com.loyalty.testing.s3.notification.{DestinationType, Notification, Notif
 import org.dizitart.no2.{Cursor, Document}
 
 import scala.jdk.CollectionConverters._
+import scala.util.Try
 
 package object repositories {
 
@@ -29,10 +30,13 @@ package object repositories {
   val ETagField = "etag"
   val ContentMd5Field = "content-md5"
   val ContentLengthField = "content-length"
+  val RangeStartField = "range-start"
+  val RangeEndField = "range-end"
   val VersionIndexField = "version-index"
   val VersionIdField = "version-id"
   val UploadIdField = "upload-id"
   val PartNumberField = "part-number"
+  val PartsCountField = "parts-count"
   val NonVersionId: UUID => String = objectId => createVersionId(objectId, 0)
   val ContentFileName = "content"
 
@@ -53,7 +57,11 @@ package object repositories {
 
     def getLong(key: String): Long = src.get(key, classOf[lang.Long]).toLong
 
+    def getOptionalLong(key: String): Option[Long] = Try(getOptionalString(key).map(_.toLong)).toOption.flatten
+
     def getInt(key: String): Int = src.get(key, classOf[lang.Integer]).toInt
+
+    def getOptionalInt(key: String): Option[Int] = Try(getOptionalString(key).map(_.toInt)).toOption.flatten
 
     def getBoolean(key: String): Boolean = src.get(key, classOf[Boolean])
 

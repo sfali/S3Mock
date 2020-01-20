@@ -1,5 +1,6 @@
 package com.loyalty.testing.s3
 
+import akka.http.scaladsl.model.headers.ByteRange
 import com.loyalty.testing.s3.notification.Notification
 import com.loyalty.testing.s3.repositories.model.{ObjectKey, ObjectStatus}
 
@@ -17,7 +18,9 @@ package object data {
                         eTag: Option[String],
                         contentLength: Long,
                         status: ObjectStatus,
-                        versionId: Option[String] = None)
+                        partsCount: Option[Int],
+                        versionId: Option[String] = None,
+                        contentRange: Option[ByteRange.Slice] = None)
 
   object ObjectInfo {
     def apply(bucketName: String,
@@ -25,12 +28,14 @@ package object data {
               eTag: Option[String] = None,
               contentLength: Long = 0L,
               status: ObjectStatus = ObjectStatus.Active,
-              versionId: Option[String] = None): ObjectInfo =
-      new ObjectInfo(bucketName, key, eTag, contentLength, status, versionId)
+              partsCount: Option[Int] = None,
+              versionId: Option[String] = None,
+              contentRange: Option[ByteRange.Slice] = None): ObjectInfo =
+      new ObjectInfo(bucketName, key, eTag, contentLength, status, partsCount, versionId, contentRange)
 
     def apply(objectKey: ObjectKey): ObjectInfo =
       ObjectInfo(objectKey.bucketName, objectKey.key, objectKey.eTag, objectKey.contentLength, objectKey.status,
-        objectKey.actualVersionId)
+        objectKey.partsCount, objectKey.actualVersionId, objectKey.contentRange)
   }
 
 }

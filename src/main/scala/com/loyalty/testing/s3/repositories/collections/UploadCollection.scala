@@ -44,6 +44,8 @@ class UploadCollection(db: Nitrite, staging: Boolean) {
             .put(ContentMd5Field, uploadInfo.contentMd5)
             .put(ContentLengthField, uploadInfo.contentLength)
             .put(PathField, uploadInfo.uploadPath.toString)
+            .put(RangeStartField, uploadInfo.contentRange.first)
+            .put(RangeEndField, uploadInfo.contentRange.last)
         case document :: Nil =>
           val other = UploadInfo(document)
           if (other != uploadInfo) {
@@ -73,7 +75,7 @@ class UploadCollection(db: Nitrite, staging: Boolean) {
   private[repositories] def findAll: List[UploadInfo] = collection.find().toScalaList.map(UploadInfo(_))
 
   private[repositories] def findAll(uploadId: String): List[Document] =
-    collection.find(feq(UploadIdField, uploadId)).toScalaList
+    collection.find(feq(UploadIdField, uploadId), FindOptions.sort(PartNumberField, SortOrder.Ascending)).toScalaList
 
   private[repositories] def insert(elements: Document*): Int =
     collection.insert(elements.asJava.toArray(Array.ofDim[Document](elements.size))).getAffectedCount

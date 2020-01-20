@@ -2,6 +2,7 @@ package com.loyalty.testing.s3.it
 
 import java.nio.file._
 import java.time.{Instant, OffsetDateTime}
+import java.util.UUID
 import java.util.concurrent.CompletionException
 
 import akka.Done
@@ -243,8 +244,8 @@ abstract class S3IntegrationSpec(resourceBasename: String)
 
   it should "get NoSuchKey when getObject is called on a bucket which does not have versioning on but version id provided" in {
     val key = "sample.txt"
-    val ex = s3Client.getObject(defaultBucketName, key, Some(NonVersionId(createObjectId(defaultBucketName, key)))).failed.futureValue
-    extractErrorResponse(ex) mustEqual AwsError(404, "The resource you requested does not exist", "NoSuchKey")
+    val ex = s3Client.getObject(defaultBucketName, key, Some(UUID.randomUUID().toString)).failed.futureValue
+    extractErrorResponse(ex) mustEqual AwsError(404, "The specified version does not exist", "NoSuchVersion")
   }
 
   it should "create different buckets" in {
@@ -398,7 +399,7 @@ abstract class S3IntegrationSpec(resourceBasename: String)
               Try(code.take(3).toInt) match {
                 case Failure(_) =>
                   code match {
-                    case "NoSuchBucket" | "NoSuchKey" => 404
+                    case "NoSuchBucket" | "NoSuchKey" | "NoSuchVersion" => 404
                     case _ => -1
                   }
                 case Success(value) => value

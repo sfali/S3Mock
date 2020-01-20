@@ -51,6 +51,7 @@ class ObjectCollection(db: Nitrite)(implicit dateTimeProvider: DateTimeProvider)
       .put(UploadIdField, objectKey.uploadId.orNull)
       .put(PathField, objectKey.objectPath.orNull)
       .put(StatusField, status.entryName)
+      .put(PartsCountField, objectKey.partsCount.orNull)
 
     Try(collection.update(updatedDocument, true)) match {
       case Failure(ex) =>

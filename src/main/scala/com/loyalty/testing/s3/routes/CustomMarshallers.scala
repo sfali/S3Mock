@@ -49,6 +49,12 @@ trait CustomMarshallers
         NoSuchKeyResponse(bucketName, key)
     }
 
+  implicit val NoSuchVersionUnmarshaller: FromEntityUnmarshaller[NoSuchVersionResponse] =
+    nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
+      case NodeSeq.Empty => throw Unmarshaller.NoContentException
+      case x => NoSuchVersionResponse(x)
+    }
+
   implicit val CopyObjectResultUnmarshaller: FromEntityUnmarshaller[CopyObjectResult] =
     nodeSeqUnmarshaller(MediaTypes.`application/xml`, `application/octet-stream`) map {
       case NodeSeq.Empty => throw Unmarshaller.NoContentException
@@ -138,10 +144,16 @@ trait CustomMarshallers
   implicit val NoSuchKeyMarshallers: ToEntityMarshaller[NoSuchKeyResponse] =
     xmlResponseMarshallers(`application/octet-stream`)
 
+  implicit val NoSuchVersionMarshallers: ToEntityMarshaller[NoSuchVersionResponse] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
   implicit val NoSuchUploadMarshallers: ToEntityMarshaller[NoSuchUploadResponse] =
     xmlResponseMarshallers(`application/octet-stream`)
 
   implicit val InvalidPartMarshallers: ToEntityMarshaller[InvalidPartResponse] =
+    xmlResponseMarshallers(`application/octet-stream`)
+
+  implicit val InvalidPartNumberMarshallers: ToEntityMarshaller[InvalidPartNumberResponse] =
     xmlResponseMarshallers(`application/octet-stream`)
 
   implicit val InvalidPartOrderMarshallers: ToEntityMarshaller[InvalidPartOrderResponse] =
@@ -181,6 +193,9 @@ trait CustomMarshallers
   implicit val NoSuchKeyResponseMarshaller: ToResponseMarshaller[NoSuchKeyResponse] =
     fromToEntityMarshaller[NoSuchKeyResponse](NotFound)
 
+  implicit val NoSuchVersionResponseMarshaller: ToResponseMarshaller[NoSuchVersionResponse] =
+    fromToEntityMarshaller[NoSuchVersionResponse](NotFound)
+
   implicit val NoSuchUploadResponseMarshaller: ToResponseMarshaller[NoSuchUploadResponse] =
     fromToEntityMarshaller[NoSuchUploadResponse](NotFound)
 
@@ -189,6 +204,9 @@ trait CustomMarshallers
 
   implicit val InvalidPartResponseMarshaller: ToResponseMarshaller[InvalidPartResponse] =
     fromToEntityMarshaller[InvalidPartResponse](BadRequest)
+
+  implicit val InvalidPartNumberResponseMarshaller: ToResponseMarshaller[InvalidPartNumberResponse] =
+    fromToEntityMarshaller[InvalidPartNumberResponse](BadRequest)
 
   implicit val ListBucketResultResponse: ToResponseMarshaller[ListBucketResult] =
     fromToEntityMarshaller[ListBucketResult](OK)

@@ -36,6 +36,14 @@ package object test {
       }
       .map(ByteString(_))
 
+  def getContentSource(start: Int, totalSize: Int)(implicit mat: Materializer): Future[String] =
+    getContentSource(createContentSource(start, totalSize))
+
+  def getContentSource(source: Source[ByteString, _])(implicit mat: Materializer): Future[String] = {
+    import mat.executionContext
+    source.map(_.utf8String).runWith(Sink.seq).map(_.mkString(""))
+  }
+
   def calculateDigest(start: Int, totalSize: Int)
                      (implicit mat: Materializer): Future[DigestInfo] =
     calculateDigest(createContentSource(start, totalSize))
